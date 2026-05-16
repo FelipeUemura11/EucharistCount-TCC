@@ -1,0 +1,16 @@
+:root {
+  --primary: #6b6375;
+  --secondary: #08060d;
+  --tertiary: #fff;
+  --text: #171717;
+  --white: #fff;
+  --black: #000;
+}
+
+body {
+  background: var(--white);
+  color: var(--text);
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
