@@ -1,16 +1,26 @@
+/* ESTILOS GLOBAIS */
+
 :root {
-  --primary: #6b6375;
-  --secondary: #08060d;
-  --tertiary: #fff;
+  --primary: #5E3D1F;
+  --secondary: #A1866D;
+  --tertiary: #422b16;
   --text: #171717;
   --white: #fff;
   --black: #000;
 }
 
-body {
-  background: var(--white);
-  color: var(--text);
+*{
+  font-family: 'Poppins', sans-serif;
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
+
+body {
+  background: var(--white);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+button { cursor: pointer; font-family: inherit; }
+ul { list-style: none; }
