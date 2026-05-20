@@ -1,6 +1,6 @@
 export function Settings() {
     return (
-        <div className="settings">
+        <div>
             <h1>Configurações</h1>
         </div>
     )

@@ -1,26 +1,39 @@
+@import "tailwindcss";
+
 /* ESTILOS GLOBAIS */
 
-:root {
-  --primary: #5E3D1F;
-  --secondary: #A1866D;
-  --tertiary: #422b16;
-  --text: #171717;
-  --white: #fff;
-  --black: #000;
-}
+@theme {
+  --color-primary: #5E3D1F;
+  --color-secondary: #A1866D;
+  --color-tertiary: #352312;
+  --color-app-bg: #f8fafc;
+  --color-text-dark: #171717;
+  --color-text-muted: #6b7280;
+  --color-text-light: #9ca3af;
+  --color-border: #e2e8f0;
+  --color-border-light: #f1f5f9;
 
-*{
-  font-family: 'Poppins', sans-serif;
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+  --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
 body {
-  background: var(--white);
-  color: var(--text);
+  font-family: var(--font-sans);
+  background: var(--color-app-bg);
+  color: var(--color-text-dark);
   min-height: 100vh;
+  line-height: 1.5;
 }
 
-button { cursor: pointer; font-family: inherit; }
-ul { list-style: none; }
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+ul {
+  list-style: none;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}

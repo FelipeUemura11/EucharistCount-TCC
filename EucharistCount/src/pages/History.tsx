@@ -1,6 +1,6 @@
 export function History() {
     return (
-        <div className="history">
+        <div>
             <h1>Histórico</h1>
         </div>
     )

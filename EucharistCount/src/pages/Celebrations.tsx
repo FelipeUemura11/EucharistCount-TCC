@@ -1,6 +1,6 @@
 export function Celebrations(){
     return (
-        <div className="celebrations">
+        <div>
             <h1>Celebrações</h1>
         </div>
     )
