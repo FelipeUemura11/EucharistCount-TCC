@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
-import { Sidebar } from './components/Sidebar'
-import { Dashboard } from './pages/Dashboard'
-import { Celebrations } from './pages/Celebrations'
-import { History } from './pages/History'
-import { Settings } from './pages/Settings'
+import Sidebar from './components/Sidebar'
+import Dashboard from './pages/Dashboard'
+import Celebrations from './pages/Celebrations'
+import History from './pages/History'
+import Settings from './pages/Settings'
 
 const pages: Record<string, ReactElement> = {
   dashboard: <Dashboard />,

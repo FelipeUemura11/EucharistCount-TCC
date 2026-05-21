@@ -14,7 +14,7 @@ interface SidebarProps {
   onNavigate: (id: string) => void;
 }
 
-export function Sidebar({ active, onNavigate }: SidebarProps) {
+export default function Sidebar({ active, onNavigate }: SidebarProps) {
   return (
     <aside className="bg-linear-to-b from-tertiary to-primary text-white flex w-70 flex-col fixed top-0 left-0 bottom-0 z-100 border-r border-white/10 shadow-[0_0_10px_rgba(0,0,0,0.5)] overflow-y-auto">
       <div className="px-5 py-6 flex items-center gap-3.5 border-b border-white/10">
