@@ -238,7 +238,7 @@ pip install -r requirements.txt
 Executar o backend:
 
 ```bash
-python app/main.py
+python app/mainCPU.py
 ```
 
 ### 3. Configurar o Frontend

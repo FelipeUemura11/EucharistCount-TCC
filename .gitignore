@@ -427,3 +427,16 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Python venvs
+venv/
+.venv/
+
+# Model artifacts
+*.pt
+*.onnx
+*.engine
+yolov5nu_openvino_model/
+
+# Runtime logs
+*.log
