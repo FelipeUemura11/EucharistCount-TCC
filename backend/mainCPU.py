@@ -8,7 +8,7 @@ from deep_sort_realtime.deepsort_tracker import DeepSort
 # =========================
 # Main config
 # =========================
-VIDEO_PATH = "videos/video_teste.mp4"
+VIDEO_PATH = "videos/escalator.mp4"
 
 # Target FPS for display/processing
 TARGET_FPS = 10
@@ -16,17 +16,16 @@ TARGET_FPS = 10
 # Display scale to fit screen (no effect on detection)
 DISPLAY_SCALE = 0.6
 
-# Default line positions by depth (ratios of frame height)
-# Default line positions by depth (ratios of frame height)
-LINE1_Y_RATIO = 0.50  # Linha 1 (Ciano) - Lá no topo da escada (25% da tela)
-LINE2_Y_RATIO = 0.65  # Linha 2 (Verde) - Catraca, bem no meio da tela (55%)
-LINE3_Y_RATIO = 0.80  # Linha 3 (Laranja) - Fim da escada, lá embaixo (85%)
+# Default vertical line positions (ratios of frame width)
+LINE1_X_RATIO = 0.35  # Linha 1 (Ciano) - esquerda
+LINE2_X_RATIO = 0.50  # Linha 2 (Verde) - centro
+LINE3_X_RATIO = 0.65  # Linha 3 (Laranja) - direita
 
-# Line widths by depth (ratios of frame width)
-LINE12_X_MIN_RATIO = 0.05
-LINE12_X_MAX_RATIO = 0.99
-LINE3_X_MIN_RATIO = 0.05
-LINE3_X_MAX_RATIO = 0.99
+# Line heights (ratios of frame height)
+LINE12_Y_MIN_RATIO = 0.05
+LINE12_Y_MAX_RATIO = 0.99
+LINE3_Y_MIN_RATIO = 0.05
+LINE3_Y_MAX_RATIO = 0.99
 
 LINE_COLOR_1 = (255, 200, 0)  # cyan-like for Line 1
 LINE_COLOR_2 = (0, 255, 0)  # green for Line 2
@@ -56,7 +55,7 @@ DRAW_YOLO_DEBUG = False
 
 # Drag behavior
 DRAG_TOLERANCE_PX = 12
-L3_MIN_WIDTH_PX = 40
+L3_MIN_HEIGHT_PX = 40
 
 
 # =========================
@@ -119,19 +118,19 @@ def main():
     h, w = frame.shape[:2]
 
     # Default line positions (ratios)
-    line1_y = int(h * LINE1_Y_RATIO)
-    line2_y = int(h * LINE2_Y_RATIO)
-    line3_y = int(h * LINE3_Y_RATIO)
+    line1_x = int(w * LINE1_X_RATIO)
+    line2_x = int(w * LINE2_X_RATIO)
+    line3_x = int(w * LINE3_X_RATIO)
 
-    line12_x1 = int(w * LINE12_X_MIN_RATIO)
-    line12_x2 = int(w * LINE12_X_MAX_RATIO)
-    line3_x1 = int(w * LINE3_X_MIN_RATIO)
-    line3_x2 = int(w * LINE3_X_MAX_RATIO)
+    line12_y1 = int(h * LINE12_Y_MIN_RATIO)
+    line12_y2 = int(h * LINE12_Y_MAX_RATIO)
+    line3_y1 = int(h * LINE3_Y_MIN_RATIO)
+    line3_y2 = int(h * LINE3_Y_MAX_RATIO)
 
     lines = [
-        ((line12_x1, line1_y), (line12_x2, line1_y)),
-        ((line12_x1, line2_y), (line12_x2, line2_y)),
-        ((line3_x1, line3_y), (line3_x2, line3_y)),
+        ((line1_x, line12_y1), (line1_x, line12_y2)),
+        ((line2_x, line12_y1), (line2_x, line12_y2)),
+        ((line3_x, line3_y1), (line3_x, line3_y2)),
     ]
 
     # Setup window
@@ -153,41 +152,41 @@ def main():
 
     def on_mouse(event, x, y, flags, param):
         nonlocal dragging_line, dragging_mode, drag_start
-        nonlocal line1_y, line2_y, line3_y, line3_x1, line3_x2
+        nonlocal line1_x, line2_x, line3_x, line3_y1, line3_y2
 
         fx, fy = to_frame_coords(x, y)
 
         if event == cv2.EVENT_LBUTTONDOWN:
             candidates = [
-                (0, line1_y),
-                (1, line2_y),
-                (2, line3_y),
+                (0, line1_x),
+                (1, line2_x),
+                (2, line3_x),
             ]
-            for idx, ly in candidates:
-                if near_line(fy, ly, DRAG_TOLERANCE_PX):
+            for idx, lx in candidates:
+                if near_line(fx, lx, DRAG_TOLERANCE_PX):
                     dragging_line = idx
                     if idx == 2 and (flags & cv2.EVENT_FLAG_SHIFTKEY):
-                        dragging_mode = "width"
-                        drag_start = fx
-                    else:
-                        dragging_mode = "y"
+                        dragging_mode = "height"
                         drag_start = fy
+                    else:
+                        dragging_mode = "x"
+                        drag_start = fx
                     return
 
         if event == cv2.EVENT_MOUSEMOVE and dragging_line is not None:
-            if dragging_mode == "y":
+            if dragging_mode == "x":
                 if dragging_line == 0:
-                    line1_y = clamp(fy, 0, h - 1)
+                    line1_x = clamp(fx, 0, w - 1)
                 elif dragging_line == 1:
-                    line2_y = clamp(fy, 0, h - 1)
+                    line2_x = clamp(fx, 0, w - 1)
                 elif dragging_line == 2:
-                    line3_y = clamp(fy, 0, h - 1)
-            elif dragging_mode == "width" and dragging_line == 2:
-                center = (line3_x1 + line3_x2) // 2
-                half = abs(fx - center)
-                half = max(half, L3_MIN_WIDTH_PX // 2)
-                line3_x1 = clamp(center - half, 0, w - 1)
-                line3_x2 = clamp(center + half, 0, w - 1)
+                    line3_x = clamp(fx, 0, w - 1)
+            elif dragging_mode == "height" and dragging_line == 2:
+                center = (line3_y1 + line3_y2) // 2
+                half = abs(fy - center)
+                half = max(half, L3_MIN_HEIGHT_PX // 2)
+                line3_y1 = clamp(center - half, 0, h - 1)
+                line3_y2 = clamp(center + half, 0, h - 1)
 
         if event == cv2.EVENT_LBUTTONUP:
             dragging_line = None
@@ -229,9 +228,9 @@ def main():
             continue
 
         lines = [
-            ((line12_x1, line1_y), (line12_x2, line1_y)),
-            ((line12_x1, line2_y), (line12_x2, line2_y)),
-            ((line3_x1, line3_y), (line3_x2, line3_y)),
+            ((line1_x, line12_y1), (line1_x, line12_y2)),
+            ((line2_x, line12_y1), (line2_x, line12_y2)),
+            ((line3_x, line3_y1), (line3_x, line3_y2)),
         ]
 
         now = time.time()
@@ -352,7 +351,7 @@ def main():
             cv2.line(frame, p1, p2, color, 2)
 
         # Textos informativos no ecrã
-        cv2.putText(frame, "Arraste L1/L2/L3 para mover | SHIFT+arraste em L3 muda largura",
+        cv2.putText(frame, "Arraste L1/L2/L3 para mover | SHIFT+arraste em L3 muda altura",
                     (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
         cv2.putText(frame, f"Entradas: {entradas}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
