@@ -2,17 +2,13 @@ from ultralytics import YOLO
 
 
 def main():
-    print("Carregando o modelo YOLOv5 Nano original (PyTorch)...")
-    model = YOLO("yolov5nu.pt")
+    print("Carregando o modelo YOLOv5n (PyTorch)...")
+    model = YOLO("yolov5n.pt")
 
-    print("\nIniciando a conversão para TensorRT (isso pode levar alguns minutos)...")
-    print("Atenção: A tela pode piscar ou o PC dar uma leve travada. É a GPU trabalhando!")
+    print("\nExportando para ONNX (GPU/FP16)...")
+    model.export(format="onnx", imgsz=640, half=True, device=0)
 
-    # Exporta para .engine usando a GPU (device=0) e precisão otimizada (half=True)
-    model.export(format="engine", imgsz=640, half=True, device=0)
-
-    print("\nSUCESSO! O arquivo 'yolov5nu.engine' foi forjado para esta placa de vídeo.")
-
+    print("\nSUCESSO! Arquivo 'yolov5n.onnx' gerado.")
 
 if __name__ == "__main__":
     main()

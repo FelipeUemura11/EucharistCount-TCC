@@ -1,3 +1,11 @@
+# TODO (benchmark):
+# 1) Exportar ONNX para v5n, v5s, v5m (imgsz=640) e comparar FPS/qualidade.
+# 2) Medir FPS real (sem frameskip) por 60s no video da escada.
+# 3) Checar taxa de ID switch e double-count perto das linhas.
+# 4) Testar ajustes de tracker: max_age, n_init, max_iou_distance, max_cosine_distance, nms_max_overlap.
+# 5) Registrar resultados em tabela simples (modelo, imgsz, FPS, erros de contagem).
+
+
 import cv2
 import time
 from collections import deque
@@ -8,9 +16,9 @@ from deep_sort_realtime.deepsort_tracker import DeepSort
 # =========================
 # Main config
 # =========================
-VIDEO_PATH = "videos/video_teste.mp4"
+VIDEO_PATH = "videos/escalator.mp4"
 
-# Na GPU com TensorRT rodamos a 30 FPS cravados
+# Na GPU com ONNX rodamos a 30 FPS cravados
 TARGET_FPS = 30
 DISPLAY_SCALE = 0.6
 
@@ -31,19 +39,19 @@ LINE_COLOR_3 = (0, 165, 255)
 LINE_COLOR_FLASH = (0, 255, 0)
 FLASH_FRAMES = 8
 
-# YOLO - OTIMIZADO VIA TENSORRT
-YOLO_MODEL_PATH = "yolov5nu.engine"
+# YOLO - ONNX (GPU)
+YOLO_MODEL_PATH = "yolov5n.onnx"
 PERSON_CLASS_ID = 0
-CONF_THRESHOLD = 0.25
+CONF_THRESHOLD = 0.35
 IMG_SIZE = 640
 
 # Performance: Sem frame skip
 DETECT_EVERY_N = 1
 
 # DeepSORT: Padrão de alta precisão
-MAX_AGE = 30
-N_INIT = 3
-NN_BUDGET = 50
+MAX_AGE = 60
+N_INIT = 5
+NN_BUDGET = 100
 
 # Trava de dupla contagem
 LOCK_FRAMES = 30
@@ -52,7 +60,6 @@ DRAW_YOLO_DEBUG = False
 # Drag behavior
 DRAG_TOLERANCE_PX = 12
 L3_MIN_HEIGHT_PX = 40
-
 
 # =========================
 # Utils
@@ -86,13 +93,18 @@ def main():
         print(f"Erro ao abrir o video: {VIDEO_PATH}")
         return
 
-    # Inicializa o YOLO com o motor TensorRT
+    # Inicializa o YOLO com ONNX (GPU via onnxruntime-gpu)
     model = YOLO(YOLO_MODEL_PATH, task="detect")
 
+    # Tracker
     tracker = DeepSort(
-        max_age=MAX_AGE,
-        n_init=N_INIT,
-        nn_budget=NN_BUDGET,
+        max_age=60,            # segura o ID mais tempo
+        n_init=3,              # confirma mais rapido
+        nn_budget=100,
+        max_iou_distance=0.7,  # associa mesmo com box menos precisa
+        max_cosine_distance=0.2,  # associa mesmo com aparencia mais “ruim”
+        nms_max_overlap=0.5,   # corta duplicadas dentro do tracker
+        gating_only_position=False,  # ajuda em top-down lotado
     )
 
     ret, frame = cap.read()
@@ -100,6 +112,10 @@ def main():
         return
 
     h, w = frame.shape[:2]
+    frame_area = w * h
+    min_area = frame_area * 0.002
+    max_area = frame_area * 0.25
+
     line1_x = int(w * LINE1_X_RATIO)
     line2_x = int(w * LINE2_X_RATIO)
     line3_x = int(w * LINE3_X_RATIO)
@@ -115,7 +131,7 @@ def main():
         ((line3_x, line3_y1), (line3_x, line3_y2)),
     ]
 
-    window_name = "Fluxo Humano - TensorRT GPU"
+    window_name = "Fluxo Humano - ONNX GPU"
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     display_w = int(w * DISPLAY_SCALE)
     display_h = int(h * DISPLAY_SCALE)
@@ -175,11 +191,14 @@ def main():
     last_intent = {}
     count_lock = {}
     flash_counters = [0, 0, 0]
+    last_intent_frame = {}
 
     prev_time = time.time()
     fps_window = deque(maxlen=30)
     frame_id = 0
     start_time = time.time()
+
+    INTENT_TTL_FRAMES = 10
 
     while True:
         ret, frame = cap.read()
@@ -206,9 +225,12 @@ def main():
             frame,
             verbose=False,
             conf=CONF_THRESHOLD,
+            iou = 0.6,
             imgsz=IMG_SIZE,
             device=0,
             classes=[PERSON_CLASS_ID],
+            agnostic_nms=True,
+            max_det=50,
         )
 
         for r in results:
@@ -216,6 +238,10 @@ def main():
                 x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
                 conf = float(box.conf[0])
                 w_box, h_box = x2 - x1, y2 - y1
+                area = w_box * h_box
+                aspect = w_box / max(h_box, 1e-6)
+                if not (min_area <= area <= max_area and 0.25 <= aspect <= 1.6):
+                    continue
                 detections.append(([x1, y1, w_box, h_box], conf, "person"))
 
                 if DRAW_YOLO_DEBUG:
@@ -252,6 +278,7 @@ def main():
                 if prev_side * curr_side < 0:
                     flash_counters[i] = FLASH_FRAMES
                     last_intent[track_id] = i
+                    last_intent_frame[track_id] = frame_id
 
             i = 1
             prev_side_gate = prev_line_sides[track_id][i]
@@ -261,19 +288,23 @@ def main():
 
             if prev_side_gate * curr_side_gate < 0:
                 flash_counters[i] = FLASH_FRAMES
+                intent = last_intent.get(track_id)
+                intent_frame = last_intent_frame.get(track_id, -9999)
+
+                if intent is None or (frame_id - intent_frame) > INTENT_TTL_FRAMES:
+                    # intent velho/inexistente -> ignora esse cruzamento
+                    continue
+
                 if frame_id >= count_lock.get(track_id, 0):
-                    intent = last_intent.get(track_id)
                     if intent == 0:
                         entradas += 1
                         count_lock[track_id] = frame_id + LOCK_FRAMES
                         last_intent[track_id] = None
-                        timestamp = time.time() - start_time
                         print(f"[GPU] ID {track_id} ENTROU. Saldo: {entradas}")
                     elif intent == 2:
                         saidas += 1
                         count_lock[track_id] = frame_id + LOCK_FRAMES
                         last_intent[track_id] = None
-                        timestamp = time.time() - start_time
                         print(f"[GPU] ID {track_id} SAIU. Saldo: {saidas}")
 
             prev_line_sides[track_id] = curr_sides
@@ -317,7 +348,7 @@ def main():
         )
         cv2.putText(
             frame,
-            f"FPS (TensorRT): {fps:.1f}",
+            f"FPS (ONNX GPU): {fps:.1f}",
             (10, 90),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.8,
