@@ -1,7 +1,10 @@
+import PagePlaceholder from '../components/layout/PagePlaceholder'
+
 export default function History() {
     return (
-        <div>
-            <h1>Histórico</h1>
-        </div>
+        <PagePlaceholder
+            title="Histórico"
+            description="Página reservada para consultas de ocupação, entradas, saídas e snapshots das celebrações anteriores."
+        />
     )
 }

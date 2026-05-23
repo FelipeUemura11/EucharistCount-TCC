@@ -36,26 +36,30 @@ export default function StatCard({
   progress,
   maxValue
 }: StatCardProps) {
+  const progressPercent = progress !== undefined && maxValue
+    ? Math.min(Math.max((progress / maxValue) * 100, 0), 100)
+    : 0;
+
   return (
-    <div className="bg-white rounded-2xl p-6 flex items-start gap-4 shadow-sm border border-app-bg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-      <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${iconBg[color]}`}>
+    <div className="bg-white rounded-lg p-6 flex items-start gap-4 shadow-sm border border-border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+      <div className={`w-14 h-14 rounded-lg flex items-center justify-center shrink-0 ${iconBg[color]}`}>
         <Icon size={28} />
       </div>
       
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-semibold text-text-muted mb-1.5 uppercase">{title}</p>
-        <p className="text-[32px] font-extrabold text-dark leading-none m-0">{value}</p>
+        <p className="text-[32px] font-extrabold text-text-dark leading-none m-0">{value}</p>
         
         {type === 'progress' && progress !== undefined && maxValue !== undefined && (
           <div className="mt-3 flex items-center gap-2.5">
             <div className="flex-1 h-2 bg-app-bg rounded-full overflow-hidden">
               <div 
                 className={`h-full rounded-full bg-linear-to-r transition-all duration-300 ${progressGradient[color]}`}
-                style={{ width: `${(progress / maxValue) * 100}%` }}
+                style={{ width: `${progressPercent}%` }}
               />
             </div>
             <span className="text-[13px] font-bold text-text-muted min-w-10 text-right">
-              {Math.round((progress / maxValue) * 100)}%
+              {Math.round(progressPercent)}%
             </span>
           </div>
         )}

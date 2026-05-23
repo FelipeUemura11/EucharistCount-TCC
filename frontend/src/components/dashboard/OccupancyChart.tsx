@@ -8,11 +8,7 @@ import {
   ResponsiveContainer,
   ReferenceLine
 } from 'recharts';
-
-interface OccupancyDataPoint {
-  time: string;
-  value: number;
-}
+import type { OccupancyDataPoint } from '../../types/dashboard';
 
 interface OccupancyChartProps {
   data: OccupancyDataPoint[];
@@ -34,14 +30,16 @@ export default function OccupancyChart({
   maxCapacity = 300,
   currentValue = 184
 }: OccupancyChartProps) {
+  const capacityTicks = Array.from({ length: 5 }, (_, index) => Math.round((maxCapacity / 4) * index));
+
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-border">
+    <div className="bg-white rounded-lg p-6 shadow-sm border border-border">
       <div className="flex justify-between items-start mb-5">
         <div>
           <h3 className="text-base font-bold text-text-dark m-0 mb-1">Evolução da ocupação</h3>
           <p className="text-[13px] text-text-muted m-0">Monitoramento em tempo real</p>
         </div>
-        <div className="flex items-baseline gap-1 bg-primary/20 px-4 py-2 rounded-xl">
+        <div className="flex items-baseline gap-1 bg-primary/20 px-4 py-2 rounded-lg">
           <span className="text-xs font-medium text-text-muted">Atual:</span>
           <span className="text-2xl font-extrabold text-primary">{currentValue}</span>
           <span className="text-sm font-semibold text-text-muted">/ {maxCapacity}</span>
@@ -81,7 +79,7 @@ export default function OccupancyChart({
               tickLine={false}
               tick={{ fill: '#9ca3af', fontSize: 12 }}
               dx={-10}
-              ticks={[0, 75, 150, 225, 300]}
+              ticks={capacityTicks}
             />
             
             <Tooltip 

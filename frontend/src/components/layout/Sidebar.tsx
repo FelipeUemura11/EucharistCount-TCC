@@ -1,17 +1,11 @@
-import logo from '../assets/logo.png'
-import logoEucharistCount from '../assets/LogoEucaristCount.png'
-import { CalendarDays, History, Settings, LayoutDashboard, type LucideIcon } from 'lucide-react'
-
-const navItems: { icon: LucideIcon; label: string; id: string }[] = [
-  { icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard' },
-  { icon: CalendarDays, label: 'Celebrações', id: 'celebrations' },
-  { icon: History, label: 'Histórico', id: 'history' },
-  { icon: Settings, label: 'Configurações', id: 'settings' },
-]
+import logo from '../../assets/logo.png'
+import logoEucharistCount from '../../assets/LogoEucaristCount.png'
+import { navigationItems } from '../../app/navigation'
+import type { PageId } from '../../types/navigation'
 
 interface SidebarProps {
-  active: string;
-  onNavigate: (id: string) => void;
+  active: PageId;
+  onNavigate: (id: PageId) => void;
 }
 
 export default function Sidebar({ active, onNavigate }: SidebarProps) {
@@ -29,7 +23,7 @@ export default function Sidebar({ active, onNavigate }: SidebarProps) {
       </div>
 
       <nav className="flex-1 py-4">
-        {navItems.map(item => (
+        {navigationItems.map(item => (
           <button
             key={item.id}
             className={`flex items-center gap-3 w-[calc(100%-24px)] mx-3 my-1 px-4 py-3 border-0 rounded-lg text-sm font-medium text-left cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1 ${
@@ -38,6 +32,7 @@ export default function Sidebar({ active, onNavigate }: SidebarProps) {
                 : 'bg-transparent text-white/70 hover:bg-white/10 hover:text-white'
             }`}
             onClick={() => onNavigate(item.id)}
+            type="button"
           >
             <span className="text-lg w-6 text-center shrink-0">
               <item.icon size={24} />
