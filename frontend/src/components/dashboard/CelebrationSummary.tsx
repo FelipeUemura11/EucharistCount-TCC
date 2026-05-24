@@ -1,4 +1,3 @@
-import { Play, CirclePause } from 'lucide-react'
 import type { CelebrationSummaryItem } from '../../types/dashboard';
 
 interface CelebrationSummaryProps {
@@ -8,10 +7,7 @@ interface CelebrationSummaryProps {
 }
 
 export default function CelebrationSummary({
-  items,
-  onStartCount,
-  onEndCount
-}: CelebrationSummaryProps) {
+  items,}: CelebrationSummaryProps) {
   return (
     <div className="bg-white rounded-lg p-6 shadow-sm border border-border flex flex-col h-full">
       <div className="mb-5">
@@ -30,25 +26,6 @@ export default function CelebrationSummary({
             </li>
           ))}
         </ul>
-      </div>
-      
-      <div className="flex flex-col gap-2.5 mt-5 pt-5 border-t border-app-bg">
-        <button 
-          className="flex items-center justify-center gap-2 px-5 py-3 rounded-lg text-sm font-semibold cursor-pointer transition-all duration-150 border-2 bg-linear-to-br from-blue-500 to-blue-600 text-white border-blue-500 hover:from-blue-600 hover:to-blue-700 hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(59,130,246,0.3)]"
-          onClick={onStartCount}
-          type="button"
-        >
-          <span className="text-xs"><Play /></span>
-          Iniciar contagem
-        </button>
-        <button 
-          className="flex items-center justify-center gap-2 px-5 py-3 rounded-lg text-sm font-semibold cursor-pointer transition-all duration-150 border-2 bg-white text-text-dark border-border hover:bg-app-bg hover:border-text-muted"
-          onClick={onEndCount}
-          type="button"
-        >
-          <span className="text-xs"><CirclePause /></span>
-          Encerrar contagem
-        </button>
       </div>
     </div>
   );
