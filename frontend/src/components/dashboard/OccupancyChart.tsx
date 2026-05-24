@@ -36,7 +36,7 @@ export default function OccupancyChart({
     <div className="bg-white rounded-lg p-6 shadow-sm border border-border">
       <div className="flex justify-between items-start mb-5">
         <div>
-          <h3 className="text-base font-bold text-text-dark m-0 mb-1">Evolução da ocupação</h3>
+          <h3 className="text-3xl font-bold text-text-dark m-0 mb-1">Evolução da ocupação</h3>
           <p className="text-[13px] text-text-muted m-0">Monitoramento em tempo real</p>
         </div>
         <div className="flex items-baseline gap-1 bg-primary/20 px-4 py-2 rounded-lg">
@@ -54,8 +54,8 @@ export default function OccupancyChart({
           >
             <defs>
               <linearGradient id="colorOccupancy" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--color-secondary)" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="var(--color-secondary)" stopOpacity={0} />
               </linearGradient>
             </defs>
             
@@ -99,7 +99,7 @@ export default function OccupancyChart({
               stroke="#ef4444" 
               strokeDasharray="5 5"
               label={{ 
-                value: 'Capacidade máxima', 
+                value: 'Máx', 
                 position: 'right',
                 fill: '#ef4444',
                 fontSize: 11
@@ -109,11 +109,11 @@ export default function OccupancyChart({
             <Area
               type="monotone"
               dataKey="value"
-              stroke="#3b82f6"
+              stroke="var(--color-secondary)"
               strokeWidth={3}
               fill="url(#colorOccupancy)"
-              dot={{ fill: '#3b82f6', strokeWidth: 2, stroke: '#ffffff', r: 4 }}
-              activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2 }}
+              dot={{ fill: 'var(--color-secondary)', strokeWidth: 2, stroke: '#ffffff', r: 4 }}
+              activeDot={{ r: 6, stroke: 'var(--color-secondary)', strokeWidth: 2 }}
             />
           </AreaChart>
         </ResponsiveContainer>
