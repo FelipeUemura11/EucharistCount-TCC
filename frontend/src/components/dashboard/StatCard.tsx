@@ -58,7 +58,7 @@ export default function StatCard({
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <span className="text-[5px] font-semibold text-text-muted min-w-10 text-right">
+            <span className="text-[12px] font-semibold text-text-muted min-w-10 text-right">
               {Math.round(progressPercent)}%
             </span>
           </div>
