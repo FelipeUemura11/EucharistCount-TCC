@@ -29,7 +29,7 @@ const defaultSnapshots: Snapshot[] = [
 
 const defaultStatuses: SystemStatus[] = [
     { label: 'Câmeras', isOnline: true, icon: Cctv },
-    { label: 'Servidor', isOnline: true, icon: Server },
+    { label: 'API Local', isOnline: true, icon: Server },
     { label: 'Banco de dados', isOnline: true, icon: Database },
 ]
 
@@ -78,7 +78,7 @@ export default function ConfigSystem({snapshots = defaultSnapshots, statuses = d
                                         className="flex flex-col items-center justify-center gap-3 border-r border-border-light last:border-r-0"
                                     >
                                     <div
-                                        className={`relative w-14 h-14 rounded-full flex items-center justify-center ${
+                                        className={`relative w-14 h-10 rounded-full flex items-center justify-center ${
                                         status.isOnline
                                             ? 'bg-emerald-50 text-emerald-600'
                                             : 'bg-red-50 text-red-600'

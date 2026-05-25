@@ -1,4 +1,4 @@
-import { Building2, ChartNoAxesCombined, Church, Clock2, DoorOpen, LogIn, LogOut, Users } from 'lucide-react';
+import { Building2, ChartNoAxesCombined, Church, ClockArrowUp, ClockArrowDown, LogIn, LogOut, Users } from 'lucide-react';
 import type { DashboardOverview } from '../types/dashboard';
 
 export const dashboardMock: DashboardOverview = {
@@ -19,10 +19,10 @@ export const dashboardMock: DashboardOverview = {
     { time: '18:50', value: 184 },
   ],
   celebrationSummary: [
-    { icon: Church, label: 'Celebração', value: 'Missa das 19h' },
-    { icon: Clock2, label: 'Início do monitoramento', value: '18:00' },
+    { icon: Church, label: 'Missa Dominical', value: 'Missa das 18h' },
     { icon: ChartNoAxesCombined, label: 'Pico de ocupação', value: '192 pessoas' },
-    { icon: DoorOpen, label: 'Porta monitorada', value: 'Entrada principal' },
+    { icon: ClockArrowUp, label: 'Início do monitoramento', value: '18:00' },
+    { icon: ClockArrowDown, label: 'Fim do monitoramento', value: '19:00' },
   ],
 };
 

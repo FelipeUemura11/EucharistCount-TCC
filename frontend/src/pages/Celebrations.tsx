@@ -3,7 +3,6 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  DoorOpen,
   Plus,
   Users,
   Video,
@@ -20,7 +19,6 @@ interface Celebration {
   startTime: string;
   monitorStart: string;
   monitorEnd: string;
-  door: string;
   expectedPeople: number;
   capacity: number;
   status: CelebrationStatus;
@@ -53,7 +51,6 @@ const selectedDayCelebrations: Celebration[] = [
     startTime: '08:00',
     monitorStart: '07:30',
     monitorEnd: '08:20',
-    door: 'Entrada principal',
     expectedPeople: 120,
     capacity: 300,
     status: 'finished',
@@ -66,7 +63,6 @@ const selectedDayCelebrations: Celebration[] = [
     startTime: '10:00',
     monitorStart: '09:30',
     monitorEnd: '10:20',
-    door: 'Entrada principal',
     expectedPeople: 210,
     capacity: 300,
     status: 'finished',
@@ -79,7 +75,6 @@ const selectedDayCelebrations: Celebration[] = [
     startTime: '19:00',
     monitorStart: '18:30',
     monitorEnd: '19:20',
-    door: 'Entrada principal',
     expectedPeople: 240,
     capacity: 300,
     status: 'scheduled',
@@ -96,7 +91,6 @@ const nextCelebrations: Celebration[] = [
     startTime: '19:30',
     monitorStart: '19:00',
     monitorEnd: '19:50',
-    door: 'Entrada lateral',
     expectedPeople: 90,
     capacity: 180,
     status: 'scheduled',
@@ -109,7 +103,6 @@ const nextCelebrations: Celebration[] = [
     startTime: '10:00',
     monitorStart: '09:30',
     monitorEnd: '10:20',
-    door: 'Entrada principal',
     expectedPeople: 230,
     capacity: 300,
     status: 'scheduled',
@@ -229,10 +222,6 @@ export default function Celebrations() {
                       <Users size={16} />
                       {celebration.expectedPeople}/{celebration.capacity}
                     </span>
-                    <span className="col-span-2 flex items-center gap-2">
-                      <DoorOpen size={16} />
-                      {celebration.door}
-                    </span>
                   </div>
                 </article>
               ))}
@@ -257,7 +246,6 @@ export default function Celebrations() {
                   <th className="py-3 pr-4 font-bold">Dia</th>
                   <th className="py-3 pr-4 font-bold">Horário</th>
                   <th className="py-3 pr-4 font-bold">Monitoramento</th>
-                  <th className="py-3 pr-4 font-bold">Entrada</th>
                   <th className="py-3 font-bold">Capacidade</th>
                 </tr>
               </thead>
@@ -268,7 +256,6 @@ export default function Celebrations() {
                     <td className="py-4 pr-4 text-sm text-text-muted">{celebration.weekday}, {celebration.day}/05</td>
                     <td className="py-4 pr-4 text-sm text-text-dark">{celebration.startTime}</td>
                     <td className="py-4 pr-4 text-sm text-text-muted">{celebration.monitorStart} - {celebration.monitorEnd}</td>
-                    <td className="py-4 pr-4 text-sm text-text-muted">{celebration.door}</td>
                     <td className="py-4 text-sm font-semibold text-text-dark">{celebration.capacity}</td>
                   </tr>
                 ))}
