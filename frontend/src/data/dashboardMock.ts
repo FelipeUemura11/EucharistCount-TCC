@@ -1,14 +1,13 @@
-import { Building2, ChartNoAxesCombined, Church, ClockArrowUp, ClockArrowDown, LogIn, LogOut, Users } from 'lucide-react';
+import { Church, ClockArrowDown, ClockArrowUp, HandHeart, LogIn, LogOut, Users } from 'lucide-react';
 import type { DashboardOverview } from '../types/dashboard';
 
 export const dashboardMock: DashboardOverview = {
   metrics: {
     currentOccupancy: 184,
-    maxCapacity: 300,
+    estimatedCommunicants: 68,
     entries: 207,
     exits: 23,
     isCountingActive: true,
-    lastUpdate: '08:16',
   },
   occupancyData: [
     { time: '18:00', value: 35 },
@@ -20,9 +19,9 @@ export const dashboardMock: DashboardOverview = {
   ],
   celebrationSummary: [
     { icon: Church, label: 'Missa Dominical', value: 'Missa das 18h' },
-    { icon: ChartNoAxesCombined, label: 'Pico de ocupação', value: '192 pessoas' },
-    { icon: ClockArrowUp, label: 'Início do monitoramento', value: '18:00' },
-    { icon: ClockArrowDown, label: 'Fim do monitoramento', value: '19:00' },
+    { icon: ClockArrowUp, label: 'Início do monitoramento', value: '17:30' },
+    { icon: ClockArrowDown  , label: 'Fim do monitoramento', value: '18:30' },
+    { icon: Users, label: 'Pessoas presentes', value: `184 pessoas` },
   ],
 };
 
@@ -31,9 +30,9 @@ export const dashboardMetricCards = {
     title: 'Pessoas presentes',
     icon: Users,
   },
-  capacity: {
-    title: 'Capacidade',
-    icon: Building2,
+  communicants: {
+    title: 'Estimativa para comunhão',
+    icon: HandHeart,
   },
   entries: {
     title: 'Entradas',

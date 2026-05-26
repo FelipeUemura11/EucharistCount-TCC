@@ -1,4 +1,5 @@
 import CelebrationSummary from '../components/dashboard/CelebrationSummary'
+import CommunionEstimate from '../components/dashboard/CommunionEstimate'
 import DashboardStats from '../components/dashboard/DashboardStats'
 import OccupancyChart from '../components/dashboard/OccupancyChart'
 import ConfigSystem from '../components/dashboard/ConfigSystem'
@@ -20,9 +21,8 @@ export default function Dashboard() {
     return (
         <div>
             <PageHeader
-                title={isLoading ? 'Carregando dashboard...' : 'Dashboard de Ocupação'}
+                title={isLoading ? 'Carregando dashboard...' : 'Dashboard da Comunhão'}
                 isActive={metrics.isCountingActive}
-                lastUpdate={metrics.lastUpdate}
             />
             <main className="flex-1 px-8 pt-7 pb-10 flex flex-col gap-6">
                 <DashboardStats metrics={metrics} />
@@ -31,7 +31,6 @@ export default function Dashboard() {
                         <div className="min-w-0">
                         <OccupancyChart 
                             data={occupancyData}
-                            maxCapacity={metrics.maxCapacity}
                             currentValue={metrics.currentOccupancy}
                         />
                         </div>
@@ -44,7 +43,14 @@ export default function Dashboard() {
                         </div>
                     </div>
                 </section>
-                <ConfigSystem/>
+                <div className="grid grid-cols-[1fr_380px] p-2 gap-6 max-[1400px]:grid-cols-[1fr_340px] max-[1200px]:grid-cols-1">
+                    <div className="min-w-0">
+                        <CommunionEstimate metrics={metrics} />
+                    </div>
+                    <div className="min-w-0">
+                        <ConfigSystem />
+                    </div>
+                </div>
             </main>
             
         </div>
