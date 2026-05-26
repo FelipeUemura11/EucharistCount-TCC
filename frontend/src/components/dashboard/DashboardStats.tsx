@@ -9,7 +9,7 @@ interface DashboardStatsProps {
 export default function DashboardStats({ metrics }: DashboardStatsProps) {
   return (
     <section>
-      <div className="mx-auto grid grid-cols-4 gap-5">
+      <div className="mx-auto grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-5">
         <StatCard
           title={dashboardMetricCards.occupancy.title}
           value={metrics.currentOccupancy}
@@ -17,15 +17,8 @@ export default function DashboardStats({ metrics }: DashboardStatsProps) {
           color="secondary"
           type="simple"
         />
-        <StatCard
-          title={dashboardMetricCards.capacity.title}
-          value={`${metrics.currentOccupancy} / ${metrics.maxCapacity}`}
-          icon={dashboardMetricCards.capacity.icon}
-          color="secondary"
-          type="progress"
-          progress={metrics.currentOccupancy}
-          maxValue={metrics.maxCapacity}
-        />
+       
+        
         <StatCard
           title={dashboardMetricCards.entries.title}
           value={metrics.entries}

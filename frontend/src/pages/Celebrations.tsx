@@ -124,7 +124,7 @@ const statusLabel: Record<CelebrationStatus, string> = {
 export default function Celebrations() {
   return (
     <div>
-      <PageHeader title="Celebrações" isActive={false} lastUpdate="--:--" showStatus={false} />
+      <PageHeader title="Celebrações" isActive={false} />
 
       <main className="flex-1 px-8 pt-7 pb-10">
         <div className="mb-6 flex items-center justify-between gap-4">

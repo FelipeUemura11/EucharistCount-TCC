@@ -13,11 +13,10 @@ export interface CelebrationSummaryItem {
 
 export interface DashboardMetrics {
   currentOccupancy: number;
-  maxCapacity: number;
+  estimatedCommunicants: number;
   entries: number;
   exits: number;
   isCountingActive: boolean;
-  lastUpdate: string;
 }
 
 export interface DashboardOverview {

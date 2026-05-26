@@ -1,13 +1,10 @@
-import { ClockCheck } from 'lucide-react'
-
 interface HeaderProps {
     title: string
     isActive: boolean
-    lastUpdate: string
     showStatus?: boolean
 }
 
-export default function PageHeader({ title, isActive, lastUpdate, showStatus = true }: HeaderProps){   
+export default function PageHeader({ title, isActive, showStatus = true }: HeaderProps){   
     return (
         <header className="bg-white px-8 py-5 flex items-center justify-between border-b border-text-dark/10 sticky top-0 z-50">
             <div className="flex items-center gap-4">
@@ -21,11 +18,6 @@ export default function PageHeader({ title, isActive, lastUpdate, showStatus = t
                         <span>
                             {isActive ? 'Contagem ativa' : 'Contagem inativa'}
                         </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-1.5 text-sm text-text-muted">
-                        <ClockCheck size={16} />
-                        <span className="font-medium">Última atualização: {lastUpdate}</span>
                     </div>
                 </div>
             )}

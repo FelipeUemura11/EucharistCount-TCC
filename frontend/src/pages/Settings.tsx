@@ -51,7 +51,7 @@ export default function Settings() {
 
   return (
     <div>
-      <PageHeader title="Configurações" isActive={false} lastUpdate="--:--" showStatus={false} />
+      <PageHeader title="Configurações" isActive={false} />
 
       <main className="flex-1 px-8 pt-7 pb-10 max-[640px]:px-4">
         <section className="mb-6 rounded-lg border border-border bg-white p-6 shadow-sm">
