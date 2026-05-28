@@ -177,7 +177,7 @@ export default function Celebrations() {
                   key={`${item.day ?? 'blank'}-${index}`}
                   type="button"
                   disabled={!item.day}
-                  className={`relative flex aspect-square min-h-14 items-center justify-center rounded-lg border text-sm font-bold transition ${
+                  className={`relative flex aspect-square min-h-0 items-center justify-center rounded-lg border text-sm font-bold transition ${
                     !item.day
                       ? 'cursor-default border-transparent bg-transparent'
                       : item.isSelected

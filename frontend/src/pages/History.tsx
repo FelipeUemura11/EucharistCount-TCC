@@ -124,16 +124,25 @@ export default function History() {
             </div>
 
             <div className="max-w-full overflow-x-auto rounded-xl">
-              <table className="w-full border-collapse text-left">
+              <table className="w-full min-w-245 table-fixed border-collapse">
+                <colgroup>
+                  <col className="w-[13%]" />
+                  <col className="w-[25%]" />
+                  <col className="w-[13%]" />
+                  <col className="w-[17%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[9%]" />
+                </colgroup>
                 <thead>
                   <tr className="bg-primary/10 border-b border-border-light text-xs uppercase text-text-muted">
-                    <th className="p-4 font-bold">Data</th>
-                    <th className="p-4 font-bold">Celebração</th>
-                    <th className="p-4 font-bold">Total de pessoas</th>
-                    <th className="p-4 font-bold">Estimativa para comunhão</th>
-                    <th className="p-4 font-bold">Hóstias sugeridas</th>
-                    <th className="p-4 font-bold">Entradas</th>
-                    <th className="p-4 font-bold">Saídas</th>
+                    <th scope="col" className="px-4 py-3 text-left font-bold">Data</th>
+                    <th scope="col" className="px-4 py-3 text-left font-bold">Celebração</th>
+                    <th scope="col" className="px-4 py-3 text-right font-bold">Total de pessoas</th>
+                    <th scope="col" className="px-4 py-3 text-right font-bold">Estimativa para comunhão</th>
+                    <th scope="col" className="px-4 py-3 text-right font-bold">Hóstias sugeridas</th>
+                    <th scope="col" className="px-4 py-3 text-right font-bold">Entradas</th>
+                    <th scope="col" className="px-4 py-3 text-right font-bold">Saídas</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -142,16 +151,16 @@ export default function History() {
                       key={record.id}
                       className="border-b border-border-light transition last:border-0 hover:bg-app-bg"
                     >
-                      <td className="p-4 text-sm font-semibold text-text-dark">{record.date}</td>
-                      <td className="p-4">
+                      <td className="px-4 py-4 text-left text-sm font-semibold text-text-dark">{record.date}</td>
+                      <td className="px-4 py-4 text-left">
                         <p className="m-0 text-sm font-bold text-text-dark">{record.celebration}</p>
                         <p className="m-0 mt-0.5 text-xs text-text-muted">{record.weekday}, {record.startTime}</p>
                       </td>
-                      <td className="p-4 text-sm font-semibold text-text-dark">{record.totalPeople}</td>
-                      <td className="p-4 text-sm font-semibold text-secondary">{record.estimatedCommunicants}</td>
-                      <td className="p-4 text-sm font-semibold text-primary">{record.suggestedHosts}</td>
-                      <td className="p-4 text-sm text-text-dark">{record.entries}</td>
-                      <td className="p-4 text-sm text-text-dark">{record.exits}</td>
+                      <td className="px-4 py-4 text-right text-sm font-semibold text-text-dark">{record.totalPeople}</td>
+                      <td className="px-4 py-4 text-right text-sm font-semibold text-secondary">{record.estimatedCommunicants}</td>
+                      <td className="px-4 py-4 text-right text-sm font-semibold text-primary">{record.suggestedHosts}</td>
+                      <td className="px-4 py-4 text-right text-sm text-text-dark">{record.entries}</td>
+                      <td className="px-4 py-4 text-right text-sm text-text-dark">{record.exits}</td>
                     </tr>
                   ))}
                 </tbody>
