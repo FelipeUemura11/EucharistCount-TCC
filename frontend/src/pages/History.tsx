@@ -4,70 +4,7 @@ import {
   Search,
 } from 'lucide-react';
 import PageHeader from '../components/layout/PageHeader';
-
-interface HistoryRecord {
-  id: number;
-  date: string;
-  weekday: string;
-  celebration: string;
-  startTime: string;
-  totalPeople: number;
-  estimatedCommunicants: number;
-  suggestedHosts: number;
-  entries: number;
-  exits: number;
-}
-
-const historyRecords: HistoryRecord[] = [
-  {
-    id: 1,
-    date: '24/05/2026',
-    weekday: 'Domingo',
-    celebration: 'Missa das 19h',
-    startTime: '19:00',
-    totalPeople: 184,
-    estimatedCommunicants: 178,
-    suggestedHosts: 196,
-    entries: 207,
-    exits: 23,
-  },
-  {
-    id: 2,
-    date: '24/05/2026',
-    weekday: 'Domingo',
-    celebration: 'Missa principal',
-    startTime: '10:00',
-    totalPeople: 172,
-    estimatedCommunicants: 165,
-    suggestedHosts: 182,
-    entries: 188,
-    exits: 16,
-  },
-  {
-    id: 3,
-    date: '21/05/2026',
-    weekday: 'Quinta-feira',
-    celebration: 'Missa de quinta-feira',
-    startTime: '19:30',
-    totalPeople: 85,
-    estimatedCommunicants: 80,
-    suggestedHosts: 88,
-    entries: 96,
-    exits: 11,
-  },
-  {
-    id: 4,
-    date: '17/05/2026',
-    weekday: 'Domingo',
-    celebration: 'Missa das 19h',
-    startTime: '19:00',
-    totalPeople: 167,
-    estimatedCommunicants: 159,
-    suggestedHosts: 175,
-    entries: 198,
-    exits: 31,
-  },
-];
+import { historyRecords } from '../data/historyMock';
 
 
 export default function History() {
