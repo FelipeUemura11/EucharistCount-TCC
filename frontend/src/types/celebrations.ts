@@ -1,4 +1,4 @@
-﻿export type CelebrationStatus = 'scheduled' | 'active' | 'finished';
+export type CelebrationStatus = 'scheduled' | 'active' | 'finished';
 
 export interface Celebration {
   id: number;
@@ -14,8 +14,26 @@ export interface Celebration {
 }
 
 export interface CalendarDay {
+  id: string;
   day?: number;
   hasCelebration?: boolean;
-  isSelected?: boolean;
   isToday?: boolean;
 }
+
+export interface CelebrationDayInfo {
+  day: number;
+  dateLabel: string;
+  weekday: string;
+}
+
+export interface CelebrationMassSchedule {
+  id: string;
+  startTime: string;
+  recordingStartTime: string;
+  recordingEndTime: string;
+  source: 'global' | 'custom';
+}
+
+export type CelebrationMassScheduleChanges = Partial<
+  Pick<CelebrationMassSchedule, 'startTime' | 'recordingStartTime' | 'recordingEndTime'>
+>;

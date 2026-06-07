@@ -1,14 +1,92 @@
-﻿import type { CalendarDay, Celebration, CelebrationStatus } from '../types/celebrations';
+import type {
+  CalendarDay,
+  Celebration,
+  CelebrationDayInfo,
+  CelebrationMassSchedule,
+  CelebrationStatus,
+} from '../types/celebrations';
+
+export const celebrationMonth = {
+  label: 'Maio de 2026',
+  monthName: 'maio',
+  monthIndex: 4,
+  year: 2026,
+  totalDays: 31,
+};
 
 export const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
+const weekdayLabels = [
+  'Domingo',
+  'Segunda-feira',
+  'Terça-feira',
+  'Quarta-feira',
+  'Quinta-feira',
+  'Sexta-feira',
+  'Sábado',
+];
+
+const globalSchedulesByWeekday: Record<number, Array<Omit<CelebrationMassSchedule, 'id' | 'source'>>> = {
+  0: [
+    { startTime: '08:00', recordingStartTime: '08:00', recordingEndTime: '09:00' },
+    { startTime: '10:00', recordingStartTime: '10:00', recordingEndTime: '11:00' },
+    { startTime: '18:00', recordingStartTime: '18:00', recordingEndTime: '19:00' },
+  ],
+  1: [],
+  2: [{ startTime: '18:00', recordingStartTime: '18:00', recordingEndTime: '18:35' }],
+  3: [{ startTime: '18:00', recordingStartTime: '18:00', recordingEndTime: '18:35' }],
+  4: [{ startTime: '18:00', recordingStartTime: '18:00', recordingEndTime: '18:35' }],
+  5: [{ startTime: '18:00', recordingStartTime: '18:00', recordingEndTime: '18:35' }],
+  6: [{ startTime: '18:00', recordingStartTime: '18:00', recordingEndTime: '19:00' }],
+};
+
+function getDate(day: number) {
+  return new Date(celebrationMonth.year, celebrationMonth.monthIndex, day);
+}
+
+function getWeekdayIndex(day: number) {
+  return getDate(day).getDay();
+}
+
+export function getDayInfo(day: number): CelebrationDayInfo {
+  const weekday = weekdayLabels[getWeekdayIndex(day)];
+
+  return {
+    day,
+    weekday,
+    dateLabel: `${weekday}, ${day} de ${celebrationMonth.monthName}`,
+  };
+}
+
+export function getGlobalMassesForDay(day: number): CelebrationMassSchedule[] {
+  return globalSchedulesByWeekday[getWeekdayIndex(day)].map((mass, index) => ({
+    ...mass,
+    id: `day-${day}-global-${index}`,
+    source: 'global',
+  }));
+}
+
+export function createInitialDaySchedules() {
+  return Array.from({ length: celebrationMonth.totalDays }, (_, index) => index + 1).reduce<
+    Record<number, CelebrationMassSchedule[]>
+  >((schedules, day) => {
+    schedules[day] = getGlobalMassesForDay(day);
+    return schedules;
+  }, {});
+}
+
 export const calendarDays: CalendarDay[] = [
-  {}, {}, {}, {}, {}, { day: 1 }, { day: 2 },
-  { day: 3 }, { day: 4 }, { day: 5 }, { day: 6 }, { day: 7 }, { day: 8 }, { day: 9 },
-  { day: 10 }, { day: 11 }, { day: 12 }, { day: 13 }, { day: 14 }, { day: 15 }, { day: 16 },
-  { day: 17 }, { day: 18 }, { day: 19, hasCelebration: true }, { day: 20 }, { day: 21, hasCelebration: true }, { day: 22 }, { day: 23 },
-  { day: 24, hasCelebration: true, isSelected: true, isToday: true }, { day: 25 }, { day: 26 }, { day: 27, hasCelebration: true }, { day: 28 }, { day: 29 }, { day: 30 },
-  { day: 31, hasCelebration: true },
+  ...Array.from({ length: getWeekdayIndex(1) }, (_, index) => ({ id: `blank-${index}` })),
+  ...Array.from({ length: celebrationMonth.totalDays }, (_, index) => {
+    const day = index + 1;
+
+    return {
+      id: `day-${day}`,
+      day,
+      hasCelebration: getGlobalMassesForDay(day).length > 0,
+      isToday: day === 24,
+    };
+  }),
 ];
 
 export const selectedDayCelebrations: Celebration[] = [
@@ -80,12 +158,12 @@ export const nextCelebrations: Celebration[] = [
 
 export const statusStyle: Record<CelebrationStatus, string> = {
   scheduled: 'bg-secondary/10 text-secondary',
-  active:    'bg-emerald-50 text-emerald-600',
-  finished:  'bg-slate-100 text-slate-600',
+  active: 'bg-emerald-50 text-emerald-600',
+  finished: 'bg-slate-100 text-slate-600',
 };
 
 export const statusLabel: Record<CelebrationStatus, string> = {
   scheduled: 'Agendada',
-  active:    'Em andamento',
-  finished:  'Finalizada',
+  active: 'Em andamento',
+  finished: 'Finalizada',
 };
