@@ -1,0 +1,22 @@
+# Eucharist Count — dependencias (CPU, sem GPU)
+#
+# Instalacao:
+#   pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+#
+# O indice extra garante o PyTorch CPU (~200 MB) em vez da versao CUDA (~2.5 GB).
+
+# Deteccao e rastreio (ByteTrack ja vem embutido)
+ultralytics==8.3.155
+
+# Processamento de imagem e video
+opencv-python==4.10.0.84
+numpy==1.26.4
+
+# Backend do PyTorch — necessario para carregar e exportar modelos
+torch==2.5.1
+torchvision==0.20.1
+
+# Inferencia ONNX em CPU: 2-4x mais rapida que o .pt
+onnxruntime==1.19.2
+onnx==1.17.0
+onnxslim==0.1.34
