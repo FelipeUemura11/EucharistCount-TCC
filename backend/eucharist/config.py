@@ -9,8 +9,6 @@ Assim a paroquia ajusta o sistema sem editar codigo, e futuramente a tela
 de Configuracoes escreve nesse mesmo JSON.
 """
 
-from __future__ import annotations
-
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -21,7 +19,6 @@ RAIZ = Path(__file__).resolve().parent.parent
 ARQUIVO_CONFIG = RAIZ / "config.json"
 PASTA_MODELOS = RAIZ / "modelos"
 PASTA_VIDEOS = RAIZ / "videos"
-PASTA_SAIDA = RAIZ / "saida"
 
 
 @dataclass

@@ -6,8 +6,6 @@ videos de validacao do TCC. Em producao a janela fica desligada e este
 modulo nao e chamado — nenhuma imagem e gerada nem armazenada.
 """
 
-from __future__ import annotations
-
 import cv2
 import numpy as np
 

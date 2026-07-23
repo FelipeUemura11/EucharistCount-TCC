@@ -16,11 +16,10 @@ Uso:
     # producao: sem janela, minimo consumo de CPU
     python main.py --sem-janela --threads 2
 
-    # gravar video anotado (para a validacao do TCC)
-    python main.py --salvar saida/validacao.mp4
+Nenhuma imagem ou video e salvo em disco em nenhuma circunstancia.
+O processamento ocorre inteiramente em memoria (RAM), em conformidade
+com a LGPD.
 """
-
-from __future__ import annotations
 
 import argparse
 import sys
@@ -40,7 +39,6 @@ def montar_argumentos() -> argparse.ArgumentParser:
     p.add_argument("--conf", type=float, help="limiar de confianca (0-1)")
     p.add_argument("--fps", type=float, help="frames por segundo a processar")
     p.add_argument("--threads", type=int, help="limite de threads de CPU")
-    p.add_argument("--salvar", help="caminho do mp4 anotado de saida")
     p.add_argument("--sem-janela", action="store_true",
                    help="roda sem interface grafica (producao)")
     p.add_argument("--sem-filtro", action="store_true",
@@ -79,7 +77,7 @@ def main() -> int:
 
     try:
         monitor = Monitor(config, RAIZ)
-        metricas = monitor.executar(gravar_em=args.salvar)
+        metricas = monitor.executar()
     except FileNotFoundError as e:
         print(f"\n[ERRO] {e}")
         return 1

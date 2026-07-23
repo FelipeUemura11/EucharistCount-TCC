@@ -14,8 +14,6 @@ Modelos disponiveis, do mais leve ao mais preciso:
     yolov8n  — alternativa ao 11n
 """
 
-from __future__ import annotations
-
 import argparse
 import shutil
 import sys

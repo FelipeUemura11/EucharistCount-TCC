@@ -9,8 +9,6 @@ O tipo Pessoa e a fronteira do modulo: a etapa de contagem por linha
 vai consumir esses objetos sem precisar conhecer YOLO nem OpenCV.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -85,7 +83,7 @@ class DetectorPessoas:
             )
 
         self._limitar_threads()
-        self.modelo = YOLO(str(caminho), task="detect")
+        self.modelo = YOLO(str(caminho), task="detect") # Carrega a rede neural convolucional (CNN) - ja treinada
         self.caminho_modelo = caminho
 
     def _limitar_threads(self) -> None:

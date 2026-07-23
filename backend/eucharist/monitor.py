@@ -6,8 +6,6 @@ provavelmente rodando em uma thread separada, com iniciar() e parar().
 Por enquanto e chamada direto pelo main.py.
 """
 
-from __future__ import annotations
-
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -67,7 +65,7 @@ class Monitor:
 
     # ---------- Loop principal ----------
 
-    def executar(self, gravar_em: str | None = None) -> Metricas:
+    def executar(self) -> Metricas:
         cfg = self.config
         fonte_resolvida = cfg.caminho_absoluto(cfg.camera.fonte)
 
@@ -88,7 +86,6 @@ class Monitor:
         print(f"Confianca  : {cfg.deteccao.confianca}")
         print()
 
-        gravador = self._criar_gravador(gravar_em, fonte) if gravar_em else None
         mostrar = cfg.visual.mostrar_janela
 
         if mostrar:
@@ -98,7 +95,7 @@ class Monitor:
                 int(fonte.largura * cfg.visual.escala_janela),
                 int(fonte.altura * cfg.visual.escala_janela),
             )
-            print("ESC/Q = sair | ESPACO = pausa | S = salvar frame\n")
+            print("ESC/Q = sair | ESPACO = pausa\n")
 
         ultimo_instante = time.perf_counter()
 
@@ -111,19 +108,13 @@ class Monitor:
                 self._atualizar_metricas(pessoas, ultimo_instante)
                 ultimo_instante = time.perf_counter()
 
-                if mostrar or gravador is not None:
+                if mostrar:
                     self._anotar(frame, pessoas)
-
-                if gravador is not None:
-                    gravador.write(frame)
 
                 if mostrar and not self._tratar_teclado(frame):
                     break
         finally:
             fonte.fechar()
-            if gravador is not None:
-                gravador.release()
-                print(f"\nVideo salvo em: {gravar_em}")
             if mostrar:
                 cv2.destroyAllWindows()
 
@@ -180,18 +171,4 @@ class Monitor:
                 elif t in (27, ord("q"), ord("Q")):
                     return False
 
-        if tecla in (ord("s"), ord("S")):
-            nome = f"frame_{self.metricas.frames_processados:06d}.jpg"
-            cv2.imwrite(nome, frame)
-            print(f"Frame salvo: {nome}")
-
         return True
-
-    def _criar_gravador(self, caminho: str, fonte: FonteVideo):
-        Path(caminho).parent.mkdir(parents=True, exist_ok=True)
-        return cv2.VideoWriter(
-            caminho,
-            cv2.VideoWriter_fourcc(*"mp4v"),
-            self.config.camera.fps_processamento,
-            (fonte.largura, fonte.altura),
-        )

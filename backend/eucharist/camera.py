@@ -13,8 +13,6 @@ Dois pontos importantes para o computador da igreja:
    e tenta de novo, em vez de encerrar silenciosamente.
 """
 
-from __future__ import annotations
-
 import os
 import time
 from typing import Iterator, Optional

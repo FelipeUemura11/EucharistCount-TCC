@@ -27,13 +27,15 @@ backend/
 │   └── calibrar.py          # descobre a melhor configuração pro seu vídeo
 │
 ├── modelos/                 # modelos .onnx (fora do Git)
-├── videos/                  # vídeos de teste (fora do Git)
-└── saida/                   # resultados gerados (fora do Git)
+└── videos/                  # vídeos de teste (fora do Git)
 ```
 
 Cada módulo tem uma responsabilidade só. `detector.py` não sabe o que é uma
 janela; `camera.py` não sabe o que é uma pessoa. Isso mantém o código simples
 de entender e permite testar as partes isoladamente.
+
+Nenhum módulo grava imagem ou vídeo em disco. Os frames existem apenas em
+memória, durante o processamento, e somem quando o programa termina.
 
 ---
 
@@ -64,11 +66,11 @@ python -m scripts.calibrar
 ```
 
 Testa 27 combinações de modelo/resolução/confiança nos frames do
-`videos/cam.mp4`, mede a velocidade **nesta máquina** e salva imagens
-anotadas em `saida/calibracao/`.
+`videos/cam.mp4` e mede a velocidade **nesta máquina**. Os frames de teste
+ficam só em memória durante a execução — nada é salvo em disco.
 
-Abra as imagens e confira se as caixas estão nas pessoas certas. O script
-recomenda uma configuração, mas a decisão final é visual.
+O script recomenda uma configuração com base em quantidade de detecções
+e velocidade.
 
 ### 2. Prepare o modelo escolhido
 
@@ -100,12 +102,12 @@ python main.py --fonte "rtsp://usuario:senha@192.168.1.50:554/stream1"
 
 # máquina fraca: menor resolução, menos threads, sem janela
 python main.py --imgsz 480 --threads 2 --sem-janela
-
-# gravar vídeo anotado para a validação do TCC
-python main.py --salvar saida/validacao.mp4
 ```
 
-**Teclas:** `ESC`/`Q` sair · `ESPAÇO` pausar · `S` salvar frame
+**Teclas:** `ESC`/`Q` sair · `ESPAÇO` pausar
+
+A janela apenas exibe o vídeo na tela — nada do que é mostrado é gravado
+ou salvo em arquivo.
 
 ---
 
@@ -148,11 +150,19 @@ de perfil e parcialmente oculta pelos bancos.
 
 ## Privacidade
 
-O sistema processa os frames apenas em memória. Nenhuma imagem é gravada,
-salvo quando `--salvar` é usado explicitamente para gerar material de
-validação — o que **não** deve ser feito em produção.
+O sistema **não possui, em nenhum ponto do código, capacidade de salvar
+imagem ou vídeo em disco.** Os frames capturados pela câmera existem
+somente em memória (RAM) durante o processamento e são descartados
+assim que o próximo frame chega. Isso vale para o monitoramento
+(`main.py`) e para a calibração (`scripts/calibrar.py`).
 
-Vídeos de fiéis reais não devem ser versionados no Git.
+Ao final do processamento, só permanecem números agregados (quantidade
+de pessoas, IDs de rastreio) — nunca a imagem em si. Essa é a base técnica
+da conformidade com a LGPD descrita no TCC: não há tratamento de dado
+pessoal identificável, porque a imagem nunca é persistida.
+
+Vídeos de teste com fiéis reais (como `videos/cam.mp4`) não devem ser
+versionados no Git — o `.gitignore` do projeto já bloqueia isso.
 
 ---
 

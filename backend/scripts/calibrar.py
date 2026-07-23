@@ -2,8 +2,9 @@
 Calibra a deteccao para o video/camera da paroquia.
 
 Testa combinacoes de modelo, resolucao e limiar de confianca em frames
-amostrados, mede velocidade em CPU e salva imagens anotadas para
-conferencia visual.
+amostrados e mede a velocidade em CPU. Nenhuma imagem e salva em disco:
+os frames de teste existem apenas em memoria durante a execucao do
+script, em conformidade com a LGPD.
 
 Rode isso uma vez, escolha a melhor configuracao e fixe em config.json.
 
@@ -11,8 +12,6 @@ Uso:
     python -m scripts.calibrar
     python -m scripts.calibrar --fonte videos/cam.mp4 --frames 10
 """
-
-from __future__ import annotations
 
 import argparse
 import sys
@@ -24,8 +23,6 @@ import numpy as np
 
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
-
-from eucharist.config import PASTA_SAIDA  # noqa: E402
 
 
 # Combinacoes testadas. Modelos .pt sao baixados automaticamente.
@@ -136,25 +133,6 @@ def testar(amostras, modelos, resolucoes, confiancas) -> list[dict]:
     return resultados
 
 
-def salvar_previews(amostras, modelo_nome, imgsz, conf) -> Path:
-    from ultralytics import YOLO
-
-    pasta = PASTA_SAIDA / "calibracao"
-    pasta.mkdir(parents=True, exist_ok=True)
-
-    modelo = YOLO(modelo_nome)
-    for posicao, frame in amostras:
-        r = modelo.predict(
-            frame, imgsz=imgsz, conf=conf,
-            classes=[0], device="cpu", verbose=False,
-        )[0]
-        cv2.imwrite(
-            str(pasta / f"frame_{posicao:06d}_n{len(r.boxes)}.jpg"),
-            r.plot(),
-        )
-    return pasta
-
-
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--fonte", default="videos/cam.mp4")
@@ -203,12 +181,6 @@ def main() -> int:
     print(f"  conf   : {melhor['conf']}")
     print(f"  ritmo  : {melhor['ms']:.0f} ms/frame "
           f"(~{1000 / melhor['ms']:.1f} fps)")
-
-    pasta = salvar_previews(amostras, melhor["modelo"], melhor["imgsz"],
-                            melhor["conf"])
-    print(f"\nImagens de conferencia em: {pasta}")
-    print("\nATENCAO: mais deteccoes nao significa deteccoes corretas.")
-    print("Abra as imagens e confirme antes de fixar a configuracao.")
 
     nome_base = melhor["modelo"].replace(".pt", "")
     print(f"\nPara usar em producao, exporte para ONNX:")
