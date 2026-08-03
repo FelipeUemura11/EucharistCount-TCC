@@ -1,17 +1,18 @@
 """
 Eucharist Count — modulo de visao computacional.
-
-Sistema de contagem de pessoas para celebracoes liturgicas.
-Opera 100% local (Edge Computing), sem GPU e sem envio de dados externos.
 """
 
 from .config import Config
+from .contador import ContadorLinha, Evento, Sentido
 from .detector import DetectorPessoas, Pessoa
 from .camera import FonteVideo
 from .monitor import Monitor, Metricas
 
 __all__ = [
     "Config",
+    "ContadorLinha",
+    "Evento",
+    "Sentido",
     "DetectorPessoas",
     "Pessoa",
     "FonteVideo",

@@ -86,6 +86,10 @@ class DetectorPessoas:
         self.modelo = YOLO(str(caminho), task="detect") # Carrega a rede neural convolucional (CNN) - ja treinada
         self.caminho_modelo = caminho
 
+        # ROI em pixels: calculada no primeiro frame, quando as
+        # dimensoes reais do video sao conhecidas.
+        self._roi_px: tuple[int, int, int, int] | None = None
+
     def _limitar_threads(self) -> None:
         """
         Restringe o uso de CPU.
@@ -110,6 +114,29 @@ class DetectorPessoas:
         except ImportError:
             pass
 
+    # ---------- Regiao de interesse ----------
+
+    def _calcular_roi(self, largura: int, altura: int) -> tuple[int, int, int, int]:
+        """Converte a ROI de fracoes para pixels, uma unica vez."""
+        rx1, ry1, rx2, ry2 = self.config.roi
+
+        x1 = max(0, int(rx1 * largura))
+        y1 = max(0, int(ry1 * altura))
+        x2 = min(largura, int(rx2 * largura))
+        y2 = min(altura, int(ry2 * altura))
+
+        # Garante um retangulo valido.
+        if x2 <= x1 or y2 <= y1:
+            return (0, 0, largura, altura)
+
+        return (x1, y1, x2, y2)
+
+    def roi_em_pixels(self, largura: int, altura: int) -> tuple[int, int, int, int]:
+        """ROI em pixels. Usada tambem pelo desenho na tela."""
+        if self._roi_px is None:
+            self._roi_px = self._calcular_roi(largura, altura)
+        return self._roi_px
+
     # ---------- Inferencia ----------
 
     def detectar(self, frame: np.ndarray, rastrear: bool = True) -> list[Pessoa]:
@@ -118,10 +145,24 @@ class DetectorPessoas:
 
         Com rastrear=True cada pessoa recebe um ID estavel entre frames
         (necessario para contar sem duplicar). Com False, so deteccao.
+
+        Se a ROI estiver ativa, so o recorte e analisado — mas as
+        coordenadas devolvidas sao sempre do frame inteiro, para que o
+        resto do sistema nao precise saber que houve recorte.
         """
+        altura_total, largura_total = frame.shape[:2]
+
+        if self.config.roi_ativo:
+            rx1, ry1, rx2, ry2 = self.roi_em_pixels(largura_total, altura_total)
+            entrada = frame[ry1:ry2, rx1:rx2]
+            deslocamento = (rx1, ry1)
+        else:
+            entrada = frame
+            deslocamento = (0, 0)
+
         if rastrear:
             resultado = self.modelo.track(
-                frame,
+                entrada,
                 imgsz=self.config.imgsz,
                 conf=self.config.confianca,
                 iou=self.config.iou,
@@ -134,7 +175,7 @@ class DetectorPessoas:
             )[0]
         else:
             resultado = self.modelo.predict(
-                frame,
+                entrada,
                 imgsz=self.config.imgsz,
                 conf=self.config.confianca,
                 iou=self.config.iou,
@@ -144,9 +185,20 @@ class DetectorPessoas:
                 verbose=False,
             )[0]
 
-        return self._converter(resultado, frame.shape[1], frame.shape[0])
+        return self._converter(
+            resultado,
+            entrada.shape[1],
+            entrada.shape[0],
+            deslocamento,
+        )
 
-    def _converter(self, resultado, largura: int, altura: int) -> list[Pessoa]:
+    def _converter(
+        self,
+        resultado,
+        largura: int,
+        altura: int,
+        deslocamento: tuple[int, int] = (0, 0),
+    ) -> list[Pessoa]:
         """Traduz a saida da Ultralytics para objetos Pessoa, aplicando o filtro."""
         caixas = resultado.boxes
         if caixas is None or len(caixas) == 0:
@@ -160,17 +212,22 @@ class DetectorPessoas:
         else:
             ids = [None] * len(xyxy)
 
+        off_x, off_y = deslocamento
+
         pessoas = []
         for (x1, y1, x2, y2), conf, pid in zip(xyxy, confs, ids):
+            # O filtro usa as dimensoes do recorte, nao do frame inteiro:
+            # e nele que a pessoa foi medida.
             if not self._plausivel(x1, y1, x2, y2, largura, altura):
                 continue
+
             pessoas.append(
                 Pessoa(
                     id=int(pid) if pid is not None else None,
-                    x1=int(x1),
-                    y1=int(y1),
-                    x2=int(x2),
-                    y2=int(y2),
+                    x1=int(x1) + off_x,
+                    y1=int(y1) + off_y,
+                    x2=int(x2) + off_x,
+                    y2=int(y2) + off_y,
                     confianca=float(conf),
                 )
             )

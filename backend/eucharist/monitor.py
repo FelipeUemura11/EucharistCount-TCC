@@ -15,8 +15,15 @@ import cv2
 
 from .camera import FonteVideo
 from .config import Config
+from .contador import ContadorLinha, Sentido
 from .detector import DetectorPessoas, Pessoa
-from .visual import desenhar_painel, desenhar_pessoa, redimensionar
+from .visual import (
+    desenhar_linhas,
+    desenhar_painel,
+    desenhar_pessoa,
+    desenhar_roi,
+    redimensionar,
+)
 
 
 @dataclass
@@ -28,9 +35,18 @@ class Metricas:
     ids_unicos: set[int] = field(default_factory=set)
     fps: float = 0.0
 
+    # Contagem por cruzamento de linha
+    entradas: int = 0
+    saidas: int = 0
+
     @property
     def total_ids(self) -> int:
         return len(self.ids_unicos)
+
+    @property
+    def dentro(self) -> int:
+        """Ocupacao estimada da igreja."""
+        return self.entradas - self.saidas
 
 
 class Monitor:
@@ -58,6 +74,7 @@ class Monitor:
         self._parar = False
         self._pausado = False
         self._janela_fps: deque[float] = deque(maxlen=30)
+        self.contador: ContadorLinha | None = None
 
     def parar(self) -> None:
         """Interrompe o loop. Sera chamado pelo APScheduler ao fim da missa."""
@@ -84,6 +101,14 @@ class Monitor:
         print(f"Modelo     : {self.detector.caminho_modelo.name}")
         print(f"imgsz      : {cfg.deteccao.imgsz}")
         print(f"Confianca  : {cfg.deteccao.confianca}")
+
+        # Contador de linha: precisa das dimensoes reais do frame.
+        if cfg.contagem.ativo:
+            self.contador = ContadorLinha(
+                cfg.contagem, fonte.largura, fonte.altura
+            )
+            print(f"Linhas     : {len(self.contador.linhas)} paralelas")
+            print(f"Lado entrada: {cfg.contagem.lado_entrada}")
         print()
 
         mostrar = cfg.visual.mostrar_janela
@@ -105,6 +130,20 @@ class Monitor:
                     break
 
                 pessoas = self.detector.detectar(frame, rastrear=True)
+
+                if self.contador is not None:
+                    eventos = self.contador.atualizar(pessoas)
+                    for evento in eventos:
+                        rotulo = (
+                            "ENTROU"
+                            if evento.sentido is Sentido.ENTRADA
+                            else "SAIU"
+                        )
+                        print(
+                            f"[{rotulo}] ID {evento.id_pessoa}  "
+                            f"dentro={self.contador.dentro}"
+                        )
+
                 self._atualizar_metricas(pessoas, ultimo_instante)
                 ultimo_instante = time.perf_counter()
 
@@ -137,20 +176,50 @@ class Monitor:
         self._janela_fps.append(1.0 / max(decorrido, 1e-6))
         m.fps = sum(self._janela_fps) / len(self._janela_fps)
 
+        if self.contador is not None:
+            m.entradas = self.contador.entradas
+            m.saidas = self.contador.saidas
+
     def _anotar(self, frame, pessoas: list[Pessoa]) -> None:
+        cfg = self.config
+
+        # Escurece o que esta fora da area analisada.
+        if cfg.deteccao.roi_ativo:
+            desenhar_roi(
+                frame,
+                self.detector.roi_em_pixels(
+                    frame.shape[1], frame.shape[0]
+                ),
+            )
+
+        if self.contador is not None and cfg.visual.mostrar_linhas:
+            desenhar_linhas(
+                frame,
+                self.contador.linhas,
+                cfg.contagem.lado_entrada,
+            )
+
         for pessoa in pessoas:
             desenhar_pessoa(frame, pessoa)
 
         m = self.metricas
-        desenhar_painel(
-            frame,
-            [
+        linhas_painel = [
+            f"Dentro da igreja : {m.dentro}",
+            f"Entradas         : {m.entradas}",
+            f"Saidas           : {m.saidas}",
+            f"Pessoas no frame : {m.pessoas_no_frame}",
+            f"FPS              : {m.fps:.1f}",
+        ]
+
+        if self.contador is None:
+            linhas_painel = [
                 f"Pessoas no frame : {m.pessoas_no_frame}",
                 f"IDs unicos       : {m.total_ids}",
                 f"FPS              : {m.fps:.1f}",
                 f"Frame            : {m.frames_processados}",
-            ],
-        )
+            ]
+
+        desenhar_painel(frame, linhas_painel)
 
     def _tratar_teclado(self, frame) -> bool:
         """Processa teclas. Retorna False quando o usuario pede para sair."""
