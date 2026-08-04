@@ -1,318 +1,210 @@
-
-### Eucharist Count ###
+# Eucharist Count
 
 Sistema de contagem de pessoas em tempo real utilizando **visão computacional**, desenvolvido para auxiliar igrejas católicas no monitoramento de ocupação durante celebrações litúrgicas.
 
-O objetivo principal do projeto é fornecer uma estimativa automatizada e precisa do número de fiéis presentes, apoiando a equipe responsável no dimensionamento dos insumos eucarísticos e reduzindo falhas causadas por estimativas manuais.
+O objetivo é fornecer uma estimativa automatizada e confiável do número de fiéis presentes, apoiando a equipe litúrgica no dimensionamento de hóstias a serem consagradas e reduzindo o desperdício ou a escassez causados por estimativas puramente visuais.
+
+> Trabalho de Conclusão de Curso — Bacharelado em Ciência da Computação, Universidade Positivo, Curitiba, 2026. A especificação completa está em [`EucharistCountDocument.pdf`](./EucharistCountDocument.pdf).
 
 ---
 
-## 📌 Visão Geral
+## Visão geral
 
-A contagem de pessoas em ambientes fechados é uma necessidade recorrente em locais com fluxo variável de público, como igrejas, auditórios, centros de convenções, cinemas e terminais de transporte.
+A contagem de pessoas em ambientes fechados é uma necessidade recorrente em locais com fluxo variável de público — igrejas, auditórios, centros de convenções, cinemas, terminais de transporte. Este projeto usa como estudo de caso uma **igreja católica de Curitiba/PR**, onde a contagem de fiéis subsidia a estimativa de hóstias consagradas por celebração.
 
-No contexto deste projeto, o estudo de caso será realizado em uma **igreja católica de Curitiba/PR**, onde a contagem de fiéis é essencial para estimar a quantidade adequada de hóstias a serem consagradas durante a celebração.
-
-O sistema será executado localmente, sem envio de imagens para a nuvem, contribuindo para maior controle sobre privacidade e proteção de dados.
+O sistema opera inteiramente **local** (Edge Computing), sem GPU e sem envio de imagens para a nuvem — nenhuma imagem ou vídeo é armazenado em disco, apenas contagens agregadas. Essa arquitetura é o que garante conformidade com a LGPD: sem retenção de dado biométrico ou identificável, não há tratamento de dado pessoal nos termos da lei.
 
 ---
 
-## 🎯 Objetivo Geral
+## Objetivo geral
 
-Desenvolver um sistema de contagem de pessoas baseado em visão computacional, aplicado à gestão de ocupação em ambientes fechados com câmeras fixas em posição diagonal, fornecendo dados precisos e automatizados sobre a quantidade de pessoas presentes durante celebrações litúrgicas.
+Desenvolver e validar um sistema automatizado de visão computacional para contagem de fluxo humano e gestão de ocupação a partir de câmeras fixas, utilizando o monitoramento de celebrações litúrgicas em igrejas católicas como estudo de caso prático.
 
----
+## Objetivos específicos
 
-## ✅ Objetivos Específicos
-
-- Implementar um módulo de detecção de pessoas utilizando visão computacional.
-- Configurar o sistema para operar com câmeras fixas posicionadas em ângulo diagonal.
-- Integrar rastreamento de múltiplos indivíduos com identificadores únicos.
-- Evitar contagens duplicadas de uma mesma pessoa.
-- Implementar lógica de contagem por cruzamento de linha virtual.
-- Diferenciar fluxos de entrada e saída de pessoas.
-- Limitar o período de contagem ao intervalo de cada celebração.
-- Persistir dados de ocupação e instantâneos temporais.
-- Disponibilizar um dashboard para acompanhamento em tempo real.
-- Validar o sistema em uma igreja católica de Curitiba/PR.
+a) Implementar um módulo de detecção de pessoas baseado em visão computacional, operando a partir de câmeras fixas em posição diagonal em ambientes fechados;
+b) Integrar um módulo de rastreamento de múltiplos indivíduos, garantindo identificadores únicos e eliminando duplicidade na contagem;
+c) Implementar a lógica de contagem por cruzamento de linha virtual, distinguindo entrada e saída, limitada ao intervalo de cada celebração;
+d) Registrar e persistir os dados de ocupação, possibilitando acompanhamento histórico da lotação antes e durante as celebrações;
+e) Validar o sistema em uma igreja católica de Curitiba/PR, avaliando acurácia da contagem e usabilidade do painel junto às equipes litúrgicas.
 
 ---
 
-## 🧠 Tecnologias Utilizadas
+## Arquitetura
 
-### Backend e Visão Computacional
-
-- **Python**  
-  Linguagem principal do sistema, escolhida pelo amplo ecossistema de inteligência artificial, visão computacional e integração com bibliotecas de processamento de vídeo.
-
-- **YOLO — You Only Look Once**  
-  Algoritmo de detecção de objetos utilizado para identificar pessoas nos quadros de vídeo em tempo quase real.
-
-- **DeepSORT**  
-  Algoritmo de rastreamento de múltiplos objetos responsável por manter a identidade de cada pessoa ao longo dos frames, reduzindo duplicidades na contagem.
-
-- **OpenCV**  
-  Biblioteca utilizada para captura, leitura e processamento dos frames de vídeo.
-
-### Banco de Dados
-
-- **MongoDB**  
-  Banco de dados NoSQL utilizado para armazenar eventos de entrada, saída, timestamps e snapshots de ocupação.
-
-### Frontend
-
-- **React**  
-  Biblioteca utilizada para construção da interface visual do sistema.
-
-- **TypeScript**  
-  Superset do JavaScript que adiciona tipagem estática, tornando o desenvolvimento mais seguro, organizado e fácil de manter.
-
-- **Vite**  
-  Ferramenta para criação e execução do projeto frontend com React e TypeScript de forma rápida e moderna.
-
----
-
-## 🏗️ Arquitetura do Sistema
-
-O sistema é dividido em três camadas principais:
-
-```text
-Câmera / Vídeo
-      ↓
-Módulo de Visão Computacional
-YOLO + DeepSORT + Lógica de Contagem
-      ↓
-API / Persistência de Dados
-Python + MongoDB
-      ↓
-Dashboard Web
-React + TypeScript
+```
+Máquina Local da Igreja
+┌─────────────────────────────────────────┐
+│  Frontend (React + TypeScript)           │
+│              ↕ HTTP localhost            │
+│  API (FastAPI)                           │
+│              ↕ registra jobs             │
+│  Automação (APScheduler)                 │
+│              ↕ aciona/finaliza           │
+│  Motor IA (OpenCV + YOLO + ByteTrack)    │
+│              ↕ grava contagem            │
+│  Base de Dados (SQLite)                  │
+└─────────────────────────────────────────┘
+        ↑
+   Câmera IP / NVR — stream RTSP
 ```
 
-### Fluxo de Funcionamento
-
-1. A câmera captura o fluxo de pessoas na entrada da igreja.
-2. O sistema processa os frames do vídeo.
-3. O YOLO detecta pessoas presentes na imagem.
-4. O DeepSORT atribui e mantém identificadores únicos para cada indivíduo.
-5. A lógica de linha virtual identifica entradas e saídas.
-6. O saldo de ocupação é atualizado em tempo real.
-7. Os dados são armazenados no MongoDB.
-8. O dashboard exibe a lotação atual e dados históricos para a equipe litúrgica.
+Tudo roda num único executável local (empacotado com PyInstaller), sem conectividade externa. A câmera fornece o stream via RTSP; o motor de IA processa os frames em memória, sem gravar nada em disco; a API expõe os dados agregados ao dashboard via `localhost`.
 
 ---
 
-## 📊 Estratégia de Contagem
+## Stack tecnológica
 
-A contagem será baseada no cruzamento de uma **linha virtual** definida na imagem da câmera.
+Conforme especificado no documento do TCC:
 
-O sistema deverá identificar a direção do movimento:
-
-- Pessoa cruza a linha no sentido de entrada → incrementa a ocupação.
-- Pessoa cruza a linha no sentido de saída → decrementa a ocupação.
-- Pessoa detectada repetidamente sem cruzar a linha → não altera a contagem.
-
-Essa estratégia evita que a simples presença de uma pessoa em vários frames gere contagens duplicadas.
+| Camada | Tecnologia | Papel |
+|---|---|---|
+| Linguagem / matemática | **Python + NumPy** | Base do backend e manipulação matricial de frames |
+| Visão computacional | **OpenCV** | Captura, redimensionamento e desenho sobre os frames |
+| Detecção | **Ultralytics YOLO** | Detecção de pessoas (classe `person`), restrita à ROI dos acessos |
+| Rastreamento | **ByteTrack** | Identificadores únicos e persistentes por indivíduo |
+| API | **FastAPI + Uvicorn** | Rotas HTTP assíncronas, comunicação local |
+| Validação de dados | **Pydantic** | Tipagem e validação dos schemas trafegados |
+| Persistência | **SQLite** | Celebrações, contagens, snapshots — em arquivo único, local |
+| Agendamento | **APScheduler** | Início/fim automático do monitoramento por celebração |
+| Frontend | **React + TypeScript + Vite** | Dashboard, Celebrações, Histórico, Configurações |
+| Gráficos | **Recharts** | Evolução da ocupação ao longo da celebração |
+| HTTP client | **Axios** | Comunicação do frontend com a API local |
+| Empacotamento | **PyInstaller** | Executável autônomo para a máquina da paróquia |
 
 ---
 
-## 💾 Persistência de Dados
+## Estado atual do projeto
 
-O MongoDB será utilizado para armazenar documentos em formato semelhante a JSON, contendo informações como:
+Este é um TCC em duas etapas. **O que está implementado até aqui** é a fundação de visão computacional; API, banco de dados e frontend fazem parte da próxima etapa (TCC II).
 
-```json
-{
-  "timestamp": "2026-05-16T18:30:00Z",
-  "entradas": 120,
-  "saidas": 15,
-  "ocupacaoAtual": 105,
-  "celebracaoId": "missa-domingo-18h"
-}
+| Componente | Status |
+|---|---|
+| Captura de vídeo (arquivo / webcam / RTSP, com reconexão) | ✅ Implementado |
+| Detecção de pessoas (YOLO, otimizado para CPU via ONNX) | ✅ Implementado |
+| Rastreamento com ID persistente (ByteTrack) | ✅ Implementado |
+| Recorte de Região de Interesse (ROI) | ✅ Implementado |
+| Contagem por cruzamento de linha virtual (entrada/saída) | ✅ Implementado |
+| Painel de monitoramento em tempo real (janela local) | ✅ Implementado |
+| API (FastAPI) | ⏳ Planejado — TCC II |
+| Persistência (SQLite) | ⏳ Planejado — TCC II |
+| Agendamento automático (APScheduler) | ⏳ Planejado — TCC II |
+| Estimativa de comunhão e hóstias sugeridas | ⏳ Planejado — TCC II |
+| Dashboard web (React) | ⏳ Planejado — TCC II |
+| Empacotamento (PyInstaller) | ⏳ Planejado — TCC II |
+
+Detalhes de uso, configuração e arquitetura interna do módulo de visão computacional estão em [`backend/README.md`](./backend/README.md).
+
+---
+
+## Estrutura do repositório
+
 ```
-
-Além dos eventos de entrada e saída, o sistema poderá armazenar snapshots temporais da ocupação, por exemplo:
-
-- 30 minutos antes da celebração;
-- 15 minutos antes da celebração;
-- 10 minutos antes da celebração;
-- 5 minutos antes da celebração;
-- durante a celebração.
-
----
-
-## 🖥️ Dashboard
-
-O dashboard será desenvolvido com React e TypeScript, permitindo que os responsáveis acompanhem a ocupação em tempo real por meio de computadores ou dispositivos móveis conectados à rede local.
-
-### Funcionalidades previstas
-
-- Exibição da ocupação atual.
-- Quantidade de entradas e saídas.
-- Histórico de ocupação por celebração.
-- Visualização de snapshots temporais.
-- Interface responsiva para celular, tablet e desktop.
-- Atualização automática dos dados sem recarregar a página.
-
----
-
-## 🔐 Privacidade e Proteção de Dados
-
-O projeto prevê execução local, sem necessidade de envio de imagens para serviços externos em nuvem.
-
-Essa abordagem reduz riscos relacionados à exposição de dados sensíveis e se alinha a princípios de privacidade e proteção de dados, especialmente considerando que imagens de pessoas podem ser tratadas como dados pessoais.
-
----
-
-## 📁 Estrutura Sugerida do Projeto
-
-```text
-eucharist-count/
+EucharistCount-TCC/
+├── EucharistCountDocument.pdf   # especificação oficial do TCC
+├── README.md                    # este arquivo
+│
 ├── backend/
-│   ├── app/
-│   │   ├── detection/
-│   │   │   ├── yolo_detector.py
-│   │   │   └── tracker.py
-│   │   ├── counting/
-│   │   │   └── line_counter.py
-│   │   ├── database/
-│   │   │   └── mongo_client.py
-│   │   ├── api/
-│   │   │   └── routes.py
-│   │   └── main.py
+│   ├── main.py                  # ponto de entrada do monitoramento
+│   ├── config.json              # parâmetros ajustáveis (câmera, modelo, contagem)
 │   ├── requirements.txt
-│   └── README.md
+│   ├── README.md                # documentação detalhada do backend
+│   │
+│   ├── eucharist/                # módulo de visão computacional
+│   │   ├── config.py            # carrega/salva config.json
+│   │   ├── camera.py            # captura: arquivo, webcam ou RTSP
+│   │   ├── detector.py          # YOLO + ByteTrack + ROI → lista de Pessoa
+│   │   ├── contador.py          # contagem por cruzamento de linha virtual
+│   │   ├── visual.py            # desenho (janela de monitoramento)
+│   │   └── monitor.py           # orquestra o ciclo completo
+│   │
+│   ├── scripts/
+│   │   ├── preparar_modelo.py   # exporta o modelo YOLO para ONNX
+│   │   └── calibrar.py          # testa combinações de modelo/resolução/confiança
+│   │
+│   ├── modelos/                 # modelos .onnx (fora do Git)
+│   └── videos/                  # vídeos de teste (fora do Git)
 │
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── services/
-│   │   ├── types/
-│   │   └── App.tsx
-│   ├── package.json
-│   └── README.md
-│
-├── docs/
-│   └── architecture.md
-│
-├── docker-compose.yml
-└── README.md
+└── frontend/                    # scaffold React + TypeScript + Vite (TCC II)
 ```
 
 ---
 
-## 🚀 Como Executar o Projeto
-
-> Os comandos abaixo representam uma estrutura inicial sugerida para desenvolvimento.
-
-### 1. Clonar o repositório
-
-```bash
-git clone <url-do-repositorio>
-cd eucharist-count
-```
-
-### 2. Configurar o Backend
+## Como executar (etapa atual: visão computacional)
 
 ```bash
 cd backend
-python -m venv venv
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+
+pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+
+python -m scripts.preparar_modelo --modelo yolo11n --imgsz 640
+python main.py
 ```
 
-Ativar o ambiente virtual:
+Instruções completas — calibração de modelo, ajuste de linha de contagem, ROI, parâmetros de `config.json` — estão em [`backend/README.md`](./backend/README.md).
 
-```bash
-# Windows
-venv\Scripts\activate
-
-# Linux/macOS
-source venv/bin/activate
-```
-
-Instalar dependências:
-
-```bash
-pip install -r requirements.txt
-```
-
-Executar o backend:
-
-```bash
-python app/mainCPU.py
-```
-
-### 3. Configurar o Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
+O frontend (`frontend/`) é um scaffold Vite + React + TypeScript ainda não integrado à API, reservado para a próxima etapa do TCC.
 
 ---
 
-## ⚙️ Variáveis de Ambiente
+## Estratégia de contagem
 
-Exemplo de arquivo `.env` para o backend:
+A contagem usa uma **linha virtual** posicionada sobre o portão de acesso, definida por dois pontos (podendo ter qualquer inclinação, o que acomoda câmeras em posição diagonal conforme exigido no objetivo específico *a*). Cada pessoa rastreada é avaliada pelo lado da linha em que se encontra, quadro a quadro:
 
-```env
-MONGO_URI=mongodb://localhost:27017
-DATABASE_NAME=eucharist_count
-CAMERA_SOURCE=0
-API_PORT=8000
-```
+- Cruzamento no sentido de entrada → incrementa a ocupação.
+- Cruzamento no sentido de saída → decrementa a ocupação.
+- Pessoa detectada repetidamente sem cruzar a linha → não altera a contagem.
 
-Exemplo de arquivo `.env` para o frontend:
-
-```env
-VITE_API_URL=http://localhost:8000
-```
+Essa abordagem, combinada ao rastreamento por ID único do ByteTrack, evita que a mera presença de uma pessoa em múltiplos frames gere contagem duplicada — o problema citado na justificativa do TCC como recorrente em sistemas baseados apenas em detecção quadro a quadro.
 
 ---
 
-## 🧪 Validação
+## Privacidade e proteção de dados (LGPD)
 
-A validação do sistema deverá considerar:
+O sistema **não possui, em nenhum ponto do código, capacidade de salvar imagem ou vídeo em disco**. Os frames capturados existem somente em memória (RAM) durante o processamento e são descartados assim que o próximo frame chega. Ao final, permanecem apenas números agregados (quantidade de pessoas, entradas, saídas) — nunca a imagem em si.
 
-- Acurácia da contagem de pessoas.
-- Capacidade de distinguir entradas e saídas.
-- Funcionamento em ambiente fechado.
-- Desempenho com câmeras em posição diagonal.
-- Robustez em situações de oclusão parcial.
-- Usabilidade do dashboard pela equipe litúrgica.
+É essa ausência estrutural de armazenamento de imagem, e não uma configuração desligável, que fundamenta a conformidade com a LGPD descrita no TCC: sem retenção de dado biométrico ou identificável, não há tratamento de dado pessoal.
+
+Vídeos de teste com fiéis reais não são versionados no Git — o `.gitignore` do projeto bloqueia isso.
 
 ---
 
-## 📚 Referências Técnicas
+## Validação planejada
 
-Este projeto é fundamentado em estudos sobre:
+Conforme o objetivo específico *e*, a validação do sistema em campo (igreja católica de Curitiba/PR) deverá avaliar:
 
-- Detecção de objetos com YOLO.
-- Rastreamento de múltiplos objetos com DeepSORT.
-- Contagem de pessoas em ambientes internos.
-- Sistemas de monitoramento em tempo real.
-- Interfaces web baseadas em React.
-- Persistência de dados temporais com bancos NoSQL.
+- Acurácia da contagem frente à contagem manual de referência;
+- Capacidade de distinguir corretamente entradas e saídas;
+- Robustez a oclusão parcial (bancos, aglomeração nos acessos);
+- Desempenho em CPU, sem GPU, na máquina real da paróquia;
+- Desempenho com câmera em posição diagonal;
+- Usabilidade do painel pela equipe litúrgica.
 
 ---
 
-## 👥 Autores
+## Referências técnicas
+
+A fundamentação bibliográfica completa (YOLO, ByteTrack, crowd counting, SQLite, FastAPI, React, entre outras) está no capítulo de Referências do [`EucharistCountDocument.pdf`](./EucharistCountDocument.pdf).
+
+---
+
+## Autores
 
 - Felipe Yukiya Soares Uemura
 - Yasmin Faraj
 - Yuji Chikara Kiyota
 - Eduardo Cornehl Wozniak
 
----
+**Orientadora:** Prof. Malgarete Rodrigues Da Costa
 
-## 🎓 Instituição
+## Instituição
 
-**Universidade Positivo**  
-Bacharelado em Ciência da Computação  
+**Universidade Positivo**
+Bacharelado em Ciência da Computação
 Curitiba — 2026
 
----
+## Licença
 
-## 📄 Licença
-
-Este projeto foi desenvolvido como proposta de Trabalho de Conclusão de Curso. A licença de uso deverá ser definida pelos autores do projeto.
+Projeto desenvolvido como Trabalho de Conclusão de Curso. A licença de uso será definida pelos autores.
