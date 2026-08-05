@@ -27,9 +27,6 @@ class ConfigCamera:
 @dataclass
 class ConfigDeteccao:
     """Como o modelo enxerga as pessoas."""
-
-    # Modelo ONNX ou .pt.
-    # Gere o ONNX com: python -m scripts.preparar_modelo
     modelo: str = "modelos/yolo11n.onnx"
 
     # Resolucao de inferencia (multiplo de 32).
@@ -40,13 +37,7 @@ class ConfigDeteccao:
 
     # Limiar de confianca. Mais baixo detecta mais, com mais falsos positivos.
     confianca: float = 0.25
-
-    # IoU do NMS: quando duas caixas sobrepostas sao consideradas o
-    # mesmo objeto e uma e descartada.
-    #
-    # ATENCAO: valor baixo funde pessoas andando lado a lado numa caixa
-    # so, fazendo duas pessoas contarem como uma. 0.7 e mais permissivo
-    # e preserva individuos proximos.
+    # IoU (Intersection over Union), métrica que mede o quanto duas caixas delimitadoras (bounding boxes) se sobrepõem.
     iou: float = 0.7
 
     # Teto de pessoas por frame.
@@ -57,18 +48,7 @@ class ConfigDeteccao:
     threads: int = 0
 
     # ---------- Regiao de Interesse (ROI) ----------
-    # Recorta o frame antes da inferencia. So o que estiver dentro do
-    # retangulo e analisado.
-    #
-    # Tres beneficios ao mesmo tempo:
-    #   1. Quem esta perto da porta ocupa mais pixels na imagem analisada,
-    #      o que separa melhor duas pessoas andando juntas
-    #   2. Pessoas distantes nao sao detectadas (nao interessam)
-    #   3. Menos area para processar = mais rapido em CPU
-    #
-    # Formato: x1, y1, x2, y2 em fracoes do frame (0.0 a 1.0).
-    # A ROI precisa incluir espaco dos DOIS lados da linha de contagem,
-    # senao o sistema nao consegue observar a pessoa antes e depois.
+    # Recorta o frame antes da inferencia. So o que estiver dentro do retangulo e analisado.
     roi_ativo: bool = True
     roi: tuple[float, float, float, float] = (0.50, 0.05, 1.0, 1.0)
 
@@ -85,9 +65,6 @@ class ConfigRastreio:
 class ConfigFiltro:
     """
     Descarta caixas com geometria improvavel para uma pessoa.
-
-    Limites propositalmente permissivos: numa igreja ha gente sentada,
-    de pe, de perfil e parcialmente oculta, entao a proporcao varia muito.
     """
 
     ativo: bool = True
@@ -112,9 +89,6 @@ class ConfigContagem:
 
         (x1, y1) = primeiro ponto
         (x2, y2) = segundo ponto
-
-    Como a linha pode ter qualquer inclinacao, ela acompanha a geometria
-    real do portao em vez de ser sempre vertical.
     """
 
     ativo: bool = True

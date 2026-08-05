@@ -24,6 +24,8 @@ backend/videos/
 
 # Saidas geradas
 backend/saida/
+backend/cache_deteccoes/
+backend/resultados_varredura/
 *.jpg
 *.jpeg
 *.png

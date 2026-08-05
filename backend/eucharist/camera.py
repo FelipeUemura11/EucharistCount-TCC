@@ -24,11 +24,6 @@ import numpy as np
 class FonteVideo:
     """
     Abstrai a origem dos frames.
-
-    Uso:
-        with FonteVideo("videos/cam.mp4", fps_alvo=6) as fonte:
-            for frame in fonte:
-                ...
     """
 
     def __init__(
@@ -47,6 +42,28 @@ class FonteVideo:
         self.altura = 0
         self.fps_original = 0.0
         self.total_frames = 0
+
+        # Indice do frame que acabou de ser entregue, contado na fonte.
+        self.indice_atual = 0
+
+    @property
+    def ao_vivo(self) -> bool:
+        """True para webcam ou RTSP; False para arquivo."""
+        return self._ao_vivo
+
+    @property
+    def tempo_atual(self) -> float:
+        """
+        Instante do frame atual, em segundos.
+
+        Para arquivo, e o tempo do VIDEO (indice / fps de origem): o
+        mesmo arquivo produz sempre os mesmos instantes, independente da
+        velocidade da maquina ou do modelo. Para stream ao vivo, tempo do
+        video e tempo real coincidem, e vale o relogio monotonico.
+        """
+        if self._ao_vivo:
+            return time.perf_counter()
+        return self.indice_atual / max(self.fps_original, 1e-6)
 
     # ---------- Ciclo de vida ----------
 
@@ -114,6 +131,7 @@ class FonteVideo:
                 if passo > 1 and indice % passo != 0:
                     continue
 
+            self.indice_atual = indice
             yield frame
 
     # ---------- Internos ----------
@@ -135,7 +153,6 @@ class FonteVideo:
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             return cap, True
 
-        # Arquivo de video
         return cv2.VideoCapture(self.fonte), False
 
     def _calcular_passo(self) -> int:

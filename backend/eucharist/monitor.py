@@ -132,7 +132,9 @@ class Monitor:
                 pessoas = self.detector.detectar(frame, rastrear=True)
 
                 if self.contador is not None:
-                    eventos = self.contador.atualizar(pessoas)
+                    # Tempo do video, nao da maquina: mantem a contagem
+                    # identica em qualquer CPU e com qualquer modelo.
+                    eventos = self.contador.atualizar(pessoas, fonte.tempo_atual)
                     for evento in eventos:
                         rotulo = (
                             "ENTROU"

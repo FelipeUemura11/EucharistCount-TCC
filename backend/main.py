@@ -46,21 +46,17 @@ def montar_argumentos() -> argparse.ArgumentParser:
     p.add_argument("--fps", type=float, help="frames por segundo a processar")
     p.add_argument("--threads", type=int, help="limite de threads de CPU")
     p.add_argument("--roi", type=str,
-                   help="area analisada: x1,y1,x2,y2 em fracoes (0-1)")
+                   help="area analisada: x1,y1,x2,y2 em fracoes (0-1)") # Regiao de Interesse (ROI)
     p.add_argument("--sem-roi", action="store_true",
                    help="analisa o frame inteiro")
     p.add_argument("--sem-janela", action="store_true",
                    help="roda sem interface grafica (producao)")
-    p.add_argument("--sem-filtro", action="store_true",
-                   help="desliga o filtro geometrico de caixas")
-    p.add_argument("--sem-contagem", action="store_true",
-                   help="desliga a contagem por linha (so deteccao)")
     p.add_argument("--linha", type=str,
                    help="linha do portao: x1,y1,x2,y2 em fracoes (0-1)")
-    p.add_argument("--espacamento", type=float,
-                   help="distancia entre as linhas paralelas")
     p.add_argument("--inverter-sentido", action="store_true",
-                   help="troca o que conta como entrada e saida")
+                   help="troca entrada por saida (se estiverem espelhadas)")
+    p.add_argument("--sem-contagem", action="store_true",
+                   help="so detecta e rastreia, sem contar cruzamentos")
     return p
 
 
@@ -80,8 +76,6 @@ def aplicar_argumentos(config: Config, args: argparse.Namespace) -> Config:
         config.deteccao.threads = args.threads
     if args.sem_janela:
         config.visual.mostrar_janela = False
-    if args.sem_filtro:
-        config.filtro.ativo = False
     if args.sem_roi:
         config.deteccao.roi_ativo = False
     if args.roi:
@@ -89,12 +83,6 @@ def aplicar_argumentos(config: Config, args: argparse.Namespace) -> Config:
         if len(valores) != 4:
             raise SystemExit("--roi precisa de 4 numeros: x1,y1,x2,y2")
         config.deteccao.roi = valores
-    if args.sem_contagem:
-        config.contagem.ativo = False
-    if args.inverter_sentido:
-        config.contagem.lado_entrada = -config.contagem.lado_entrada
-    if args.espacamento:
-        config.contagem.espacamento = args.espacamento
     if args.linha:
         valores = tuple(float(v) for v in args.linha.split(","))
         if len(valores) != 4:

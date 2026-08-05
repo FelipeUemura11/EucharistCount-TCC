@@ -50,7 +50,7 @@ python -m venv .venv
 # source .venv/bin/activate     # Linux/Mac
 
 pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
-```
+```r
 
 O `--extra-index-url` é importante: sem ele o pip baixa a versão CUDA do
 PyTorch (~2.5 GB) que não serve para nada numa máquina sem GPU.

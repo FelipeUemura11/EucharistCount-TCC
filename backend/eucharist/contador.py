@@ -1,8 +1,6 @@
 """
 Contagem de pessoas por cruzamento de linhas virtuais.
 
-COMO FUNCIONA
-
 Uma linha base e definida por dois pontos (o portao). A partir dela o
 sistema gera linhas paralelas equidistantes. Uma pessoa so e contada
 quando cruza pelo menos N dessas linhas no mesmo sentido, dentro de uma
@@ -90,11 +88,6 @@ def _lado_da_linha(ponto, a, b) -> int:
 class ContadorLinha:
     """
     Mantem o estado de cruzamento de cada pessoa e emite eventos.
-
-    Uso:
-        contador = ContadorLinha(config, largura, altura)
-        eventos = contador.atualizar(pessoas)
-        print(contador.dentro)
     """
 
     def __init__(self, config: ConfigContagem, largura: int, altura: int):
@@ -168,9 +161,23 @@ class ContadorLinha:
 
     # ---------- Ciclo principal ----------
 
-    def atualizar(self, pessoas: list[Pessoa]) -> list[Evento]:
-        """Processa um frame e devolve os eventos confirmados nele."""
-        agora = time.perf_counter()
+    def atualizar(
+        self, pessoas: list[Pessoa], agora: float | None = None
+    ) -> list[Evento]:
+        """
+        Processa um frame e devolve os eventos confirmados nele.
+
+        `agora` e o instante do frame, em segundos. Quem chama deve passar
+        o tempo do VIDEO (indice do frame / fps), nao o relogio da maquina:
+        os limiares em segundos (janela, cooldown, esquecer) descrevem o
+        movimento das pessoas na cena, e nao a velocidade da CPU. Sem isso,
+        analisar o mesmo arquivo com um modelo mais lento muda a contagem.
+
+        Omitido, cai no relogio monotonico — util em teste isolado.
+        """
+        if agora is None:
+            agora = time.perf_counter()
+
         eventos: list[Evento] = []
 
         for pessoa in pessoas:

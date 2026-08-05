@@ -142,13 +142,6 @@ class DetectorPessoas:
     def detectar(self, frame: np.ndarray, rastrear: bool = True) -> list[Pessoa]:
         """
         Detecta pessoas em um frame.
-
-        Com rastrear=True cada pessoa recebe um ID estavel entre frames
-        (necessario para contar sem duplicar). Com False, so deteccao.
-
-        Se a ROI estiver ativa, so o recorte e analisado — mas as
-        coordenadas devolvidas sao sempre do frame inteiro, para que o
-        resto do sistema nao precise saber que houve recorte.
         """
         altura_total, largura_total = frame.shape[:2]
 
