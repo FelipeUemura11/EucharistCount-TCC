@@ -1,13 +1,13 @@
 {
   "camera": {
     "fonte": "videos/cam.mp4",
-    "fps_processamento": 10.0,
+    "fps_processamento": 7.5,
     "segundos_reconexao": 3.0
   },
   "deteccao": {
     "modelo": "modelos/yolo11n.onnx",
     "imgsz": 640,
-    "confianca": 0.20,
+    "confianca": 0.15,
     "iou": 0.7,
     "max_deteccoes": 300,
     "threads": 0,
@@ -26,10 +26,10 @@
   },
   "contagem": {
     "ativo": true,
-    "linha_base": [0.99, 0.20, 0.92, 0.99],
-    "numero_linhas": 1,
-    "espacamento": 0.045,
-    "linhas_necessarias": 1,
+    "linha_base": [0.958,0.15,0.878,1.00],
+    "numero_linhas": 3,
+    "espacamento": 0.035,
+    "linhas_necessarias": 2,
     "lado_entrada": -1,
     "segundos_janela": 6.0,
     "segundos_cooldown": 3.0,

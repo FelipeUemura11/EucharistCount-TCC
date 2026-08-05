@@ -18,7 +18,7 @@ class ConfigCamera:
     fonte: str = "videos/cam.mp4"
 
     # 5 a 8 fps eh suficiente para rastreio confiavel e reduz muito o uso de CPU.
-    fps_processamento: float = 6.0
+    fps_processamento: float = 7.5
 
     # Segundos de espera antes de tentar reconectar um stream que caiu.
     segundos_reconexao: float = 3.0
@@ -36,7 +36,7 @@ class ConfigDeteccao:
     imgsz: int = 640
 
     # Limiar de confianca. Mais baixo detecta mais, com mais falsos positivos.
-    confianca: float = 0.25
+    confianca: float = 0.15
     # IoU (Intersection over Union), métrica que mede o quanto duas caixas delimitadoras (bounding boxes) se sobrepõem.
     iou: float = 0.7
 
@@ -94,11 +94,11 @@ class ConfigContagem:
     ativo: bool = True
 
     # Linha base: x1, y1, x2, y2 (fracoes do frame).
-    linha_base: tuple[float, float, float, float] = (0.99,0.20,0.92,0.99)
+    linha_base: tuple[float, float, float, float] = (0.958,0.15,0.878,1.00)
 
-    numero_linhas: int = 1
-    espacamento: float = 0.045
-    linhas_necessarias: int = 1
+    numero_linhas: int = 3
+    espacamento: float = 0.035
+    linhas_necessarias: int = 2
     lado_entrada: int = -1
     # Tempo maximo entre a primeira e a ultima linha da mesma travessia.
     segundos_janela: float = 6.0
