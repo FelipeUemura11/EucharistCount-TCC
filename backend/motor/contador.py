@@ -215,9 +215,7 @@ class ContadorLinha:
 
         return self._confirmar(pessoa.id, rastro, agora)
 
-    def _confirmar(
-        self, id_pessoa: int, rastro: _Rastro, agora: float
-    ) -> Evento | None:
+    def _confirmar(self, id_pessoa: int, rastro: _Rastro, agora: float) -> Evento | None:
         """Verifica se os cruzamentos acumulados fecham uma contagem."""
         cfg = self.config
 

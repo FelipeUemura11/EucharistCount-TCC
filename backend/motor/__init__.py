@@ -1,8 +1,5 @@
 """
 Eucharist Count — Motor de Visao Computacional.
-
-Nome alinhado ao Diagrama de Arquitetura do TCC, onde este componente
-e chamado de "Motor IA (OpenCV + YOLO + ByteTrack)".
 """
 
 from .config import Config

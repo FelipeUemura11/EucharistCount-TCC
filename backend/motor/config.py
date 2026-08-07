@@ -17,7 +17,7 @@ class ConfigCamera:
     """Acesso da camera."""
     fonte: str = "videos/cam.mp4"
 
-    # 5 a 8 fps eh suficiente para rastreio confiavel e reduz muito o uso de CPU.
+    # 5 a 8 fps é suficiente para rastreio confiável e reduz muito o uso de CPU.
     fps_processamento: float = 7.5
 
     # Segundos de espera antes de tentar reconectar um stream que caiu.
@@ -55,9 +55,7 @@ class ConfigDeteccao:
 
 @dataclass
 class ConfigRastreio:
-    """Como cada pessoa mantem o mesmo ID entre frames."""
-
-    # ByteTrack: leve e resistente a oclusao parcial (bancos de igreja).
+    """Tracker escolhido. Como cada pessoa mantem o mesmo ID entre frames."""
     algoritmo: str = "bytetrack.yaml"
 
 

@@ -1,15 +1,13 @@
 """
 Captura de video: arquivo, webcam ou camera IP (RTSP).
 
-Responsabilidade unica: entregar frames. Nao sabe nada sobre deteccao.
-
 Dois pontos importantes para o computador da igreja:
 
-1. Limitacao de taxa. Processar 30 fps e desperdicio de CPU. Ao pedir
+1. Limitacao de taxa. Processar 30 fps é desperdicio de CPU. Ao pedir
    6 fps, os frames excedentes sao descartados na leitura, antes de
    qualquer processamento pesado.
 
-2. Reconexao. Se o stream RTSP cair no meio da missa, o sistema espera
+2. Reconexão. Se o stream RTSP cair no meio da missa, o sistema espera
    e tenta de novo, em vez de encerrar silenciosamente.
 """
 
@@ -22,10 +20,6 @@ import numpy as np
 
 
 class FonteVideo:
-    """
-    Abstrai a origem dos frames.
-    """
-
     def __init__(
         self,
         fonte: str,
