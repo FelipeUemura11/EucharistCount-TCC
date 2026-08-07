@@ -2,15 +2,8 @@
 Calibra a deteccao para o video/camera da paroquia.
 
 Testa combinacoes de modelo, resolucao e limiar de confianca em frames
-amostrados e mede a velocidade em CPU. Nenhuma imagem e salva em disco:
-os frames de teste existem apenas em memoria durante a execucao do
-script, em conformidade com a LGPD.
+amostrados e mede a velocidade em CPU.
 
-Rode isso uma vez, escolha a melhor configuracao e fixe em config.json.
-
-Uso:
-    python -m scripts.calibrar
-    python -m scripts.calibrar --fonte videos/cam.mp4 --frames 10
 """
 
 import argparse

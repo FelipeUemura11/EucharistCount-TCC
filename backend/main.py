@@ -1,37 +1,12 @@
 """
 Eucharist Count — ponto de entrada do monitoramento.
-
-Uso:
-    # video de teste (padrao definido em config.json)
-    python main.py
-
-    # outra fonte
-    python main.py --fonte videos/cam.mp4
-    python main.py --fonte 0
-    python main.py --fonte "rtsp://usuario:senha@192.168.1.50:554/stream1"
-
-    # ajustes rapidos sem editar a config
-    python main.py --imgsz 480 --conf 0.20
-
-    # ajustar a linha do portao (x1,y1,x2,y2 em fracoes do frame)
-    python main.py --linha 0.98,0.25,0.77,0.97
-
-    # se entradas e saidas estiverem trocadas
-    python main.py --inverter-sentido
-
-    # producao: sem janela, minimo consumo de CPU
-    python main.py --sem-janela --threads 2
-
-Nenhuma imagem ou video e salvo em disco em nenhuma circunstancia.
-O processamento ocorre inteiramente em memoria (RAM), em conformidade
-com a LGPD.
 """
 
 import argparse
 import sys
 
-from eucharist.config import RAIZ, Config
-from eucharist.monitor import Monitor
+from motor.config import RAIZ, Config
+from motor.monitor import Monitor
 
 
 def montar_argumentos() -> argparse.ArgumentParser:
@@ -53,10 +28,6 @@ def montar_argumentos() -> argparse.ArgumentParser:
                    help="roda sem interface grafica (producao)")
     p.add_argument("--linha", type=str,
                    help="linha do portao: x1,y1,x2,y2 em fracoes (0-1)")
-    p.add_argument("--inverter-sentido", action="store_true",
-                   help="troca entrada por saida (se estiverem espelhadas)")
-    p.add_argument("--sem-contagem", action="store_true",
-                   help="so detecta e rastreia, sem contar cruzamentos")
     return p
 
 

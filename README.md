@@ -110,7 +110,7 @@ EucharistCount-TCC/
 │   ├── requirements.txt
 │   ├── README.md                # documentação detalhada do backend
 │   │
-│   ├── eucharist/                # módulo de visão computacional
+│   ├── motor/                    # Motor de Visao Computacional (nome alinhado ao TCC)
 │   │   ├── config.py            # carrega/salva config.json
 │   │   ├── camera.py            # captura: arquivo, webcam ou RTSP
 │   │   ├── detector.py          # YOLO + ByteTrack + ROI → lista de Pessoa
