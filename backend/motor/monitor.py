@@ -6,8 +6,6 @@ provavelmente rodando em uma thread separada, com iniciar() e parar().
 Por enquanto e chamada direto pelo main.py.
 """
 
-from __future__ import annotations
-
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -17,8 +15,15 @@ import cv2
 
 from .camera import FonteVideo
 from .config import Config
+from .contador import ContadorLinha, Sentido
 from .detector import DetectorPessoas, Pessoa
-from .visual import desenhar_painel, desenhar_pessoa, redimensionar
+from .visual import (
+    desenhar_linhas,
+    desenhar_painel,
+    desenhar_pessoa,
+    desenhar_roi,
+    redimensionar,
+)
 
 
 @dataclass
@@ -30,9 +35,18 @@ class Metricas:
     ids_unicos: set[int] = field(default_factory=set)
     fps: float = 0.0
 
+    # Contagem por cruzamento de linha
+    entradas: int = 0
+    saidas: int = 0
+
     @property
     def total_ids(self) -> int:
         return len(self.ids_unicos)
+
+    @property
+    def dentro(self) -> int:
+        """Ocupacao estimada da igreja."""
+        return self.entradas - self.saidas
 
 
 class Monitor:
@@ -60,6 +74,7 @@ class Monitor:
         self._parar = False
         self._pausado = False
         self._janela_fps: deque[float] = deque(maxlen=30)
+        self.contador: ContadorLinha | None = None
 
     def parar(self) -> None:
         """Interrompe o loop. Sera chamado pelo APScheduler ao fim da missa."""
@@ -67,7 +82,7 @@ class Monitor:
 
     # ---------- Loop principal ----------
 
-    def executar(self, gravar_em: str | None = None) -> Metricas:
+    def executar(self) -> Metricas:
         cfg = self.config
         fonte_resolvida = cfg.caminho_absoluto(cfg.camera.fonte)
 
@@ -86,9 +101,16 @@ class Monitor:
         print(f"Modelo     : {self.detector.caminho_modelo.name}")
         print(f"imgsz      : {cfg.deteccao.imgsz}")
         print(f"Confianca  : {cfg.deteccao.confianca}")
+
+        # Contador de linha: precisa das dimensoes reais do frame.
+        if cfg.contagem.ativo:
+            self.contador = ContadorLinha(
+                cfg.contagem, fonte.largura, fonte.altura
+            )
+            print(f"Linhas     : {len(self.contador.linhas)} paralelas")
+            print(f"Lado entrada: {cfg.contagem.lado_entrada}")
         print()
 
-        gravador = self._criar_gravador(gravar_em, fonte) if gravar_em else None
         mostrar = cfg.visual.mostrar_janela
 
         if mostrar:
@@ -98,7 +120,7 @@ class Monitor:
                 int(fonte.largura * cfg.visual.escala_janela),
                 int(fonte.altura * cfg.visual.escala_janela),
             )
-            print("ESC/Q = sair | ESPACO = pausa | S = salvar frame\n")
+            print("ESC/Q = sair | ESPACO = pausa\n")
 
         ultimo_instante = time.perf_counter()
 
@@ -108,22 +130,32 @@ class Monitor:
                     break
 
                 pessoas = self.detector.detectar(frame, rastrear=True)
+
+                if self.contador is not None:
+                    # Tempo do video, nao da maquina: mantem a contagem
+                    # identica em qualquer CPU e com qualquer modelo.
+                    eventos = self.contador.atualizar(pessoas, fonte.tempo_atual)
+                    for evento in eventos:
+                        rotulo = (
+                            "ENTROU"
+                            if evento.sentido is Sentido.ENTRADA
+                            else "SAIU"
+                        )
+                        print(
+                            f"[{rotulo}] ID {evento.id_pessoa}  "
+                            f"dentro={self.contador.dentro}"
+                        )
+
                 self._atualizar_metricas(pessoas, ultimo_instante)
                 ultimo_instante = time.perf_counter()
 
-                if mostrar or gravador is not None:
+                if mostrar:
                     self._anotar(frame, pessoas)
-
-                if gravador is not None:
-                    gravador.write(frame)
 
                 if mostrar and not self._tratar_teclado(frame):
                     break
         finally:
             fonte.fechar()
-            if gravador is not None:
-                gravador.release()
-                print(f"\nVideo salvo em: {gravar_em}")
             if mostrar:
                 cv2.destroyAllWindows()
 
@@ -146,20 +178,50 @@ class Monitor:
         self._janela_fps.append(1.0 / max(decorrido, 1e-6))
         m.fps = sum(self._janela_fps) / len(self._janela_fps)
 
+        if self.contador is not None:
+            m.entradas = self.contador.entradas
+            m.saidas = self.contador.saidas
+
     def _anotar(self, frame, pessoas: list[Pessoa]) -> None:
+        cfg = self.config
+
+        # Escurece o que esta fora da area analisada.
+        if cfg.deteccao.roi_ativo:
+            desenhar_roi(
+                frame,
+                self.detector.roi_em_pixels(
+                    frame.shape[1], frame.shape[0]
+                ),
+            )
+
+        if self.contador is not None and cfg.visual.mostrar_linhas:
+            desenhar_linhas(
+                frame,
+                self.contador.linhas,
+                cfg.contagem.lado_entrada,
+            )
+
         for pessoa in pessoas:
             desenhar_pessoa(frame, pessoa)
 
         m = self.metricas
-        desenhar_painel(
-            frame,
-            [
+        linhas_painel = [
+            f"Dentro da igreja : {m.dentro}",
+            f"Entradas         : {m.entradas}",
+            f"Saidas           : {m.saidas}",
+            f"Pessoas no frame : {m.pessoas_no_frame}",
+            f"FPS              : {m.fps:.1f}",
+        ]
+
+        if self.contador is None:
+            linhas_painel = [
                 f"Pessoas no frame : {m.pessoas_no_frame}",
                 f"IDs unicos       : {m.total_ids}",
                 f"FPS              : {m.fps:.1f}",
                 f"Frame            : {m.frames_processados}",
-            ],
-        )
+            ]
+
+        desenhar_painel(frame, linhas_painel)
 
     def _tratar_teclado(self, frame) -> bool:
         """Processa teclas. Retorna False quando o usuario pede para sair."""
@@ -180,18 +242,4 @@ class Monitor:
                 elif t in (27, ord("q"), ord("Q")):
                     return False
 
-        if tecla in (ord("s"), ord("S")):
-            nome = f"frame_{self.metricas.frames_processados:06d}.jpg"
-            cv2.imwrite(nome, frame)
-            print(f"Frame salvo: {nome}")
-
         return True
-
-    def _criar_gravador(self, caminho: str, fonte: FonteVideo):
-        Path(caminho).parent.mkdir(parents=True, exist_ok=True)
-        return cv2.VideoWriter(
-            caminho,
-            cv2.VideoWriter_fourcc(*"mp4v"),
-            self.config.camera.fps_processamento,
-            (fonte.largura, fonte.altura),
-        )

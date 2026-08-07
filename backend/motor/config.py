@@ -1,40 +1,24 @@
 """
 Configuracao central do Eucharist Count.
-
-Todos os parametros ajustaveis do sistema ficam aqui. Nenhum outro modulo
-deve conter numeros magicos.
-
-O arquivo config.json (na raiz do backend) sobrescreve estes valores.
-Assim a paroquia ajusta o sistema sem editar codigo, e futuramente a tela
-de Configuracoes escreve nesse mesmo JSON.
 """
-
-from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-
-# Raiz do backend — todos os caminhos sao relativos a ela.
 RAIZ = Path(__file__).resolve().parent.parent
 ARQUIVO_CONFIG = RAIZ / "config.json"
 PASTA_MODELOS = RAIZ / "modelos"
 PASTA_VIDEOS = RAIZ / "videos"
-PASTA_SAIDA = RAIZ / "saida"
 
 
 @dataclass
 class ConfigCamera:
-    """De onde vem o video."""
-
-    # Arquivo de teste, indice de webcam ("0") ou URL "rtsp://..."
+    """Acesso da camera."""
     fonte: str = "videos/cam.mp4"
 
-    # Quantos frames por segundo processar. O computador da igreja nao
-    # precisa analisar 30 fps: pessoas nao se teletransportam. 5 a 8 fps
-    # e suficiente para rastreio confiavel e reduz muito o uso de CPU.
-    fps_processamento: float = 6.0
+    # 5 a 8 fps é suficiente para rastreio confiável e reduz muito o uso de CPU.
+    fps_processamento: float = 7.5
 
     # Segundos de espera antes de tentar reconectar um stream que caiu.
     segundos_reconexao: float = 3.0
@@ -43,9 +27,6 @@ class ConfigCamera:
 @dataclass
 class ConfigDeteccao:
     """Como o modelo enxerga as pessoas."""
-
-    # Modelo ONNX ou .pt. ONNX roda bem mais rapido em CPU.
-    # Gere o ONNX com: python -m scripts.preparar_modelo
     modelo: str = "modelos/yolo11n.onnx"
 
     # Resolucao de inferencia (multiplo de 32).
@@ -55,10 +36,9 @@ class ConfigDeteccao:
     imgsz: int = 640
 
     # Limiar de confianca. Mais baixo detecta mais, com mais falsos positivos.
-    confianca: float = 0.25
-
-    # IoU do NMS: remocao de caixas sobrepostas.
-    iou: float = 0.5
+    confianca: float = 0.15
+    # IoU (Intersection over Union), métrica que mede o quanto duas caixas delimitadoras (bounding boxes) se sobrepõem.
+    iou: float = 0.7
 
     # Teto de pessoas por frame.
     max_deteccoes: int = 300
@@ -67,12 +47,15 @@ class ConfigDeteccao:
     # Numa maquina fraca, limitar a 2-4 evita travar o resto do sistema.
     threads: int = 0
 
+    # ---------- Regiao de Interesse (ROI) ----------
+    # Recorta o frame antes da inferencia. So o que estiver dentro do retangulo e analisado.
+    roi_ativo: bool = True
+    roi: tuple[float, float, float, float] = (0.50, 0.05, 1.0, 1.0)
+
 
 @dataclass
 class ConfigRastreio:
-    """Como cada pessoa mantem o mesmo ID entre frames."""
-
-    # ByteTrack: leve e resistente a oclusao parcial (bancos de igreja).
+    """Tracker escolhido. Como cada pessoa mantem o mesmo ID entre frames."""
     algoritmo: str = "bytetrack.yaml"
 
 
@@ -80,9 +63,6 @@ class ConfigRastreio:
 class ConfigFiltro:
     """
     Descarta caixas com geometria improvavel para uma pessoa.
-
-    Limites propositalmente permissivos: numa igreja ha gente sentada,
-    de pe, de perfil e parcialmente oculta, entao a proporcao varia muito.
     """
 
     ativo: bool = True
@@ -97,11 +77,44 @@ class ConfigFiltro:
 
 
 @dataclass
+class ConfigContagem:
+    """
+    Contagem por cruzamento de linhas virtuais no portao.
+
+    A linha base e definida por dois pontos, em fracoes da largura e da
+    altura do frame (0.0 a 1.0) — assim funciona igual em qualquer
+    resolucao de camera. A partir dela sao geradas linhas paralelas.
+
+        (x1, y1) = primeiro ponto
+        (x2, y2) = segundo ponto
+    """
+
+    ativo: bool = True
+
+    # Linha base: x1, y1, x2, y2 (fracoes do frame).
+    linha_base: tuple[float, float, float, float] = (0.958,0.15,0.878,1.00)
+
+    numero_linhas: int = 3
+    espacamento: float = 0.035
+    linhas_necessarias: int = 2
+    lado_entrada: int = -1
+    # Tempo maximo entre a primeira e a ultima linha da mesma travessia.
+    segundos_janela: float = 6.0
+    # Apos contar alguem, ignora essa pessoa por este tempo.
+    segundos_cooldown: float = 3.0
+    # Descarta o rastro de quem sumiu do enquadramento.
+    segundos_esquecer: float = 10.0
+
+
+@dataclass
 class ConfigVisual:
     """Janela de monitoramento. Desligada em producao."""
 
     mostrar_janela: bool = True
     escala_janela: float = 0.6
+
+    # Desenha as linhas virtuais e a zona de contagem sobre a imagem.
+    mostrar_linhas: bool = True
 
 
 @dataclass
@@ -110,6 +123,7 @@ class Config:
     deteccao: ConfigDeteccao = field(default_factory=ConfigDeteccao)
     rastreio: ConfigRastreio = field(default_factory=ConfigRastreio)
     filtro: ConfigFiltro = field(default_factory=ConfigFiltro)
+    contagem: ConfigContagem = field(default_factory=ConfigContagem)
     visual: ConfigVisual = field(default_factory=ConfigVisual)
 
     # ---------- Persistencia ----------
@@ -129,6 +143,7 @@ class Config:
             deteccao=ConfigDeteccao(**dados.get("deteccao", {})),
             rastreio=ConfigRastreio(**dados.get("rastreio", {})),
             filtro=ConfigFiltro(**dados.get("filtro", {})),
+            contagem=ConfigContagem(**dados.get("contagem", {})),
             visual=ConfigVisual(**dados.get("visual", {})),
         )
 

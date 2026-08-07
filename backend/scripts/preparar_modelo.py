@@ -4,17 +4,7 @@ Prepara o modelo de deteccao para CPU.
 Baixa o checkpoint PyTorch e exporta para ONNX, que roda tipicamente
 2 a 4x mais rapido em CPU do que o .pt original.
 
-Uso:
-    python -m scripts.preparar_modelo
-    python -m scripts.preparar_modelo --modelo yolo11s --imgsz 480
-
-Modelos disponiveis, do mais leve ao mais preciso:
-    yolo11n  — recomendado para maquina fraca
-    yolo11s  — mais preciso, cerca de 2.5x mais lento
-    yolov8n  — alternativa ao 11n
 """
-
-from __future__ import annotations
 
 import argparse
 import shutil
@@ -24,7 +14,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
 
-from eucharist.config import PASTA_MODELOS  # noqa: E402
+from motor.config import PASTA_MODELOS  # noqa: E402
 
 
 def main() -> int:

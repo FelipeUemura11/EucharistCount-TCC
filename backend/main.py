@@ -1,32 +1,12 @@
 """
 Eucharist Count — ponto de entrada do monitoramento.
-
-Uso:
-    # video de teste (padrao definido em config.json)
-    python main.py
-
-    # outra fonte
-    python main.py --fonte videos/cam.mp4
-    python main.py --fonte 0
-    python main.py --fonte "rtsp://usuario:senha@192.168.1.50:554/stream1"
-
-    # ajustes rapidos sem editar a config
-    python main.py --imgsz 480 --conf 0.20
-
-    # producao: sem janela, minimo consumo de CPU
-    python main.py --sem-janela --threads 2
-
-    # gravar video anotado (para a validacao do TCC)
-    python main.py --salvar saida/validacao.mp4
 """
-
-from __future__ import annotations
 
 import argparse
 import sys
 
-from eucharist.config import RAIZ, Config
-from eucharist.monitor import Monitor
+from motor.config import RAIZ, Config
+from motor.monitor import Monitor
 
 
 def montar_argumentos() -> argparse.ArgumentParser:
@@ -40,11 +20,14 @@ def montar_argumentos() -> argparse.ArgumentParser:
     p.add_argument("--conf", type=float, help="limiar de confianca (0-1)")
     p.add_argument("--fps", type=float, help="frames por segundo a processar")
     p.add_argument("--threads", type=int, help="limite de threads de CPU")
-    p.add_argument("--salvar", help="caminho do mp4 anotado de saida")
+    p.add_argument("--roi", type=str,
+                   help="area analisada: x1,y1,x2,y2 em fracoes (0-1)") # Regiao de Interesse (ROI)
+    p.add_argument("--sem-roi", action="store_true",
+                   help="analisa o frame inteiro")
     p.add_argument("--sem-janela", action="store_true",
                    help="roda sem interface grafica (producao)")
-    p.add_argument("--sem-filtro", action="store_true",
-                   help="desliga o filtro geometrico de caixas")
+    p.add_argument("--linha", type=str,
+                   help="linha do portao: x1,y1,x2,y2 em fracoes (0-1)")
     return p
 
 
@@ -64,8 +47,18 @@ def aplicar_argumentos(config: Config, args: argparse.Namespace) -> Config:
         config.deteccao.threads = args.threads
     if args.sem_janela:
         config.visual.mostrar_janela = False
-    if args.sem_filtro:
-        config.filtro.ativo = False
+    if args.sem_roi:
+        config.deteccao.roi_ativo = False
+    if args.roi:
+        valores = tuple(float(v) for v in args.roi.split(","))
+        if len(valores) != 4:
+            raise SystemExit("--roi precisa de 4 numeros: x1,y1,x2,y2")
+        config.deteccao.roi = valores
+    if args.linha:
+        valores = tuple(float(v) for v in args.linha.split(","))
+        if len(valores) != 4:
+            raise SystemExit("--linha precisa de 4 numeros: x1,y1,x2,y2")
+        config.contagem.linha_base = valores
     return config
 
 
@@ -79,7 +72,7 @@ def main() -> int:
 
     try:
         monitor = Monitor(config, RAIZ)
-        metricas = monitor.executar(gravar_em=args.salvar)
+        metricas = monitor.executar()
     except FileNotFoundError as e:
         print(f"\n[ERRO] {e}")
         return 1
@@ -92,7 +85,9 @@ def main() -> int:
 
     print("\n" + "=" * 52)
     print(f"Frames processados : {metricas.frames_processados}")
-    print(f"IDs unicos         : {metricas.total_ids}")
+    print(f"Entradas           : {metricas.entradas}")
+    print(f"Saidas             : {metricas.saidas}")
+    print(f"Dentro da igreja   : {metricas.dentro}")
     print(f"FPS medio          : {metricas.fps:.1f}")
     print("=" * 52)
     return 0

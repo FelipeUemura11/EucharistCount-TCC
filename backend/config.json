@@ -1,29 +1,43 @@
 {
   "camera": {
     "fonte": "videos/cam.mp4",
-    "fps_processamento": 6.0,
+    "fps_processamento": 7.5,
     "segundos_reconexao": 3.0
   },
   "deteccao": {
     "modelo": "modelos/yolo11n.onnx",
     "imgsz": 640,
-    "confianca": 0.25,
-    "iou": 0.5,
+    "confianca": 0.15,
+    "iou": 0.7,
     "max_deteccoes": 300,
-    "threads": 0
+    "threads": 0,
+    "roi_ativo": true,
+    "roi": [0.50, 0.05, 1.0, 1.0]
   },
   "rastreio": {
     "algoritmo": "bytetrack.yaml"
   },
   "filtro": {
     "ativo": true,
-    "area_min": 0.0002,
+    "area_min": 0.0001,
     "area_max": 0.35,
-    "aspecto_min": 0.15,
-    "aspecto_max": 2.5
+    "aspecto_min": 0.10,
+    "aspecto_max": 3.2
+  },
+  "contagem": {
+    "ativo": true,
+    "linha_base": [0.958,0.15,0.878,1.00],
+    "numero_linhas": 3,
+    "espacamento": 0.035,
+    "linhas_necessarias": 2,
+    "lado_entrada": -1,
+    "segundos_janela": 6.0,
+    "segundos_cooldown": 3.0,
+    "segundos_esquecer": 10.0
   },
   "visual": {
     "mostrar_janela": true,
-    "escala_janela": 0.6
+    "escala_janela": 0.6,
+    "mostrar_linhas": true
   }
 }

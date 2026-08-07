@@ -23,7 +23,6 @@ backend/videos/
 *.mkv
 
 # Saidas geradas
-backend/saida/
 *.jpg
 *.jpeg
 *.png
