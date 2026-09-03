@@ -12,10 +12,10 @@
     "max_deteccoes": 300,
     "threads": 0,
     "roi_ativo": true,
-    "roi": [0.50, 0.05, 1.0, 1.0]
+    "roi": [0.0, 0.0, 0.42, 1.0]
   },
   "rastreio": {
-    "algoritmo": "bytetrack.yaml"
+    "algoritmo": "bytetrack_ajustado.yaml"
   },
   "filtro": {
     "ativo": true,
@@ -26,13 +26,13 @@
   },
   "contagem": {
     "ativo": true,
-    "linha_base": [0.958,0.15,0.878,1.00],
-    "numero_linhas": 3,
+    "linha_base": [0.045, 0.0, 0.045, 1.0],
+    "numero_linhas": 1,
+    "linhas_necessarias": 1,
+    "lado_entrada": 1,
     "espacamento": 0.035,
-    "linhas_necessarias": 2,
-    "lado_entrada": -1,
     "segundos_janela": 6.0,
-    "segundos_cooldown": 3.0,
+    "segundos_cooldown": 8.0,
     "segundos_esquecer": 10.0
   },
   "visual": {
