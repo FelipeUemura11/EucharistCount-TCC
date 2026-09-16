@@ -23,6 +23,9 @@ def main() -> int:
                     help="yolo11n, yolo11s, yolov8n, ...")
     ap.add_argument("--imgsz", type=int, default=640,
                     help="resolucao de inferencia (multiplo de 32)")
+    ap.add_argument("--fixo", action="store_true",
+                    help="trava o modelo no imgsz informado. Sem esta flag, "
+                         "o ONNX aceita qualquer resolucao em tempo de execucao")
     args = ap.parse_args()
 
     from ultralytics import YOLO
@@ -32,15 +35,23 @@ def main() -> int:
     print(f"Baixando/carregando {args.modelo}...")
     modelo = YOLO(f"{args.modelo}.pt")
 
-    print(f"Exportando para ONNX (imgsz={args.imgsz})...")
+    dinamico = not args.fixo
+
+    print(f"Exportando para ONNX (imgsz={args.imgsz}, dynamic={dinamico})...")
     # simplify reduz o grafo; opset 12 e amplamente compativel.
     # half=False de proposito: FP16 nao acelera em CPU e perde precisao.
+    #
+    # dynamic=True deixa a dimensao de entrada flexivel: o mesmo arquivo
+    # roda em 640, 960, 1280... Sem isso, o grafo congela no imgsz da
+    # exportacao e o ONNX Runtime recusa qualquer outro tamanho com
+    # "Got invalid dimensions for input".
     caminho_onnx = modelo.export(
         format="onnx",
         imgsz=args.imgsz,
         half=False,
         simplify=True,
         opset=12,
+        dynamic=dinamico,
         device="cpu",
     )
 
@@ -59,6 +70,9 @@ def main() -> int:
     print("\nAjuste config.json:")
     print(f'  "modelo": "modelos/{args.modelo}.onnx",')
     print(f'  "imgsz": {args.imgsz}')
+    if dinamico:
+        print("\nEste modelo aceita outras resolucoes sem reexportar:")
+        print("  python main.py --imgsz 960")
     print("\nDepois teste com:")
     print("  python main.py --fonte videos/cam.mp4")
     return 0

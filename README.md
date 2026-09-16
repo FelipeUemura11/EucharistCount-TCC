@@ -83,7 +83,6 @@ Este é um TCC em duas etapas. **O que está implementado até aqui** é a funda
 | Captura de vídeo (arquivo / webcam / RTSP, com reconexão) | ✅ Implementado |
 | Detecção de pessoas (YOLO, otimizado para CPU via ONNX) | ✅ Implementado |
 | Rastreamento com ID persistente (ByteTrack) | ✅ Implementado |
-| Recorte de Região de Interesse (ROI) | ✅ Implementado |
 | Contagem por cruzamento de linha virtual (entrada/saída) | ✅ Implementado |
 | Painel de monitoramento em tempo real (janela local) | ✅ Implementado |
 | API (FastAPI) | ⏳ Planejado — TCC II |
@@ -113,7 +112,7 @@ EucharistCount-TCC/
 │   ├── motor/                    # Motor de Visao Computacional (nome alinhado ao TCC)
 │   │   ├── config.py            # carrega/salva config.json
 │   │   ├── camera.py            # captura: arquivo, webcam ou RTSP
-│   │   ├── detector.py          # YOLO + ByteTrack + ROI → lista de Pessoa
+│   │   ├── detector.py          # YOLO + ByteTrack → lista de Pessoa
 │   │   ├── contador.py          # contagem por cruzamento de linha virtual
 │   │   ├── visual.py            # desenho (janela de monitoramento)
 │   │   └── monitor.py           # orquestra o ciclo completo

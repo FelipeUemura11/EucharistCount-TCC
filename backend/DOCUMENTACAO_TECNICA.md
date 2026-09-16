@@ -19,7 +19,7 @@ Câmera/Arquivo
 FonteVideo (camera.py)          → entrega o frame, no ritmo certo
     │
     ▼
-DetectorPessoas (detector.py)   → recorta a ROI, roda YOLO + ByteTrack
+DetectorPessoas (detector.py)   → roda YOLO + ByteTrack, filtra caixas
     │                              devolve uma lista de objetos Pessoa
     ▼
 ContadorLinha (contador.py)     → verifica se alguma Pessoa cruzou a linha
@@ -196,30 +196,26 @@ Esses limites são propositalmente **permissivos**, não restritivos. A razão �
 
 ---
 
-## 7. ROI (Região de Interesse): olhar só para onde importa
+## 7. Filtro geométrico e enquadramento da câmera
 
-Antes mesmo de rodar o YOLO, o frame é recortado:
+Uma versão anterior deste sistema recortava digitalmente o frame antes da
+inferência (técnica conhecida como ROI — Região de Interesse), para
+analisar apenas a área próxima ao portão.
 
-```python
-if self.config.roi_ativo:
-    rx1, ry1, rx2, ry2 = self.roi_em_pixels(largura_total, altura_total)
-    entrada = frame[ry1:ry2, rx1:rx2]
-```
+Essa etapa foi **removida** após o reposicionamento físico da câmera. Com
+a câmera apontada diretamente para a entrada, todo o enquadramento já
+corresponde à área de interesse — recortar digitalmente passou a ser
+redundante e só adicionaria complexidade ao código (conversão de
+coordenadas, risco de cortar a linha de contagem, mais um parâmetro a
+calibrar).
 
-A ROI atual é `[0.50, 0.05, 1.0, 1.0]` — metade direita do frame, quase toda a altura. Essa escolha resolve três problemas ao mesmo tempo:
+A lição que fica registrada aqui é relevante para o TCC: **ajustar o
+posicionamento físico da câmera resolve melhor, e com menos código, o que
+se tentava compensar em software.** O enquadramento correto na instalação
+é preferencial a qualquer recorte digital posterior.
 
-1. **Precisão.** O requisito do projeto é contar apenas quem está perto da porta, não quem está andando ao fundo do pátio. Recortando a imagem, a mesma pessoa perto do portão ocupa uma **fração maior de pixels dentro da imagem analisada** do que ocuparia na imagem inteira — isso ajuda o modelo a distinguir melhor duas pessoas próximas uma da outra, porque há mais detalhe disponível para diferenciá-las.
-2. **Foco.** Pessoas distantes simplesmente não entram na região analisada, então nunca geram detecção — não é preciso filtrar depois, elas nunca existem para o sistema.
-3. **Desempenho.** Processar metade da área de imagem custa proporcionalmente menos CPU. Numa máquina sem GPU, esse ganho é revertido diretamente em mais frames por segundo ou em folga para rodar em resolução maior.
-
-Um detalhe de implementação importante: como a ROI recorta a imagem, as coordenadas que o YOLO devolve são relativas ao recorte, não ao frame inteiro. O código soma de volta o deslocamento (`off_x`, `off_y`) para que o resto do sistema — contador, desenho na tela — sempre trabalhe com coordenadas do frame completo, sem precisar saber que uma ROI existe:
-
-```python
-x1=int(x1) + off_x,
-y1=int(y1) + off_y,
-```
-
-**Restrição de projeto:** a ROI precisa necessariamente incluir espaço dos dois lados da linha de contagem. Se ela terminar exatamente em cima da linha, o sistema nunca teria a chance de observar a pessoa *antes* de cruzar — e sem essa observação prévia, o algoritmo de contagem (seção 8) não tem como saber que houve uma travessia.
+O que permanece é o filtro geométrico descrito na seção 6, aplicado sobre
+as detecções do frame completo.
 
 ---
 
@@ -392,6 +388,6 @@ Essa é a base técnica direta da conformidade com a LGPD que o TCC declara: sem
 | Ponto de referência | Pés (base da caixa) | Mais estável que o centro sob oclusão parcial |
 | Cálculo de lado da linha | Produto vetorial | Funciona em qualquer ângulo de câmera (diagonal) |
 | Número de linhas | 3, exigindo 2 | Filtra tremor de rastreamento sem exigir perfeição |
-| ROI | Metade direita do frame | Ignora quem está longe, melhora separação de pessoas, poupa CPU |
+| Enquadramento | Câmera apontada para a entrada | Resolve fisicamente o que a ROI compensava em software |
 | Base de tempo da contagem | Tempo do vídeo, não da CPU | Reprodutibilidade entre execuções e hardwares |
 | Armazenamento de imagem | Inexistente no código | Conformidade estrutural com a LGPD |

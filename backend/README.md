@@ -18,7 +18,7 @@ backend/
 ├── motor/                   # Motor de Visão Computacional (OpenCV + YOLO + ByteTrack)
 │   ├── config.py            # carrega/salva config.json
 │   ├── camera.py            # captura: arquivo, webcam ou RTSP
-│   ├── detector.py          # YOLO + ByteTrack + ROI → lista de Pessoa
+│   ├── detector.py          # YOLO + ByteTrack → lista de Pessoa
 │   ├── contador.py          # contagem por cruzamento de linha virtual
 │   ├── visual.py            # desenho (só para monitoramento)
 │   └── monitor.py           # orquestra o ciclo completo
@@ -74,14 +74,14 @@ python -m scripts.preparar_modelo --modelo yolo11n --imgsz 640
 
 Exporta para ONNX, que roda 2 a 4× mais rápido em CPU que o `.pt`.
 
-### 3. Posicione a linha de contagem e a ROI, e rode
+### 3. Posicione a linha de contagem e rode
 
 ```bash
 python main.py
 ```
 
-Ajuste `contagem.linha_base` e `deteccao.roi` no `config.json` até a linha
-e a área analisada (destacada em ciano na janela) ficarem sobre o portão.
+Ajuste `contagem.linha_base` no `config.json` até as linhas amarelas
+ficarem sobre o portão.
 
 ---
 
@@ -96,12 +96,6 @@ python main.py --fonte "rtsp://usuario:senha@192.168.1.50:554/stream1"
 
 # ajustar a linha do portao (x1,y1,x2,y2 em fracoes do frame)
 python main.py --linha 0.96,0.20,0.88,0.99
-
-# ajustar a area analisada (ROI)
-python main.py --roi 0.50,0.05,1.0,1.0
-
-# se entrada/saida estiverem trocadas
-python main.py --inverter-sentido
 
 # maquina fraca: menor resolucao, menos threads, sem janela
 python main.py --imgsz 480 --threads 2 --sem-janela
@@ -123,13 +117,6 @@ paralelas equidistantes (`numero_linhas`, `espacamento`); a pessoa só é
 contada ao cruzar pelo menos `linhas_necessarias` delas no mesmo sentido,
 o que evita contagem falsa por tremor da caixa delimitadora.
 
-Antes da inferência, o frame é recortado pela **ROI** (`deteccao.roi`):
-só a área próxima ao portão é analisada. Isso ignora quem está longe,
-melhora a separação entre pessoas próximas (mais pixels por indivíduo) e
-reduz o custo de CPU. A ROI precisa incluir espaço dos dois lados da
-linha de contagem — senão o sistema não consegue observar a pessoa antes
-e depois da travessia.
-
 O rastreamento usa ByteTrack via Ultralytics, garantindo que cada pessoa
 mantenha um ID único entre frames — sem isso, a mesma pessoa detectada
 em vários quadros poderia ser contada mais de uma vez.
@@ -143,7 +130,6 @@ Em ordem de impacto:
 | Parâmetro | Efeito |
 |---|---|
 | `fps_processamento` | maior ganho, menor perda. Pessoas não andam rápido o bastante para poucos fps ser insuficiente |
-| `roi` | recortar a área analisada reduz proporcionalmente o custo de CPU |
 | `imgsz: 480` | mais rápido que 640/960, mas perde pessoas ao fundo |
 | `modelo: yolo11n.onnx` | o mais leve que ainda detecta bem |
 | `threads` | limita o uso de CPU e mantém a máquina utilizável |
@@ -167,7 +153,6 @@ Se as pessoas do fundo não forem detectadas, o problema quase sempre é o
 - `confianca` — limiar (0–1); mais baixo detecta mais e erra mais
 - `iou` — limiar do NMS; baixo demais funde pessoas próximas numa caixa só
 - `threads` — limite de núcleos; `0` = automático
-- `roi_ativo` / `roi` — região analisada, em frações do frame (x1,y1,x2,y2)
 
 **filtro** — descarta caixas com geometria improvável para uma pessoa.
 Os limites são permissivos de propósito: numa igreja há gente sentada,

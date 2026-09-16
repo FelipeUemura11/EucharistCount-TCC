@@ -21,7 +21,6 @@ from .visual import (
     desenhar_linhas,
     desenhar_painel,
     desenhar_pessoa,
-    desenhar_roi,
     redimensionar,
 )
 
@@ -184,15 +183,6 @@ class Monitor:
 
     def _anotar(self, frame, pessoas: list[Pessoa]) -> None:
         cfg = self.config
-
-        # Escurece o que esta fora da area analisada.
-        if cfg.deteccao.roi_ativo:
-            desenhar_roi(
-                frame,
-                self.detector.roi_em_pixels(
-                    frame.shape[1], frame.shape[0]
-                ),
-            )
 
         if self.contador is not None and cfg.visual.mostrar_linhas:
             desenhar_linhas(

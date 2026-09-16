@@ -10,9 +10,7 @@
     "confianca": 0.15,
     "iou": 0.7,
     "max_deteccoes": 300,
-    "threads": 0,
-    "roi_ativo": true,
-    "roi": [0.50, 0.05, 1.0, 1.0]
+    "threads": 0
   },
   "rastreio": {
     "algoritmo": "bytetrack.yaml"
@@ -26,7 +24,7 @@
   },
   "contagem": {
     "ativo": true,
-    "linha_base": [0.958,0.15,0.878,1.00],
+    "linha_base": [0.50, 0.0, 0.50, 1.00],
     "numero_linhas": 3,
     "espacamento": 0.035,
     "linhas_necessarias": 2,

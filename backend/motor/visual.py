@@ -17,7 +17,6 @@ PRETO = (0, 0, 0)
 VERDE = (80, 220, 80)
 VERMELHO = (80, 80, 240)
 AMARELO = (60, 220, 240)
-CIANO = (240, 200, 60)
 FONTE = cv2.FONT_HERSHEY_SIMPLEX
 
 
@@ -87,31 +86,6 @@ def redimensionar(frame: np.ndarray, escala: float) -> np.ndarray:
     if escala == 1.0:
         return frame
     return cv2.resize(frame, (0, 0), fx=escala, fy=escala)
-
-
-def desenhar_roi(
-    frame: np.ndarray,
-    roi: tuple[int, int, int, int],
-) -> None:
-    """
-    Escurece tudo fora da regiao analisada.
-
-    Deixa obvio na tela qual area o sistema realmente enxerga — o que
-    ajuda a posicionar a ROI sobre a porta da igreja.
-    """
-    x1, y1, x2, y2 = roi
-
-    escuro = frame.copy()
-    escuro[:] = (0, 0, 0)
-    # Reabre a janela da ROI no overlay escuro.
-    escuro[y1:y2, x1:x2] = frame[y1:y2, x1:x2]
-    cv2.addWeighted(escuro, 0.65, frame, 0.35, 0, frame)
-
-    cv2.rectangle(frame, (x1, y1), (x2, y2), CIANO, 2)
-    cv2.putText(
-        frame, "AREA ANALISADA", (x1 + 8, y1 + 22),
-        FONTE, 0.5, CIANO, 1, cv2.LINE_AA,
-    )
 
 
 def desenhar_linhas(

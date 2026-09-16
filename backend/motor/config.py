@@ -47,11 +47,6 @@ class ConfigDeteccao:
     # Numa maquina fraca, limitar a 2-4 evita travar o resto do sistema.
     threads: int = 0
 
-    # ---------- Regiao de Interesse (ROI) ----------
-    # Recorta o frame antes da inferencia. So o que estiver dentro do retangulo e analisado.
-    roi_ativo: bool = True
-    roi: tuple[float, float, float, float] = (0.50, 0.05, 1.0, 1.0)
-
 
 @dataclass
 class ConfigRastreio:
@@ -92,7 +87,8 @@ class ConfigContagem:
     ativo: bool = True
 
     # Linha base: x1, y1, x2, y2 (fracoes do frame).
-    linha_base: tuple[float, float, float, float] = (0.958,0.15,0.878,1.00)
+    # x1 == x2 deixa a linha perfeitamente vertical.
+    linha_base: tuple[float, float, float, float] = (0.50, 0.0, 0.50, 1.00)
 
     numero_linhas: int = 3
     espacamento: float = 0.035

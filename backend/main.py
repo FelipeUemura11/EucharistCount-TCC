@@ -20,10 +20,6 @@ def montar_argumentos() -> argparse.ArgumentParser:
     p.add_argument("--conf", type=float, help="limiar de confianca (0-1)")
     p.add_argument("--fps", type=float, help="frames por segundo a processar")
     p.add_argument("--threads", type=int, help="limite de threads de CPU")
-    p.add_argument("--roi", type=str,
-                   help="area analisada: x1,y1,x2,y2 em fracoes (0-1)") # Regiao de Interesse (ROI)
-    p.add_argument("--sem-roi", action="store_true",
-                   help="analisa o frame inteiro")
     p.add_argument("--sem-janela", action="store_true",
                    help="roda sem interface grafica (producao)")
     p.add_argument("--linha", type=str,
@@ -47,13 +43,6 @@ def aplicar_argumentos(config: Config, args: argparse.Namespace) -> Config:
         config.deteccao.threads = args.threads
     if args.sem_janela:
         config.visual.mostrar_janela = False
-    if args.sem_roi:
-        config.deteccao.roi_ativo = False
-    if args.roi:
-        valores = tuple(float(v) for v in args.roi.split(","))
-        if len(valores) != 4:
-            raise SystemExit("--roi precisa de 4 numeros: x1,y1,x2,y2")
-        config.deteccao.roi = valores
     if args.linha:
         valores = tuple(float(v) for v in args.linha.split(","))
         if len(valores) != 4:
