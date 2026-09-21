@@ -74,7 +74,7 @@ def main() -> int:
         print("\nEste modelo aceita outras resolucoes sem reexportar:")
         print("  python main.py --imgsz 960")
     print("\nDepois teste com:")
-    print("  python main.py --fonte videos/cam.mp4")
+    print("  python main.py --fonte videos/20-09-teste.mp4")
     return 0
 
 

@@ -128,7 +128,6 @@ def testar(amostras, modelos, resolucoes, confiancas) -> list[dict]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--fonte", default="videos/cam.mp4")
     ap.add_argument("--frames", type=int, default=8)
     ap.add_argument("--max-ms", type=float, default=400.0,
                     help="descarta configuracoes mais lentas que isto")

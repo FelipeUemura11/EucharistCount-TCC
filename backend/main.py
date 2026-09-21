@@ -23,7 +23,7 @@ def montar_argumentos() -> argparse.ArgumentParser:
     p.add_argument("--sem-janela", action="store_true",
                    help="roda sem interface grafica (producao)")
     p.add_argument("--linha", type=str,
-                   help="linha do portao: x1,y1,x2,y2 em fracoes (0-1)")
+                   help="linha de contagem: x1,y1,x2,y2 em fracoes (0-1)")
     return p
 
 
@@ -47,7 +47,7 @@ def aplicar_argumentos(config: Config, args: argparse.Namespace) -> Config:
         valores = tuple(float(v) for v in args.linha.split(","))
         if len(valores) != 4:
             raise SystemExit("--linha precisa de 4 numeros: x1,y1,x2,y2")
-        config.contagem.linha_base = valores
+        config.contagem.linha = valores
     return config
 
 

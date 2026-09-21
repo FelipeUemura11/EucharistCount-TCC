@@ -18,7 +18,7 @@ from .config import Config
 from .contador import ContadorLinha, Sentido
 from .detector import DetectorPessoas, Pessoa
 from .visual import (
-    desenhar_linhas,
+    desenhar_linha,
     desenhar_painel,
     desenhar_pessoa,
     redimensionar,
@@ -50,10 +50,7 @@ class Metricas:
 
 class Monitor:
     """
-    Orquestra o ciclo: ler frame -> detectar -> (opcional) desenhar.
-
-    A logica de contagem por linha entrara aqui depois, consumindo a
-    lista de Pessoa que o detector ja devolve.
+    Orquestra o ciclo: ler frame -> detectar -> contar -> desenhar.
     """
 
     JANELA = "Eucharist Count - Monitoramento"
@@ -106,8 +103,7 @@ class Monitor:
             self.contador = ContadorLinha(
                 cfg.contagem, fonte.largura, fonte.altura
             )
-            print(f"Linhas     : {len(self.contador.linhas)} paralelas")
-            print(f"Lado entrada: {cfg.contagem.lado_entrada}")
+            print(f"Linha      : {self.contador.linha}")
         print()
 
         mostrar = cfg.visual.mostrar_janela
@@ -185,11 +181,7 @@ class Monitor:
         cfg = self.config
 
         if self.contador is not None and cfg.visual.mostrar_linhas:
-            desenhar_linhas(
-                frame,
-                self.contador.linhas,
-                cfg.contagem.lado_entrada,
-            )
+            desenhar_linha(frame, self.contador.linha, self.contador.margem)
 
         for pessoa in pessoas:
             desenhar_pessoa(frame, pessoa)

@@ -15,7 +15,7 @@ PASTA_VIDEOS = RAIZ / "videos"
 @dataclass
 class ConfigCamera:
     """Acesso da camera."""
-    fonte: str = "videos/cam.mp4"
+    fonte: str = "videos/20-09-teste.mp4"
 
     # 5 a 8 fps é suficiente para rastreio confiável e reduz muito o uso de CPU.
     fps_processamento: float = 7.5
@@ -74,28 +74,33 @@ class ConfigFiltro:
 @dataclass
 class ConfigContagem:
     """
-    Contagem por cruzamento de linhas virtuais no portao.
+    Contagem por cruzamento de uma linha virtual no acesso.
 
-    A linha base e definida por dois pontos, em fracoes da largura e da
-    altura do frame (0.0 a 1.0) — assim funciona igual em qualquer
-    resolucao de camera. A partir dela sao geradas linhas paralelas.
+    A linha e definida por dois pontos em fracoes da largura e da altura
+    do frame (0.0 a 1.0) — assim a mesma configuracao vale em qualquer
+    resolucao de camera.
 
-        (x1, y1) = primeiro ponto
-        (x2, y2) = segundo ponto
+        (x1, y1) = ponto de cima
+        (x2, y2) = ponto de baixo
+
+    x1 == x2 deixa a linha perfeitamente vertical.
     """
 
     ativo: bool = True
 
-    # Linha base: x1, y1, x2, y2 (fracoes do frame).
-    # x1 == x2 deixa a linha perfeitamente vertical.
-    linha_base: tuple[float, float, float, float] = (0.50, 0.0, 0.50, 1.00)
+    # Linha de contagem: x1, y1, x2, y2 (fracoes do frame).
+    # Vertical na porcao esquerda do quadro, um pouco a direita do
+    # portao: colada no portao o rastreio morre na oclusao e a travessia
+    # nao chega a ser confirmada (ver DOCUMENTACAO_TECNICA, secao 7.1).
+    linha: tuple[float, float, float, float] = (0.25, 0.0, 0.25, 1.00)
 
-    numero_linhas: int = 3
-    espacamento: float = 0.035
-    linhas_necessarias: int = 2
-    lado_entrada: int = -1
-    # Tempo maximo entre a primeira e a ultima linha da mesma travessia.
-    segundos_janela: float = 6.0
+    # Meia-largura da zona morta em volta da linha, em fracao da largura
+    # do frame. O lado da pessoa so e confirmado fora dela — e o que
+    # impede o tremor da caixa delimitadora de virar contagem falsa.
+    # Aumentar exige que a pessoa se afaste mais da linha para ser
+    # contada, e quem perde o rastro antes disso deixa de ser contado.
+    margem: float = 0.035
+
     # Apos contar alguem, ignora essa pessoa por este tempo.
     segundos_cooldown: float = 3.0
     # Descarta o rastro de quem sumiu do enquadramento.

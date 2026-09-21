@@ -61,7 +61,7 @@ Conforme especificado no documento do TCC:
 |---|---|---|
 | Linguagem / matemática | **Python + NumPy** | Base do backend e manipulação matricial de frames |
 | Visão computacional | **OpenCV** | Captura, redimensionamento e desenho sobre os frames |
-| Detecção | **Ultralytics YOLO** | Detecção de pessoas (classe `person`), restrita à ROI dos acessos |
+| Detecção | **Ultralytics YOLO** | Detecção de pessoas (classe `person`) no quadro da câmera de acesso |
 | Rastreamento | **ByteTrack** | Identificadores únicos e persistentes por indivíduo |
 | API | **FastAPI + Uvicorn** | Rotas HTTP assíncronas, comunicação local |
 | Validação de dados | **Pydantic** | Tipagem e validação dos schemas trafegados |
@@ -108,6 +108,7 @@ EucharistCount-TCC/
 │   ├── config.json              # parâmetros ajustáveis (câmera, modelo, contagem)
 │   ├── requirements.txt
 │   ├── README.md                # documentação detalhada do backend
+│   ├── DOCUMENTACAO_TECNICA.md  # o porquê de cada decisão do motor
 │   │
 │   ├── motor/                    # Motor de Visao Computacional (nome alinhado ao TCC)
 │   │   ├── config.py            # carrega/salva config.json
@@ -142,7 +143,7 @@ python -m scripts.preparar_modelo --modelo yolo11n --imgsz 640
 python main.py
 ```
 
-Instruções completas — calibração de modelo, ajuste de linha de contagem, ROI, parâmetros de `config.json` — estão em [`backend/README.md`](./backend/README.md).
+Instruções completas — calibração de modelo, ajuste da linha de contagem e parâmetros de `config.json` — estão em [`backend/README.md`](./backend/README.md).
 
 O frontend (`frontend/`) é um scaffold Vite + React + TypeScript ainda não integrado à API, reservado para a próxima etapa do TCC.
 
@@ -156,7 +157,18 @@ A contagem usa uma **linha virtual** posicionada sobre o portão de acesso, defi
 - Cruzamento no sentido de saída → decrementa a ocupação.
 - Pessoa detectada repetidamente sem cruzar a linha → não altera a contagem.
 
+Em volta da linha há uma **zona morta** de poucos pontos percentuais da largura do quadro, dentro da qual nenhum lado é decidido. É ela que separa deslocamento real do tremor natural da caixa delimitadora, que de outro modo faria uma pessoa parada sobre a linha "entrar e sair" indefinidamente.
+
 Essa abordagem, combinada ao rastreamento por ID único do ByteTrack, evita que a mera presença de uma pessoa em múltiplos frames gere contagem duplicada — o problema citado na justificativa do TCC como recorrente em sistemas baseados apenas em detecção quadro a quadro.
+
+### Câmera atual e sentido da entrada
+
+A câmera originalmente usada no estudo de caso apresentou problemas e foi substituída pela câmera instalada **do outro lado da igreja**. No enquadramento atual o portão aparece no **canto esquerdo** do quadro, de modo que:
+
+- quem **entra** se desloca da **direita para a esquerda**;
+- quem **sai** se desloca da **esquerda para a direita**.
+
+A câmera é definitiva, então esse sentido é uma regra fixa do código e não uma configuração. A troca exigiu apenas reposicionar a linha de contagem em `backend/config.json`. Os detalhes e a justificativa estão na [documentação técnica do backend](./backend/DOCUMENTACAO_TECNICA.md).
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "camera": {
-    "fonte": "videos/cam.mp4",
+    "fonte": "videos/20-09-teste.mp4",
     "fps_processamento": 7.5,
     "segundos_reconexao": 3.0
   },
@@ -24,12 +24,8 @@
   },
   "contagem": {
     "ativo": true,
-    "linha_base": [0.50, 0.0, 0.50, 1.00],
-    "numero_linhas": 3,
-    "espacamento": 0.035,
-    "linhas_necessarias": 2,
-    "lado_entrada": -1,
-    "segundos_janela": 6.0,
+    "linha": [0.25, 0.0, 0.25, 1.00],
+    "margem": 0.035,
     "segundos_cooldown": 3.0,
     "segundos_esquecer": 10.0
   },
