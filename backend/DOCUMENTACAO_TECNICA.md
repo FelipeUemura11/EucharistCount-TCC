@@ -19,10 +19,10 @@ Câmera/Arquivo
 FonteVideo (camera.py)          → entrega o frame, no ritmo certo
     │
     ▼
-DetectorPessoas (detector.py)   → recorta a ROI, roda YOLO + ByteTrack
+DetectorPessoas (detector.py)   → roda YOLO + ByteTrack, filtra caixas
     │                              devolve uma lista de objetos Pessoa
     ▼
-ContadorLinha (contador.py)     → verifica se alguma Pessoa cruzou a linha
+ContadorLinha (contador.py)     → verifica se alguma Pessoa trocou de lado
     │                              devolve Eventos (entrada/saída)
     ▼
 Monitor (monitor.py)            → atualiza métricas, desenha na tela
@@ -140,7 +140,7 @@ O modelo usado é o **YOLO11n** (variante "nano" da 11ª geração da arquitetur
 
 Todo objeto que o YOLO acredita ser uma pessoa recebe uma pontuação de 0 a 1. O parâmetro `confianca` (atualmente **0.15**) é o piso: qualquer detecção abaixo disso é descartada antes mesmo de chegar ao filtro geométrico ou ao contador.
 
-O valor está deliberadamente baixo. A justificativa é o cenário de uso: no acesso da igreja há oclusão parcial constante (pessoas passando perto umas das outras, roupas escuras, contraluz), o que reduz artificialmente a confiança do modelo mesmo quando a detecção está correta. Um limiar baixo aceita essas detecções "menos certas" — e o risco de falso positivo que isso trria é compensado por duas outras camadas do sistema: o filtro geométrico (seção 6) e a exigência de cruzar múltiplas linhas para confirmar uma contagem (seção 8).
+O valor está deliberadamente baixo. A justificativa é o cenário de uso: no acesso da igreja há oclusão parcial constante (pessoas passando perto umas das outras, roupas escuras, contraluz), o que reduz artificialmente a confiança do modelo mesmo quando a detecção está correta. Um limiar baixo aceita essas detecções "menos certas" — e o risco de falso positivo que isso traz é compensado por duas outras camadas do sistema: o filtro geométrico (seção 6) e a exigência de atravessar a zona morta inteira para confirmar uma contagem (seção 8.4).
 
 ### IoU (Intersection over Union) e NMS (Non-Maximum Suppression)
 
@@ -196,30 +196,100 @@ Esses limites são propositalmente **permissivos**, não restritivos. A razão �
 
 ---
 
-## 7. ROI (Região de Interesse): olhar só para onde importa
+## 7. Enquadramento da câmera e o que ele já resolve
 
-Antes mesmo de rodar o YOLO, o frame é recortado:
+Uma versão anterior deste sistema recortava digitalmente o frame antes da
+inferência (técnica conhecida como ROI — Região de Interesse), para
+analisar apenas a área próxima ao portão.
 
-```python
-if self.config.roi_ativo:
-    rx1, ry1, rx2, ry2 = self.roi_em_pixels(largura_total, altura_total)
-    entrada = frame[ry1:ry2, rx1:rx2]
-```
+Essa etapa foi **removida** após o reposicionamento físico da câmera. Com
+a câmera apontada diretamente para a entrada, todo o enquadramento já
+corresponde à área de interesse — recortar digitalmente passou a ser
+redundante e só adicionaria complexidade ao código (conversão de
+coordenadas, risco de cortar a linha de contagem, mais um parâmetro a
+calibrar).
 
-A ROI atual é `[0.50, 0.05, 1.0, 1.0]` — metade direita do frame, quase toda a altura. Essa escolha resolve três problemas ao mesmo tempo:
+### 7.1 A troca de câmera e o que ela mudou no software
 
-1. **Precisão.** O requisito do projeto é contar apenas quem está perto da porta, não quem está andando ao fundo do pátio. Recortando a imagem, a mesma pessoa perto do portão ocupa uma **fração maior de pixels dentro da imagem analisada** do que ocuparia na imagem inteira — isso ajuda o modelo a distinguir melhor duas pessoas próximas uma da outra, porque há mais detalhe disponível para diferenciá-las.
-2. **Foco.** Pessoas distantes simplesmente não entram na região analisada, então nunca geram detecção — não é preciso filtrar depois, elas nunca existem para o sistema.
-3. **Desempenho.** Processar metade da área de imagem custa proporcionalmente menos CPU. Numa máquina sem GPU, esse ganho é revertido diretamente em mais frames por segundo ou em folga para rodar em resolução maior.
+A câmera originalmente usada no estudo de caso apresentou problemas em
+campo e foi substituída pela câmera já instalada **do outro lado da
+igreja** (identificada como `CAM 2` na gravação). O enquadramento mudou
+por completo:
 
-Um detalhe de implementação importante: como a ROI recorta a imagem, as coordenadas que o YOLO devolve são relativas ao recorte, não ao frame inteiro. O código soma de volta o deslocamento (`off_x`, `off_y`) para que o resto do sistema — contador, desenho na tela — sempre trabalhe com coordenadas do frame completo, sem precisar saber que uma ROI existe:
+| | Câmera antiga | Câmera atual (`CAM 2`) |
+|---|---|---|
+| Posição do portão no frame | região central | **canto esquerdo** |
+| Quem está entrando se desloca | para a direita | **da direita para a esquerda** |
+| Quem está saindo se desloca | para a esquerda | **da esquerda para a direita** |
 
-```python
-x1=int(x1) + off_x,
-y1=int(y1) + off_y,
-```
+A consequência prática é que a matemática não mudou: só a posição da
+linha, que passou de uma vertical no meio do frame
+(`[0.50, 0.0, 0.50, 1.00]`) para uma vertical **na porção esquerda**
+(`[0.25, 0.0, 0.25, 1.00]`), perto do portão.
 
-**Restrição de projeto:** a ROI precisa necessariamente incluir espaço dos dois lados da linha de contagem. Se ela terminar exatamente em cima da linha, o sistema nunca teria a chance de observar a pessoa *antes* de cruzar — e sem essa observação prévia, o algoritmo de contagem (seção 8) não tem como saber que houve uma travessia.
+Essa câmera é **fixa** — não haverá nova troca. Por isso o sentido da
+entrada (direita → esquerda) deixou de ser configuração e passou a ser
+uma regra do código, descrita na seção 8.6.
+
+### 7.2 Por que a linha não fica colada no portão
+
+A primeira tentativa colocou a linha em `x = 0.20`, praticamente em cima
+do batente. O raciocínio parecia correto: o modelo detecta pés até
+`x ≈ 0.06` da largura do frame, então haveria folga de sobra dos dois
+lados.
+
+**Esse raciocínio estava errado**, e a medição mostrou por quê. O que a
+contagem exige não é que *exista detecção* do outro lado da linha — é
+que o **rastro sobreviva** até lá, com o mesmo ID. E é exatamente na
+boca do portão que o rastreio morre: a pessoa entra na sombra do vão,
+passa atrás da grade e do arbusto do primeiro plano, e some no meio de
+quem já está parado ali esperando.
+
+Medindo, num trecho de 40 s de chegada de fiéis, onde termina o rastro
+de cada pessoa que caminhava para a esquerda:
+
+| Onde o rastro terminou (`x`) | Quantos |
+|---|---|
+| 0.00 – 0.10 | 2 |
+| 0.10 – 0.16 | 7 |
+| **0.16 – 0.20** | **9** |
+| 0.20 – 0.24 | 1 |
+| 0.24 – 0.30 | 4 |
+| 0.30 – 1.00 | 7 |
+
+Com a linha em `0.20` e `margem = 0.035`, a pessoa só é confirmada do
+lado de dentro ao ser vista antes de `x = 0.165`. O maior grupo de
+rastros — os 9 que terminam entre `0.16` e `0.20` — morre poucos pixels
+antes desse limiar. Resultado: **apenas 8 das 9 a 19 entradas plausíveis
+daquele trecho eram contadas.**
+
+Deslocar a linha para `x = 0.25` move o limiar de confirmação para
+`x = 0.215`, antes da zona de oclusão, e recupera esses rastros. Numa
+varredura das duas coisas que se pode ajustar — posição da linha e
+largura da zona morta — medida em dois trechos independentes do vídeo:
+
+| `linha` | `margem` | Trecho A (9–19 plausíveis) | Trecho B (5–10 plausíveis) |
+|---|---|---|---|
+| 0.20 | 0.035 | 8 ✗ | 6 |
+| 0.20 | 0.020 | 16 | 8 |
+| **0.25** | **0.035** | **17 ✓** | **9 ✓** |
+| 0.30 | 0.035 | 16 ✓ | 10 ✓ |
+| 0.35 | 0.035 | 16 ✓ | 10 ✓ |
+| 0.40 | 0.035 | 13 ✓ | 11 ✗ |
+
+O número plausível de entradas de cada trecho foi estimado **sem usar o
+contador**, para não julgar o parâmetro com a própria ferramenta que ele
+configura: o piso são os rastros inequívocos, que vão de `x > 0.55` até
+`x < 0.22` num único ID; o teto acrescenta os rastros parciais que se
+deslocaram para a esquerda e podem ser pedaços de travessias reais.
+
+`0.25 / 0.035` é o único ajuste que cai dentro da faixa plausível nos
+dois trechos, e tem a vantagem de não mexer na `margem` — mantendo
+intacta a proteção contra tremor descrita na seção 8.4. Empurrar a linha
+para `0.40` começa a contar gente demais: naquela altura do quadro ela
+cruza o caminho de quem apenas circula pelo pátio sem entrar.
+
+
 
 ---
 
@@ -231,21 +301,23 @@ Esta é a parte central do sistema: transformar "uma pessoa detectada em algum l
 
 Uma linha virtual modela naturalmente o ato de "atravessar um limiar físico" — o portão da igreja. Ao contrário de uma zona (região poligonal), que exigiria decidir arbitrariamente quando alguém "está dentro" versus "está passando", uma linha reduz o problema a uma pergunta binária e bem definida a cada frame: a pessoa está de que lado?
 
-### 8.2 O cálculo do lado: produto vetorial
+### 8.2 A fórmula: distância com sinal
 
 Dada uma linha entre os pontos A e B, e um ponto P (a posição da pessoa), o sistema calcula:
 
 ```python
 produto = (bx - ax) * (py - ay) - (by - ay) * (px - ax)
+distancia = produto / comprimento_da_linha
 ```
 
-Essa é a componente z do **produto vetorial** entre o vetor da linha (`B - A`) e o vetor do ponto até o início da linha (`P - A`). O resultado:
+O numerador é a componente z do **produto vetorial** entre o vetor da linha (`B - A`) e o vetor do ponto até o início da linha (`P - A`). Dividido pelo comprimento da linha, o resultado é a **distância com sinal** entre o ponto e a reta:
 
-- **Positivo** → o ponto está de um lado da linha
-- **Negativo** → o ponto está do outro lado
-- **Zero** → o ponto está exatamente sobre a linha
+- **O sinal** diz de que lado o ponto está (positivo de um lado, negativo do outro, zero exatamente sobre a reta).
+- **O módulo** diz a distância em pixels até a reta.
 
-A vantagem decisiva dessa fórmula é que ela funciona **para qualquer inclinação da linha**, sem nenhum caso especial. Uma comparação simples como "a pessoa está à esquerda ou à direita de um valor de x fixo" só funcionaria para linhas perfeitamente verticais; o produto vetorial generaliza isso para qualquer ângulo. Isso é o que permite a linha de contagem acompanhar a geometria real da câmera — que, no objetivo específico do TCC, é posicionada **em ângulo diagonal**, não perpendicular ao chão.
+Uma única fórmula responde às duas perguntas de que o contador precisa — de que lado, e a que distância. É por isso que o módulo não tem nenhuma outra função geométrica.
+
+A vantagem decisiva dessa formulação é que ela funciona **para qualquer inclinação da linha**, sem nenhum caso especial. Uma comparação simples como "a pessoa está à esquerda ou à direita de um valor de x fixo" só funcionaria para linhas perfeitamente verticais; o produto vetorial generaliza isso para qualquer ângulo. Isso é o que permite a linha de contagem acompanhar a geometria real da câmera — que, no objetivo específico do TCC, é posicionada **em ângulo diagonal**, não perpendicular ao chão.
 
 ### 8.3 O ponto de referência da pessoa: os pés, não o centro
 
@@ -259,51 +331,73 @@ def base(self) -> tuple[int, int]:
 
 A razão é a estabilidade sob oclusão parcial. Quando o torso de uma pessoa é parcialmente encoberto por outra pessoa ou por um obstáculo, a caixa delimitadora "encolhe" de forma inconsistente pelo topo, deslocando o centro geométrico de forma imprevisível. Os pés, apoiados no chão, são a parte da caixa que menos varia nessas situações — e é justamente a posição no chão que corresponde fisicamente a "de que lado da porta a pessoa está".
 
-### 8.4 Por que três linhas, e não uma
+### 8.4 A zona morta: por que não basta trocar de sinal
 
-`numero_linhas: 3`, com `espacamento: 0.035` (fração da largura do frame) entre elas, gera três linhas paralelas à linha base, geometricamente equidistantes:
+Se o contador registrasse toda troca de sinal da distância, o sistema geraria contagens falsas o tempo todo. O motivo é que **o YOLO nunca desenha a caixa exatamente no mesmo pixel dois frames seguidos**, mesmo para uma pessoa completamente parada. Alguém aguardando em pé em cima da linha "entraria e sairia" repetidamente sem ter saído do lugar.
+
+A solução é uma **zona morta** em torno da linha, de largura `margem` para cada lado:
 
 ```python
-meio = (n - 1) / 2   # com n=3, meio=1 → deslocamentos: -1, 0, +1
-for i in range(n):
-    desloc = (i - meio) * passo
+if abs(distancia) < self.margem:
+    return None          # lado indefinido: nada muda neste frame
+
+lado = 1 if distancia > 0 else -1
 ```
 
-O motivo é filtrar ruído de rastreamento. Se existisse apenas uma linha, qualquer oscilação natural da caixa delimitadora — o YOLO nunca desenha a caixa em exatamente o mesmo pixel dois frames seguidos, mesmo para uma pessoa parada — poderia fazer o ponto "dos pés" cruzar a linha de um lado para o outro repetidamente, sem que a pessoa tenha realmente se movido. Isso geraria contagens falsas de entrada e saída alternadas para a mesma pessoa parada perto da linha.
+O lado da pessoa só é atualizado quando ela está a mais de `margem` pixels da linha. Entre `-margem` e `+margem` nenhuma decisão é tomada. O tremor de poucos pixels da caixa delimitadora acontece inteiro dentro dessa faixa e nunca chega a mudar o lado registrado; só um deslocamento real atravessa a faixa inteira, de um lado ao outro.
 
-Com três linhas espaçadas, esse tremor de poucos pixels não é suficiente para cruzar mais de uma linha — só um deslocamento real e sustentado da pessoa consegue atravessar várias delas em sequência.
+O valor atual é `margem: 0.035` (fração da largura do frame), ou seja, uma faixa total de 7% da largura. Num frame de 1024 px isso são ±36 px em torno da linha.
 
-### 8.5 Por que exigir 2 de 3 linhas, e não as 3
+Um ponto que costuma gerar dúvida: a travessia **não precisa acontecer em um único frame**. A pessoa pode levar quantos frames quiser atravessando a faixa — o contador apenas registra o novo lado quando ela sai dela. Isso torna o parâmetro tolerante a pessoas andando devagar, paradas no meio do caminho, ou momentaneamente perdidas pelo rastreador.
 
-`linhas_necessarias: 2` significa que a travessia só é confirmada quando a pessoa é observada cruzando **pelo menos duas** das três linhas no mesmo sentido — não as três.
+### 8.5 Uma nota histórica: de três linhas para uma faixa
 
-Esse número é um equilíbrio deliberado:
+Uma versão anterior deste contador gerava **três linhas paralelas** e só confirmava a travessia quando a pessoa cruzasse pelo menos duas delas no mesmo sentido, dentro de uma janela de tempo. O objetivo era exatamente o mesmo da zona morta: exigir deslocamento real, e não tremor.
 
-- Exigir **as 3** seria mais rigoroso contra ruído, mas mais frágil: bastaria a pessoa ser perdida pelo rastreador por um único frame no meio da travessia (por exemplo, uma oclusão momentânea por outra pessoa) para que a contagem falhasse — mesmo a travessia sendo real.
-- Exigir apenas **1** eliminaria a proteção contra tremor descrita no item anterior, voltando ao problema de uma linha só.
+A zona morta substitui esse mecanismo porque entrega a mesma garantia com bem menos peças móveis. O esquema antigo exigia quatro parâmetros (`numero_linhas`, `espacamento`, `linhas_necessarias`, `segundos_janela`) e mantinha, para cada pessoa, um dicionário de lados por linha mais uma lista de cruzamentos com carimbo de tempo. O esquema atual exige um parâmetro (`margem`) e guarda **um único inteiro por pessoa**: o último lado confirmado.
 
-Dois de três dá margem para perder uma observação no meio do caminho sem perder a contagem, e ainda assim garante que houve deslocamento real (não é possível cruzar duas linhas por acidente com o mesmo tremor que cruzaria uma).
+Além de mais simples, a faixa é conceitualmente mais direta: o que se quer exigir é *deslocamento mínimo em pixels*, e a margem expressa isso literalmente, enquanto "duas de três linhas espaçadas de 0.035" expressava a mesma distância de forma indireta.
 
-### 8.6 O sentido da entrada: `lado_entrada`
+### 8.6 O sentido da entrada
 
-O sinal do produto vetorial (seção 8.2) define dois lados da linha, mas nada na matemática diz qual lado é "dentro" e qual é "fora" — isso depende da orientação física da câmera, que pode variar conforme o portão e o ângulo de instalação. Por isso `lado_entrada` é um parâmetro configurável (`-1` no valor atual), não uma constante fixa no código: a fórmula matemática é universal, mas o mapeamento entre "sinal positivo/negativo" e "entrando/saindo" é específico de cada instalação de câmera, e precisa ser calibrado visualmente uma vez (observando a seta desenhada na tela) e depois fica fixo na configuração.
+O sinal da distância separa os dois lados da linha, mas nada na matemática diz qual lado é "dentro" e qual é "fora" — isso depende da posição física da câmera. Na instalação atual (`CAM 2`, seção 7.1) o portão está no canto esquerdo do frame: **quem passa da direita para a esquerda entra; quem vai da esquerda para a direita sai.** Como a câmera é fixa, essa regra está no código, e não no `config.json`.
 
-### 8.7 As três janelas de tempo
-
-Três parâmetros temporais governam o ciclo de vida de cada travessia:
-
-**`segundos_janela` (6.0s)** — tempo máximo entre o primeiro e o último cruzamento de linha que ainda contam como parte da *mesma* travessia. Cruzamentos mais espaçados que isso são descartados antes de contar, porque provavelmente não representam um único movimento contínuo de entrada ou saída.
-
-**`segundos_cooldown` (3.0s)** — depois de confirmar uma contagem para uma pessoa, o sistema ignora novos eventos dela por esse período. Isso evita contar a mesma pessoa duas vezes caso ela oscile perto da linha logo após ser contada.
-
-**`segundos_esquecer` (10.0s)** — pessoas que somem do enquadramento (saem da ROI, ou o rastreador simplesmente as perde) têm seu histórico apagado após esse tempo:
+O lado positivo é sempre o lado apontado pelo vetor perpendicular `(-dy, dx)`. Para uma linha percorrida **de cima para baixo**, esse vetor aponta para a **esquerda do frame**. Para que isso valha sempre, o contador normaliza a linha nessa ordem ao convertê-la para pixels:
 
 ```python
-expirados = [pid for pid, r in self._rastros.items()
-             if agora - r.visto_em > limite]
+return (a, b) if a[1] <= b[1] else (b, a)
+```
+
+Assim, inverter a ordem dos pontos no `config.json` não troca entrada com saída silenciosamente.
+
+Com a esquerda sendo o lado positivo, o lado para onde a pessoa foi **é** o sentido da travessia. Os valores do enum `Sentido` foram escolhidos para coincidir com os lados (`ENTRADA = +1`, `SAIDA = -1`), e a conversão vira uma linha:
+
+```python
+sentido = Sentido(lado)   # foi para a esquerda = entrou
+```
+
+A seta verde "ENTRA" desenhada na janela de monitoramento aponta sempre para a esquerda, e a vermelha "SAI" para a direita, para conferir visualmente a linha antes de confiar nos números.
+
+Vale registrar o histórico: a versão anterior tinha um parâmetro `entrada_para_esquerda` (e, antes dele, `lado_entrada: ±1`) para acomodar uma eventual troca de câmera. Com a câmera definitiva, esse parâmetro só acrescentava um caminho de código e um valor de configuração que nunca mais mudariam — e que, se editado por engano, inverteria silenciosamente todas as contagens.
+
+### 8.7 As duas janelas de tempo
+
+Dois parâmetros temporais governam o ciclo de vida de cada rastro:
+
+**`segundos_cooldown` (3.0s)** — depois de confirmar uma contagem para uma pessoa, o sistema ignora novos eventos dela por esse período. Isso evita contar a mesma pessoa duas vezes caso ela volte a atravessar a faixa logo após ser contada — alguém que para na porta, hesita e volta, por exemplo.
+
+**`segundos_esquecer` (10.0s)** — pessoas que somem do enquadramento (ou que o rastreador simplesmente perde) têm seu rastro apagado após esse tempo:
+
+```python
+limite = self.config.segundos_esquecer
+for pid in [pid for pid, r in self._rastros.items()
+            if agora - r.visto_em > limite]:
+    del self._rastros[pid]
 ```
 
 Sem essa limpeza, o dicionário de rastros cresceria indefinidamente ao longo de uma missa inteira, consumindo memória sem necessidade numa máquina já limitada.
+
+A `segundos_janela` da versão anterior deixou de existir junto com a lista de cruzamentos: não havendo mais eventos parciais acumulados, não há o que expirar.
 
 ### 8.8 Um detalhe crítico: tempo do vídeo, não da máquina
 
@@ -317,7 +411,9 @@ def tempo_atual(self) -> float:
     return self.indice_atual / max(self.fps_original, 1e-6)
 ```
 
-Para um arquivo de vídeo, o tempo é `número do frame ÷ fps original do arquivo` — um valor que depende só do conteúdo do vídeo, nunca de quão rápido a máquina processa. Isso é essencial para a reprodutibilidade dos testes de validação do TCC: rodar o mesmo `cam.mp4` numa máquina mais lenta ou mais rápida produz **exatamente a mesma contagem**, porque os limiares de tempo (janela, cooldown, esquecer) sempre se referem ao tempo que se passou *dentro do vídeo*, não ao tempo que o computador levou para processá-lo. Sem esse cuidado, o mesmo vídeo poderia gerar contagens diferentes dependendo do hardware — o que inviabilizaria comparar resultados de forma confiável.
+Para um arquivo de vídeo, o tempo é `número do frame ÷ fps original do arquivo` — um valor que depende só do conteúdo do vídeo, nunca de quão rápido a máquina processa. Isso é essencial para a reprodutibilidade dos testes de validação do TCC: rodar o mesmo arquivo numa máquina mais lenta ou mais rápida produz **exatamente a mesma contagem**, porque os limiares de tempo (cooldown, esquecer) sempre se referem ao tempo que se passou *dentro do vídeo*, não ao tempo que o computador levou para processá-lo. Sem esse cuidado, o mesmo vídeo poderia gerar contagens diferentes dependendo do hardware — o que inviabilizaria comparar resultados de forma confiável.
+
+Um cuidado que decorre disso: o campo `contado_em` de cada rastro nasce em `-infinito`, e não em zero. Como o tempo do vídeo começa em zero, um valor inicial zero colocaria todo mundo em cooldown durante os primeiros 3 segundos de gravação — ninguém que cruzasse a linha nesse intervalo seria contado.
 
 ---
 
@@ -390,8 +486,10 @@ Essa é a base técnica direta da conformidade com a LGPD que o TCC declara: sem
 | `iou` (NMS) | 0.7 | Evita fundir pessoas próximas numa única detecção |
 | Rastreador | ByteTrack | Resiliente a oclusão, sem custo de extrator de aparência |
 | Ponto de referência | Pés (base da caixa) | Mais estável que o centro sob oclusão parcial |
-| Cálculo de lado da linha | Produto vetorial | Funciona em qualquer ângulo de câmera (diagonal) |
-| Número de linhas | 3, exigindo 2 | Filtra tremor de rastreamento sem exigir perfeição |
-| ROI | Metade direita do frame | Ignora quem está longe, melhora separação de pessoas, poupa CPU |
+| Cálculo de lado da linha | Distância com sinal (produto vetorial) | Uma fórmula dá lado e distância, em qualquer ângulo |
+| Posição da linha | Vertical em `x = 0.25` | Perto do portão, mas fora da zona onde o rastreio morre |
+| Sentido da entrada | Direita → esquerda | Lado da igreja de onde a câmera atual enquadra o portão |
+| Anti-tremor | Zona morta de ±3,5% da largura | Mesma garantia das 3 linhas antigas, com 1 parâmetro |
+| Enquadramento | Câmera apontada para a entrada | Resolve fisicamente o que a ROI compensava em software |
 | Base de tempo da contagem | Tempo do vídeo, não da CPU | Reprodutibilidade entre execuções e hardwares |
 | Armazenamento de imagem | Inexistente no código | Conformidade estrutural com a LGPD |

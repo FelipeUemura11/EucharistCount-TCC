@@ -6,6 +6,8 @@ videos de validacao do TCC. Em producao a janela fica desligada e este
 modulo nao e chamado — nenhuma imagem e gerada nem armazenada.
 """
 
+import math
+
 import cv2
 import numpy as np
 
@@ -17,7 +19,7 @@ PRETO = (0, 0, 0)
 VERDE = (80, 220, 80)
 VERMELHO = (80, 80, 240)
 AMARELO = (60, 220, 240)
-CIANO = (240, 200, 60)
+CINZA = (150, 150, 150)
 FONTE = cv2.FONT_HERSHEY_SIMPLEX
 
 
@@ -59,7 +61,7 @@ def desenhar_pessoa(frame: np.ndarray, pessoa: Pessoa) -> None:
         FONTE, 0.5, PRETO, 1, cv2.LINE_AA,
     )
 
-    # Ponto dos pes: futura referencia para o cruzamento de linha.
+    # Ponto dos pes: e ele que o contador compara com a linha.
     cv2.circle(frame, pessoa.base, 3, cor, -1)
 
 
@@ -89,79 +91,51 @@ def redimensionar(frame: np.ndarray, escala: float) -> np.ndarray:
     return cv2.resize(frame, (0, 0), fx=escala, fy=escala)
 
 
-def desenhar_roi(
+def desenhar_linha(
     frame: np.ndarray,
-    roi: tuple[int, int, int, int],
+    linha: tuple[tuple[int, int], tuple[int, int]],
+    margem: float,
 ) -> None:
     """
-    Escurece tudo fora da regiao analisada.
+    Desenha a linha de contagem, a zona morta e as setas de sentido.
 
-    Deixa obvio na tela qual area o sistema realmente enxerga — o que
-    ajuda a posicionar a ROI sobre a porta da igreja.
+    Serve para conferir visualmente se a linha esta sobre o acesso antes
+    de confiar nos numeros.
     """
-    x1, y1, x2, y2 = roi
+    (ax, ay), (bx, by) = linha
 
-    escuro = frame.copy()
-    escuro[:] = (0, 0, 0)
-    # Reabre a janela da ROI no overlay escuro.
-    escuro[y1:y2, x1:x2] = frame[y1:y2, x1:x2]
-    cv2.addWeighted(escuro, 0.65, frame, 0.35, 0, frame)
-
-    cv2.rectangle(frame, (x1, y1), (x2, y2), CIANO, 2)
-    cv2.putText(
-        frame, "AREA ANALISADA", (x1 + 8, y1 + 22),
-        FONTE, 0.5, CIANO, 1, cv2.LINE_AA,
-    )
-
-
-def desenhar_linhas(
-    frame: np.ndarray,
-    linhas: list[tuple[tuple[int, int], tuple[int, int]]],
-    lado_entrada: int = -1,
-) -> None:
-    """
-    Desenha as linhas virtuais de contagem e as setas de sentido.
-
-    Serve para conferir visualmente se as linhas estao sobre o portao
-    antes de confiar nos numeros.
-    """
-    if not linhas:
-        return
-
-    for i, (a, b) in enumerate(linhas):
-        cv2.line(frame, a, b, AMARELO, 2)
-        cv2.putText(
-            frame, f"L{i + 1}", (a[0] - 12, max(a[1] - 8, 14)),
-            FONTE, 0.5, AMARELO, 1, cv2.LINE_AA,
-        )
-
-    # Seta perpendicular a linha central, apontando para o lado que
-    # conta como entrada.
-    a, b = linhas[len(linhas) // 2]
-    meio = ((a[0] + b[0]) // 2, (a[1] + b[1]) // 2)
-
-    dx = b[0] - a[0]
-    dy = b[1] - a[1]
-    comprimento = (dx * dx + dy * dy) ** 0.5
+    dx, dy = bx - ax, by - ay
+    comprimento = math.hypot(dx, dy)
     if comprimento == 0:
         return
 
-    # Perpendicular unitario, na mesma convencao do contador.
-    nx = -dy / comprimento
-    ny = dx / comprimento
+    # Perpendicular unitario, na mesma convencao do contador: numa linha
+    # de cima para baixo, aponta para a esquerda do frame.
+    nx, ny = -dy / comprimento, dx / comprimento
 
+    def deslocar(distancia: float):
+        ox, oy = nx * distancia, ny * distancia
+        return (int(ax + ox), int(ay + oy)), (int(bx + ox), int(by + oy))
+
+    # Bordas da zona morta: entre elas o lado da pessoa fica indefinido.
+    for distancia in (margem, -margem):
+        inicio, fim = deslocar(distancia)
+        cv2.line(frame, inicio, fim, CINZA, 1)
+
+    cv2.line(frame, (ax, ay), (bx, by), AMARELO, 2)
+
+    # Setas perpendiculares, a partir do meio da linha.
+    meio = ((ax + bx) // 2, (ay + by) // 2)
     tamanho = 55
 
-    for lado, cor, texto in (
-        (lado_entrada, VERDE, "ENTRA"),
-        (-lado_entrada, VERMELHO, "SAI"),
-    ):
-        fim = (
+    # +1 e a esquerda do quadro (entra); -1, a direita (sai).
+    for lado, cor, texto in ((1, VERDE, "ENTRA"), (-1, VERMELHO, "SAI")):
+        ponta = (
             int(meio[0] + nx * tamanho * lado),
             int(meio[1] + ny * tamanho * lado),
         )
-        cv2.arrowedLine(frame, meio, fim, cor, 2, tipLength=0.3)
+        cv2.arrowedLine(frame, meio, ponta, cor, 2, tipLength=0.3)
         cv2.putText(
-            frame, texto, (fim[0] - 20, fim[1] - 8),
+            frame, texto, (ponta[0] - 20, ponta[1] - 8),
             FONTE, 0.5, cor, 2, cv2.LINE_AA,
         )

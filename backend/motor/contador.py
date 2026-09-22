@@ -1,43 +1,68 @@
 """
-Contagem de pessoas por cruzamento de linhas virtuais.
+Contagem de pessoas por cruzamento de uma linha virtual.
 
-Uma linha base e definida por dois pontos (o portao). A partir dela o
-sistema gera linhas paralelas equidistantes. Uma pessoa so e contada
-quando cruza pelo menos N dessas linhas no mesmo sentido, dentro de uma
-janela de tempo.
-
-Por que varias linhas e nao uma? Com uma unica linha, qualquer tremor da
-caixa delimitadora em cima dela gera contagens falsas — a pessoa "entra
-e sai" varias vezes parada no mesmo lugar. Exigir a travessia ordenada
-de varias linhas confirma que houve deslocamento real.
+A linha fica sobre o acesso, definida por dois pontos. Cada pessoa
+rastreada e avaliada pelo lado da linha em que esta; quando muda de
+lado, o sistema registra uma entrada ou uma saida.
 
 DE QUE LADO ESTA A PESSOA
 
-Para uma linha que vai do ponto A ao ponto B, usa-se o produto vetorial:
+Para a linha que vai do ponto A ao ponto B e um ponto P, o produto
+vetorial dividido pelo comprimento da linha
 
-    lado = sinal( (B-A) x (P-A) )
+    d = (B-A) x (P-A) / |B-A|
 
-O sinal e positivo de um lado da reta e negativo do outro, qualquer que
-seja a inclinacao. Isso permite linhas diagonais sem tratamento especial.
+devolve a distancia COM SINAL entre o ponto e a reta: o modulo e a
+distancia em pixels, e o sinal diz de que lado o ponto esta. Uma unica
+formula responde as duas perguntas, em qualquer inclinacao de linha —
+nao existe caso especial para camera diagonal.
 
-Este modulo nao conhece OpenCV nem YOLO. Recebe objetos Pessoa e devolve
-eventos de contagem — o que permite testa-lo isoladamente.
+O lado positivo e sempre o do vetor perpendicular (-dy, dx). Numa linha
+percorrida de cima para baixo isso e a ESQUERDA do frame, e o contador
+normaliza a linha nessa ordem para que "esquerda" seja sempre esquerda,
+qualquer que seja a ordem dos pontos no config.json.
+
+SENTIDO
+
+A camera e fixa: o portao fica a esquerda do quadro, entao quem passa da
+direita para a esquerda ENTRA na igreja e quem vai da esquerda para a
+direita SAI. O lado de destino da pessoa ja diz o sentido: esquerda
+(+1) e ENTRADA, direita (-1) e SAIDA — os valores de `Sentido` foram
+escolhidos para coincidir com os lados.
+
+ZONA MORTA: POR QUE UMA MARGEM
+
+A caixa que o YOLO desenha nunca cai no mesmo pixel dois frames
+seguidos. Se bastasse trocar o sinal de d, uma pessoa parada em cima da
+linha "entraria e sairia" repetidamente sem sair do lugar.
+
+Por isso o lado so e confirmado quando a pessoa esta a mais de `margem`
+pixels da linha. Entre -margem e +margem existe uma zona morta onde nada
+e decidido: o tremor de poucos pixels acontece inteiro dentro dela, e so
+um deslocamento real atravessa a faixa inteira de um lado ao outro.
+
+Este modulo nao conhece OpenCV nem YOLO: recebe objetos Pessoa e devolve
+eventos — o que permite testa-lo isoladamente.
 """
 
+import math
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 from .config import ConfigContagem
 from .detector import Pessoa
 
 
-# Um segmento de reta em pixels: ((x1, y1), (x2, y2))
-Segmento = tuple[tuple[int, int], tuple[int, int]]
+Ponto = tuple[int, int]
+Segmento = tuple[Ponto, Ponto]
 
 
 class Sentido(Enum):
-    """Direcao do cruzamento."""
+    """
+    Direcao do cruzamento. O valor e o lado da linha para onde a pessoa foi:
+    +1 = esquerda do quadro (entrou), -1 = direita (saiu).
+    """
 
     ENTRADA = 1
     SAIDA = -1
@@ -54,99 +79,50 @@ class Evento:
 
 @dataclass
 class _Rastro:
-    """Historico de cruzamentos de uma pessoa. Uso interno."""
+    """Estado de uma pessoa entre frames. Uso interno."""
 
-    # Para cada linha: de que lado a pessoa estava (-1 ou +1)
-    lados: dict[int, int] = field(default_factory=dict)
-
-    # Cruzamentos confirmados: (indice_da_linha, lado_de_destino, instante)
-    cruzamentos: list[tuple[int, int, float]] = field(default_factory=list)
-
+    # Ultimo lado confirmado: +1, -1, ou 0 enquanto nunca saiu da zona morta.
+    lado: int = 0
     visto_em: float = 0.0
-    contado_em: float = 0.0
-
-
-def _lado_da_linha(ponto, a, b) -> int:
-    """
-    De que lado da reta A->B esta o ponto.
-
-    Retorna +1, -1, ou 0 (exatamente em cima).
-    """
-    px, py = ponto
-    ax, ay = a
-    bx, by = b
-
-    produto = (bx - ax) * (py - ay) - (by - ay) * (px - ax)
-
-    if produto > 0:
-        return 1
-    if produto < 0:
-        return -1
-    return 0
+    # -inf para que a primeira contagem nunca caia no cooldown.
+    contado_em: float = -math.inf
 
 
 class ContadorLinha:
-    """
-    Mantem o estado de cruzamento de cada pessoa e emite eventos.
-    """
+    """Acompanha de que lado da linha esta cada pessoa e emite eventos."""
 
     def __init__(self, config: ConfigContagem, largura: int, altura: int):
         self.config = config
-        self.largura = largura
-        self.altura = altura
-
-        self.linhas: list[Segmento] = self._gerar_linhas()
-
+        self.linha = self._preparar_linha(largura, altura)
+        self.margem = config.margem * largura
         self.entradas = 0
         self.saidas = 0
         self._rastros: dict[int, _Rastro] = {}
 
-    def _gerar_linhas(self) -> list[Segmento]:
+    def _preparar_linha(self, largura: int, altura: int) -> Segmento:
         """
-        Converte a linha base em N linhas paralelas, em pixels.
+        Converte a linha da config (fracoes de 0 a 1) para pixels.
 
-        A linha base vem da config como fracoes (0.0 a 1.0), para
-        funcionar igual em qualquer resolucao de camera.
+        As fracoes deixam a mesma configuracao valida em qualquer
+        resolucao de camera. Os pontos sao ordenados de cima para baixo
+        para que o lado positivo seja sempre a esquerda do frame — assim
+        inverter a ordem dos pontos no config.json nao troca entrada com
+        saida sem querer.
         """
-        cfg = self.config
-        x1, y1, x2, y2 = cfg.linha_base
+        x1, y1, x2, y2 = self.config.linha
+        a = (int(x1 * largura), int(y1 * altura))
+        b = (int(x2 * largura), int(y2 * altura))
+        return (a, b) if a[1] <= b[1] else (b, a)
 
-        ax = x1 * self.largura
-        ay = y1 * self.altura
-        bx = x2 * self.largura
-        by = y2 * self.altura
+    def _distancia(self, ponto: Ponto) -> float:
+        """Distancia com sinal, em pixels, entre o ponto e a linha."""
+        (ax, ay), (bx, by) = self.linha
+        px, py = ponto
 
-        # Vetor da linha e seu perpendicular normalizado.
-        dx = bx - ax
-        dy = by - ay
-        comprimento = (dx * dx + dy * dy) ** 0.5
+        produto = (bx - ax) * (py - ay) - (by - ay) * (px - ax)
+        comprimento = math.hypot(bx - ax, by - ay)
 
-        if comprimento == 0:
-            return []
-
-        # Perpendicular unitario: gira o vetor em 90 graus.
-        nx = -dy / comprimento
-        ny = dx / comprimento
-
-        # Deslocamento entre linhas paralelas, em pixels.
-        passo = cfg.espacamento * self.largura
-
-        # Distribui as linhas simetricamente em torno da base.
-        # Ex.: 3 linhas -> deslocamentos -1, 0, +1
-        n = cfg.numero_linhas
-        meio = (n - 1) / 2
-
-        linhas: list[Segmento] = []
-        for i in range(n):
-            desloc = (i - meio) * passo
-            ox = nx * desloc
-            oy = ny * desloc
-            linhas.append((
-                (int(ax + ox), int(ay + oy)),
-                (int(bx + ox), int(by + oy)),
-            ))
-
-        return linhas
+        return produto / max(comprimento, 1e-6)
 
     @property
     def dentro(self) -> int:
@@ -154,7 +130,7 @@ class ContadorLinha:
         return self.entradas - self.saidas
 
     def zerar(self) -> None:
-        """Reinicia os contadores. Sera chamado no inicio de cada celebracao."""
+        """Reinicia os contadores. Chamado no inicio de cada celebracao."""
         self.entradas = 0
         self.saidas = 0
         self._rastros.clear()
@@ -169,17 +145,16 @@ class ContadorLinha:
 
         `agora` e o instante do frame, em segundos. Quem chama deve passar
         o tempo do VIDEO (indice do frame / fps), nao o relogio da maquina:
-        os limiares em segundos (janela, cooldown, esquecer) descrevem o
-        movimento das pessoas na cena, e nao a velocidade da CPU. Sem isso,
-        analisar o mesmo arquivo com um modelo mais lento muda a contagem.
+        os limiares em segundos descrevem o movimento das pessoas na cena,
+        e nao a velocidade da CPU. Sem isso, analisar o mesmo arquivo com
+        um modelo mais lento mudaria a contagem.
 
         Omitido, cai no relogio monotonico — util em teste isolado.
         """
         if agora is None:
             agora = time.perf_counter()
 
-        eventos: list[Evento] = []
-
+        eventos = []
         for pessoa in pessoas:
             if pessoa.id is None:
                 continue  # sem ID nao da para acompanhar entre frames
@@ -188,87 +163,54 @@ class ContadorLinha:
             if evento is not None:
                 eventos.append(evento)
 
-        self._limpar_antigos(agora)
+        self._esquecer_ausentes(agora)
         return eventos
 
     def _processar(self, pessoa: Pessoa, agora: float) -> Evento | None:
-        ponto = pessoa.base  # ponto dos pes
-
         rastro = self._rastros.setdefault(pessoa.id, _Rastro())
         rastro.visto_em = agora
 
-        # Registra a travessia de cada linha.
-        for indice, (a, b) in enumerate(self.linhas):
-            lado_atual = _lado_da_linha(ponto, a, b)
+        # Ponto dos pes: mais estavel que o centro quando o torso e
+        # parcialmente ocluido, e e a posicao no chao que corresponde
+        # fisicamente a "de que lado do portao a pessoa esta".
+        distancia = self._distancia(pessoa.base)
 
-            if lado_atual == 0:
-                continue  # em cima da linha: espera o proximo frame
+        if abs(distancia) < self.margem:
+            return None  # zona morta: lado indefinido, nada muda
 
-            lado_anterior = rastro.lados.get(indice)
-            rastro.lados[indice] = lado_atual
+        lado = 1 if distancia > 0 else -1
+        anterior, rastro.lado = rastro.lado, lado
 
-            if lado_anterior is None or lado_anterior == lado_atual:
-                continue  # primeira vez vendo, ou nao cruzou
+        if anterior == lado:
+            return None  # continua do mesmo lado
+        if anterior == 0:
+            return None  # primeira vez fora da zona morta: so registra
 
-            # Mudou de lado: guarda para qual lado a pessoa foi.
-            rastro.cruzamentos.append((indice, lado_atual, agora))
-
-        return self._confirmar(pessoa.id, rastro, agora)
-
-    def _confirmar(self, id_pessoa: int, rastro: _Rastro, agora: float) -> Evento | None:
-        """Verifica se os cruzamentos acumulados fecham uma contagem."""
-        cfg = self.config
-
-        # Cooldown: evita contar a mesma pessoa repetidamente.
-        if agora - rastro.contado_em < cfg.segundos_cooldown:
+        # Cooldown: quem acabou de ser contado nao conta de novo ao
+        # oscilar perto da linha.
+        if agora - rastro.contado_em < self.config.segundos_cooldown:
             return None
 
-        # Descarta cruzamentos velhos demais para a mesma travessia.
-        rastro.cruzamentos = [
-            c for c in rastro.cruzamentos
-            if agora - c[2] <= cfg.segundos_janela
-        ]
+        rastro.contado_em = agora
 
-        if not rastro.cruzamentos:
-            return None
+        sentido = Sentido(lado)  # foi para a esquerda = entrou
+        if sentido is Sentido.ENTRADA:
+            self.entradas += 1
+        else:
+            self.saidas += 1
 
-        lado_entrada = cfg.lado_entrada
+        return Evento(pessoa.id, sentido, agora)
 
-        for lado in (lado_entrada, -lado_entrada):
-            linhas_cruzadas = {
-                indice for indice, destino, _ in rastro.cruzamentos
-                if destino == lado
-            }
-
-            if len(linhas_cruzadas) < cfg.linhas_necessarias:
-                continue
-
-            sentido = (
-                Sentido.ENTRADA if lado == lado_entrada else Sentido.SAIDA
-            )
-
-            if sentido is Sentido.ENTRADA:
-                self.entradas += 1
-            else:
-                self.saidas += 1
-
-            rastro.cruzamentos.clear()
-            rastro.contado_em = agora
-            return Evento(id_pessoa, sentido, agora)
-
-        return None
-
-    def _limpar_antigos(self, agora: float) -> None:
+    def _esquecer_ausentes(self, agora: float) -> None:
         """
-        Remove rastros de pessoas que sumiram.
+        Remove o rastro de quem sumiu do enquadramento.
 
         Sem isso o dicionario cresceria durante toda a missa, consumindo
         memoria a toa numa maquina ja limitada.
         """
         limite = self.config.segundos_esquecer
-        expirados = [
+        for pid in [
             pid for pid, r in self._rastros.items()
             if agora - r.visto_em > limite
-        ]
-        for pid in expirados:
+        ]:
             del self._rastros[pid]

@@ -60,7 +60,7 @@ Conforme especificado no documento do TCC:
 |---|---|---|
 | Linguagem / matemática | **Python + NumPy** | Base do backend e manipulação matricial de frames |
 | Visão computacional | **OpenCV** | Captura, redimensionamento e desenho sobre os frames |
-| Detecção | **Ultralytics YOLO** | Detecção de pessoas (classe `person`), restrita à ROI dos acessos |
+| Detecção | **Ultralytics YOLO** | Detecção de pessoas (classe `person`) no quadro da câmera de acesso |
 | Rastreamento | **ByteTrack** | Identificadores únicos e persistentes por indivíduo |
 | API | **FastAPI + Uvicorn** | Rotas HTTP assíncronas, comunicação local |
 | Validação de dados | **Pydantic** | Tipagem e validação dos schemas trafegados |
@@ -75,21 +75,20 @@ Conforme especificado no documento do TCC:
 
 ## Estado atual do projeto
 
-Este é um TCC em duas etapas. **O que está implementado até aqui** é a fundação de visão computacional; API, banco de dados e frontend fazem parte da próxima etapa (TCC II).
+Este é um TCC em duas etapas. **O que está implementado até aqui** é a fundação de visão computacional, que já conta de ponta a ponta. Persistência, estimativa de comunhão e dashboard já existem como peças isoladas, mas só se conectam quando a API do TCC II for escrita.
 
 | Componente | Status |
 |---|---|
 | Captura de vídeo (arquivo / webcam / RTSP, com reconexão) | ✅ Implementado |
 | Detecção de pessoas (YOLO, otimizado para CPU via ONNX) | ✅ Implementado |
 | Rastreamento com ID persistente (ByteTrack) | ✅ Implementado |
-| Recorte de Região de Interesse (ROI) | ✅ Implementado |
 | Contagem por cruzamento de linha virtual (entrada/saída) | ✅ Implementado |
 | Painel de monitoramento em tempo real (janela local) | ✅ Implementado |
+| Persistência (SQLite) | 🚧 Schema e CRUD prontos em [`backend/db/`](./backend/db/), ainda não ligados ao motor |
+| Estimativa de comunhão e hóstias sugeridas | 🚧 Coeficiente e regressão prontos, à espera da API |
+| Dashboard web (React) | 🚧 Telas prontas sobre mocks, à espera da API |
 | API (FastAPI) | ⏳ Planejado — TCC II |
-| Persistência (SQLite) | ⏳ Planejado — TCC II |
 | Agendamento automático (APScheduler) | ⏳ Planejado — TCC II |
-| Estimativa de comunhão e hóstias sugeridas | ⏳ Planejado — TCC II |
-| Dashboard web (React) | ⏳ Planejado — TCC II |
 | Empacotamento (PyInstaller) | ⏳ Planejado — TCC II |
 
 Detalhes de uso, configuração e arquitetura interna do módulo de visão computacional estão em [`backend/README.md`](./backend/README.md).
@@ -100,31 +99,39 @@ Detalhes de uso, configuração e arquitetura interna do módulo de visão compu
 
 ```
 EucharistCount-TCC/
-├── EucharistCountDocument.pdf   # especificação oficial do TCC
 ├── README.md                    # este arquivo
 │
 ├── backend/
 │   ├── main.py                  # ponto de entrada do monitoramento
 │   ├── config.json              # parâmetros ajustáveis (câmera, modelo, contagem)
+│   ├── bytetrack_ajustado.yaml  # tracker ajustado para esta cena
+│   ├── counting_people.csv      # contagem manual de referência (validação)
 │   ├── requirements.txt
 │   ├── README.md                # documentação detalhada do backend
+│   ├── DOCUMENTACAO_TECNICA.md  # o porquê de cada decisão do motor
 │   │
 │   ├── motor/                    # Motor de Visao Computacional (nome alinhado ao TCC)
-│   │   ├── config.py            # carrega/salva config.json
+│   │   ├── config.py            # carrega o config.json
 │   │   ├── camera.py            # captura: arquivo, webcam ou RTSP
-│   │   ├── detector.py          # YOLO + ByteTrack + ROI → lista de Pessoa
+│   │   ├── detector.py          # YOLO + ByteTrack → lista de Pessoa
 │   │   ├── contador.py          # contagem por cruzamento de linha virtual
 │   │   ├── visual.py            # desenho (janela de monitoramento)
 │   │   └── monitor.py           # orquestra o ciclo completo
 │   │
+│   ├── db/                      # camada de persistência SQLite (TCC II)
+│   │   ├── schema.sql           # tabelas, índices e a view do histórico
+│   │   ├── crud.py              # uma função por operação, para a API usar
+│   │   └── ...                  # importação do CSV e estimativa de comunhão
+│   │
 │   ├── scripts/
 │   │   ├── preparar_modelo.py   # exporta o modelo YOLO para ONNX
-│   │   └── calibrar.py          # testa combinações de modelo/resolução/confiança
+│   │   ├── calibrar.py          # testa combinações de modelo/resolução/confiança
+│   │   └── calibrar_linha.py    # marca a linha de contagem por clique
 │   │
 │   ├── modelos/                 # modelos .onnx (fora do Git)
 │   └── videos/                  # vídeos de teste (fora do Git)
 │
-└── frontend/                    # scaffold React + TypeScript + Vite (TCC II)
+└── frontend/                    # React + TypeScript + Vite, ainda sobre mocks
 ```
 
 ---
@@ -142,9 +149,9 @@ python -m scripts.preparar_modelo --modelo yolo11n --imgsz 640
 python main.py
 ```
 
-Instruções completas — calibração de modelo, ajuste de linha de contagem, ROI, parâmetros de `config.json` — estão em [`backend/README.md`](./backend/README.md).
+Instruções completas — calibração de modelo, ajuste da linha de contagem e parâmetros de `config.json` — estão em [`backend/README.md`](./backend/README.md).
 
-O frontend (`frontend/`) é um scaffold Vite + React + TypeScript ainda não integrado à API, reservado para a próxima etapa do TCC.
+O frontend (`frontend/`) tem as telas montadas em React + TypeScript, mas ainda consome dados fictícios: a integração com a API é da próxima etapa do TCC. Instruções em [`frontend/README.md`](./frontend/README.md).
 
 ---
 
@@ -156,7 +163,18 @@ A contagem usa uma **linha virtual** posicionada sobre o portão de acesso, defi
 - Cruzamento no sentido de saída → decrementa a ocupação.
 - Pessoa detectada repetidamente sem cruzar a linha → não altera a contagem.
 
+Em volta da linha há uma **zona morta** de poucos pontos percentuais da largura do quadro, dentro da qual nenhum lado é decidido. É ela que separa deslocamento real do tremor natural da caixa delimitadora, que de outro modo faria uma pessoa parada sobre a linha "entrar e sair" indefinidamente.
+
 Essa abordagem, combinada ao rastreamento por ID único do ByteTrack, evita que a mera presença de uma pessoa em múltiplos frames gere contagem duplicada — o problema citado na justificativa do TCC como recorrente em sistemas baseados apenas em detecção quadro a quadro.
+
+### Câmera atual e sentido da entrada
+
+A câmera originalmente usada no estudo de caso apresentou problemas e foi substituída pela câmera instalada **do outro lado da igreja**. No enquadramento atual o portão aparece no **canto esquerdo** do quadro, de modo que:
+
+- quem **entra** se desloca da **direita para a esquerda**;
+- quem **sai** se desloca da **esquerda para a direita**.
+
+A câmera é definitiva, então esse sentido é uma regra fixa do código e não uma configuração. A troca exigiu apenas reposicionar a linha de contagem em `backend/config.json`. Os detalhes e a justificativa estão na [documentação técnica do backend](./backend/DOCUMENTACAO_TECNICA.md).
 
 ---
 
@@ -185,7 +203,9 @@ Conforme o objetivo específico *e*, a validação do sistema em campo (igreja c
 
 ## Referências técnicas
 
-A fundamentação bibliográfica completa (YOLO, ByteTrack, crowd counting, SQLite, FastAPI, React, entre outras) está no capítulo de Referências do [`EucharistCountDocument.pdf`](./EucharistCountDocument.pdf).
+A fundamentação bibliográfica completa (YOLO, ByteTrack, crowd counting, SQLite, FastAPI, React, entre outras) está no capítulo de Referências do documento do TCC, entregue à parte.
+
+O porquê de cada decisão do motor de visão computacional — fórmulas, parâmetros e as medições que os justificam — está em [`backend/DOCUMENTACAO_TECNICA.md`](./backend/DOCUMENTACAO_TECNICA.md).
 
 ---
 

@@ -127,14 +127,20 @@ def testar(amostras, modelos, resolucoes, confiancas) -> list[dict]:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--fonte", default="videos/cam.mp4")
+    ap = argparse.ArgumentParser(
+        description="Testa combinacoes de modelo/resolucao/confianca em CPU"
+    )
+    ap.add_argument("--fonte",
+                    help="video, indice de webcam (0) ou rtsp://. "
+                         "Padrao: a fonte do config.json")
     ap.add_argument("--frames", type=int, default=8)
     ap.add_argument("--max-ms", type=float, default=400.0,
                     help="descarta configuracoes mais lentas que isto")
     args = ap.parse_args()
 
-    caminho = args.fonte
+    from motor.config import Config
+
+    caminho = args.fonte or Config.carregar().camera.fonte
     if not Path(caminho).is_absolute():
         caminho = str(RAIZ / caminho)
 

@@ -35,18 +35,6 @@ class Pessoa:
     confianca: float
 
     @property
-    def largura(self) -> int:
-        return self.x2 - self.x1
-
-    @property
-    def altura(self) -> int:
-        return self.y2 - self.y1
-
-    @property
-    def centro(self) -> tuple[int, int]:
-        return (self.x1 + self.x2) // 2, (self.y1 + self.y2) // 2
-
-    @property
     def base(self) -> tuple[int, int]:
         """
         Ponto dos pes.
@@ -69,7 +57,6 @@ class DetectorPessoas:
         raiz: Path,
     ):
         self.config = config
-        self.config_rastreio = config_rastreio
         self.config_filtro = config_filtro
 
         caminho = Path(config.modelo)
@@ -82,13 +69,17 @@ class DetectorPessoas:
                 f"Gere-o com: python -m scripts.preparar_modelo"
             )
 
+        # O tracker e um .yaml do proprio projeto, resolvido a partir da
+        # raiz do backend para o main.py funcionar de qualquer diretorio.
+        # Nomes embutidos da Ultralytics (ex.: "bytetrack.yaml") nao
+        # existem em disco e sao repassados como vieram.
+        self.caminho_tracker = raiz / config_rastreio.algoritmo
+        if not self.caminho_tracker.exists():
+            self.caminho_tracker = Path(config_rastreio.algoritmo)
+
         self._limitar_threads()
         self.modelo = YOLO(str(caminho), task="detect") # Carrega a rede neural convolucional (CNN) - ja treinada
         self.caminho_modelo = caminho
-
-        # ROI em pixels: calculada no primeiro frame, quando as
-        # dimensoes reais do video sao conhecidas.
-        self._roi_px: tuple[int, int, int, int] | None = None
 
     def _limitar_threads(self) -> None:
         """
@@ -114,84 +105,29 @@ class DetectorPessoas:
         except ImportError:
             pass
 
-    # ---------- Regiao de interesse ----------
-
-    def _calcular_roi(self, largura: int, altura: int) -> tuple[int, int, int, int]:
-        """Converte a ROI de fracoes para pixels, uma unica vez."""
-        rx1, ry1, rx2, ry2 = self.config.roi
-
-        x1 = max(0, int(rx1 * largura))
-        y1 = max(0, int(ry1 * altura))
-        x2 = min(largura, int(rx2 * largura))
-        y2 = min(altura, int(ry2 * altura))
-
-        # Garante um retangulo valido.
-        if x2 <= x1 or y2 <= y1:
-            return (0, 0, largura, altura)
-
-        return (x1, y1, x2, y2)
-
-    def roi_em_pixels(self, largura: int, altura: int) -> tuple[int, int, int, int]:
-        """ROI em pixels. Usada tambem pelo desenho na tela."""
-        if self._roi_px is None:
-            self._roi_px = self._calcular_roi(largura, altura)
-        return self._roi_px
-
     # ---------- Inferencia ----------
 
-    def detectar(self, frame: np.ndarray, rastrear: bool = True) -> list[Pessoa]:
+    def detectar(self, frame: np.ndarray) -> list[Pessoa]:
         """
-        Detecta pessoas em um frame.
+        Detecta pessoas em um frame, cada uma com um ID estavel entre
+        frames — e o ID que permite contar sem duplicar.
         """
-        altura_total, largura_total = frame.shape[:2]
+        resultado = self.modelo.track(
+            frame,
+            imgsz=self.config.imgsz,
+            conf=self.config.confianca,
+            iou=self.config.iou,
+            classes=[CLASSE_PESSOA],
+            max_det=self.config.max_deteccoes,
+            tracker=str(self.caminho_tracker),
+            persist=True,  # mantem os IDs entre chamadas
+            device="cpu",
+            verbose=False,
+        )[0]
 
-        if self.config.roi_ativo:
-            rx1, ry1, rx2, ry2 = self.roi_em_pixels(largura_total, altura_total)
-            entrada = frame[ry1:ry2, rx1:rx2]
-            deslocamento = (rx1, ry1)
-        else:
-            entrada = frame
-            deslocamento = (0, 0)
+        return self._converter(resultado, frame.shape[1], frame.shape[0])
 
-        if rastrear:
-            resultado = self.modelo.track(
-                entrada,
-                imgsz=self.config.imgsz,
-                conf=self.config.confianca,
-                iou=self.config.iou,
-                classes=[CLASSE_PESSOA],
-                max_det=self.config.max_deteccoes,
-                tracker=self.config_rastreio.algoritmo,
-                persist=True,  # mantem os IDs entre chamadas
-                device="cpu",
-                verbose=False,
-            )[0]
-        else:
-            resultado = self.modelo.predict(
-                entrada,
-                imgsz=self.config.imgsz,
-                conf=self.config.confianca,
-                iou=self.config.iou,
-                classes=[CLASSE_PESSOA],
-                max_det=self.config.max_deteccoes,
-                device="cpu",
-                verbose=False,
-            )[0]
-
-        return self._converter(
-            resultado,
-            entrada.shape[1],
-            entrada.shape[0],
-            deslocamento,
-        )
-
-    def _converter(
-        self,
-        resultado,
-        largura: int,
-        altura: int,
-        deslocamento: tuple[int, int] = (0, 0),
-    ) -> list[Pessoa]:
+    def _converter(self, resultado, largura: int, altura: int) -> list[Pessoa]:
         """Traduz a saida da Ultralytics para objetos Pessoa, aplicando o filtro."""
         caixas = resultado.boxes
         if caixas is None or len(caixas) == 0:
@@ -205,22 +141,18 @@ class DetectorPessoas:
         else:
             ids = [None] * len(xyxy)
 
-        off_x, off_y = deslocamento
-
         pessoas = []
         for (x1, y1, x2, y2), conf, pid in zip(xyxy, confs, ids):
-            # O filtro usa as dimensoes do recorte, nao do frame inteiro:
-            # e nele que a pessoa foi medida.
             if not self._plausivel(x1, y1, x2, y2, largura, altura):
                 continue
 
             pessoas.append(
                 Pessoa(
                     id=int(pid) if pid is not None else None,
-                    x1=int(x1) + off_x,
-                    y1=int(y1) + off_y,
-                    x2=int(x2) + off_x,
-                    y2=int(y2) + off_y,
+                    x1=int(x1),
+                    y1=int(y1),
+                    x2=int(x2),
+                    y2=int(y2),
                     confianca=float(conf),
                 )
             )
