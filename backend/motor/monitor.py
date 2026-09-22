@@ -124,7 +124,7 @@ class Monitor:
                 if self._parar:
                     break
 
-                pessoas = self.detector.detectar(frame, rastrear=True)
+                pessoas = self.detector.detectar(frame)
 
                 if self.contador is not None:
                     # Tempo do video, nao da maquina: mantem a contagem
@@ -187,15 +187,15 @@ class Monitor:
             desenhar_pessoa(frame, pessoa)
 
         m = self.metricas
-        linhas_painel = [
-            f"Dentro da igreja : {m.dentro}",
-            f"Entradas         : {m.entradas}",
-            f"Saidas           : {m.saidas}",
-            f"Pessoas no frame : {m.pessoas_no_frame}",
-            f"FPS              : {m.fps:.1f}",
-        ]
-
-        if self.contador is None:
+        if self.contador is not None:
+            linhas_painel = [
+                f"Dentro da igreja : {m.dentro}",
+                f"Entradas         : {m.entradas}",
+                f"Saidas           : {m.saidas}",
+                f"Pessoas no frame : {m.pessoas_no_frame}",
+                f"FPS              : {m.fps:.1f}",
+            ]
+        else:
             linhas_painel = [
                 f"Pessoas no frame : {m.pessoas_no_frame}",
                 f"IDs unicos       : {m.total_ids}",

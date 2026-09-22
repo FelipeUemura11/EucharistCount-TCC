@@ -62,10 +62,7 @@ def main() -> int:
     try:
         monitor = Monitor(config, RAIZ)
         metricas = monitor.executar()
-    except FileNotFoundError as e:
-        print(f"\n[ERRO] {e}")
-        return 1
-    except RuntimeError as e:
+    except (FileNotFoundError, RuntimeError) as e:
         print(f"\n[ERRO] {e}")
         return 1
     except KeyboardInterrupt:

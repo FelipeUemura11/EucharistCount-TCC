@@ -41,11 +41,6 @@ class FonteVideo:
         self.indice_atual = 0
 
     @property
-    def ao_vivo(self) -> bool:
-        """True para webcam ou RTSP; False para arquivo."""
-        return self._ao_vivo
-
-    @property
     def tempo_atual(self) -> float:
         """
         Instante do frame atual, em segundos.
@@ -78,14 +73,6 @@ class FonteVideo:
         if self._cap is not None:
             self._cap.release()
             self._cap = None
-
-    def __enter__(self) -> "FonteVideo":
-        if not self.abrir():
-            raise RuntimeError(f"Nao foi possivel abrir a fonte: {self.fonte}")
-        return self
-
-    def __exit__(self, *_) -> None:
-        self.fechar()
 
     # ---------- Leitura ----------
 

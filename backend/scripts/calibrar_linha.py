@@ -1,23 +1,23 @@
 """
-Calibrador visual de ROI e linha de contagem, por clique do mouse.
+Calibrador visual da linha de contagem, por clique do mouse.
+
+Descobrir a posicao certa da linha e o ajuste de maior impacto do
+sistema (ver DOCUMENTACAO_TECNICA, secao 7.2). Este script evita o
+vai-e-vem de editar o config.json no escuro: pausa o video num momento
+com gente, voce clica os dois pontos sobre o portao e ele imprime a
+tupla pronta para colar.
 
 Uso:
-    python calibrar_linha.py --fonte videos/cam.mp4
+    python -m scripts.calibrar_linha --fonte videos/20-09-teste.mp4
 
 Controles:
-    barra de espaco     -> pausa/retoma o video (pause para clicar com precisao)
-    seta direita/esquerda -> avanca/volta ~30 frames (procurar um bom momento)
-    r                    -> modo ROI: clique 2 pontos (canto superior-esquerdo,
-                             depois canto inferior-direito) da area a analisar
-    l                    -> modo LINHA: clique 2 pontos (ponto A, depois ponto B)
-                             do portao/entrada
-    c                    -> limpa os pontos marcados
-    q / ESC               -> sai
+    espaco          -> pausa/retoma (pause para clicar com precisao)
+    setas <- ->     -> volta/avanca ~30 frames
+    c               -> limpa os pontos marcados
+    q / ESC         -> sai
 
-A cada 2 cliques, o terminal imprime a tupla pronta para colar no
-config.json (secao "deteccao.roi" ou "contagem.linha_base"), ja em
-fracoes (0.0-1.0) da resolucao do video -- funciona igual em qualquer
-tamanho de imagem, exatamente como o resto do projeto espera.
+A ordem dos cliques nao importa: o contador normaliza a linha de cima
+para baixo, entao clicar B antes de A nao troca entrada com saida.
 """
 
 import argparse
@@ -26,70 +26,64 @@ from pathlib import Path
 
 import cv2
 
+RAIZ = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(RAIZ))
+
+COR = (0, 255, 255)
+AJUDA = "c=limpar  espaco=pausa  setas=navegar  q=sair"
+
 pontos: list[tuple[int, int]] = []
-modo = "roi"  # "roi" ou "linha"
-frame_atual = None
 largura = altura = 1
 
 
-def callback_mouse(evento, x, y, flags, param):
-    if evento == cv2.EVENT_LBUTTONDOWN:
-        pontos.append((x, y))
-        fx, fy = x / largura, y / altura
-        print(f"[{modo.upper()}] clique {len(pontos)}: "
-              f"pixel=({x},{y})  fracao=({fx:.3f},{fy:.3f})")
+def callback_mouse(evento, x, y, _flags, _param):
+    if evento != cv2.EVENT_LBUTTONDOWN:
+        return
 
-        if len(pontos) == 2:
-            (x1, y1), (x2, y2) = pontos
-            fx1, fy1 = x1 / largura, y1 / altura
-            fx2, fy2 = x2 / largura, y2 / altura
+    if len(pontos) == 2:
+        pontos.clear()  # terceiro clique recomeca a marcacao
 
-            if modo == "roi":
-                # garante canto sup-esq / inf-dir, independente da ordem do clique
-                fx1, fx2 = sorted((fx1, fx2))
-                fy1, fy2 = sorted((fy1, fy2))
-                print(f'\n  "roi": [{fx1:.3f}, {fy1:.3f}, {fx2:.3f}, {fy2:.3f}]\n')
-            else:
-                print(f'\n  "linha_base": [{fx1:.3f}, {fy1:.3f}, '
-                      f'{fx2:.3f}, {fy2:.3f}]\n')
-                print("  (se ENTROU/SAIU sair invertido depois, so trocar "
-                      "o sinal de lado_entrada no config.json, nao precisa "
-                      "reclicar)")
+    pontos.append((x, y))
+    print(f"clique {len(pontos)}: pixel=({x},{y})  "
+          f"fracao=({x / largura:.3f},{y / altura:.3f})")
+
+    if len(pontos) == 2:
+        (x1, y1), (x2, y2) = pontos
+        print(f'\n  "linha": [{x1 / largura:.3f}, {y1 / altura:.3f}, '
+              f'{x2 / largura:.3f}, {y2 / altura:.3f}]\n')
 
 
 def desenhar(frame):
     saida = frame.copy()
 
-    cor = (255, 200, 0) if modo == "roi" else (0, 255, 255)
     for p in pontos:
-        cv2.circle(saida, p, 5, cor, -1)
+        cv2.circle(saida, p, 5, COR, -1)
     if len(pontos) == 2:
-        cv2.line(saida, pontos[0], pontos[1], cor, 2)
-        if modo == "roi":
-            (x1, y1), (x2, y2) = pontos
-            cv2.rectangle(saida, (min(x1, x2), min(y1, y2)),
-                          (max(x1, x2), max(y1, y2)), cor, 2)
+        cv2.line(saida, pontos[0], pontos[1], COR, 2)
 
-    cv2.putText(saida, f"modo: {modo.upper()}  |  r=roi  l=linha  "
-                        f"c=limpar  espaco=pausa  setas=navegar  q=sair",
-                (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 3)
-    cv2.putText(saida, f"modo: {modo.upper()}  |  r=roi  l=linha  "
-                        f"c=limpar  espaco=pausa  setas=navegar  q=sair",
-                (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
+    # Texto em preto grosso por baixo do branco fino: legivel tanto em
+    # cena clara quanto escura.
+    for cor, espessura in (((0, 0, 0), 3), ((255, 255, 255), 1)):
+        cv2.putText(saida, AJUDA, (10, 25),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, cor, espessura)
     return saida
 
 
 def main() -> int:
-    global modo, pontos, frame_atual, largura, altura
+    global largura, altura
 
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--fonte", required=True, help="caminho do video")
+    ap = argparse.ArgumentParser(
+        description="Marca a linha de contagem clicando sobre o portao"
+    )
+    ap.add_argument("--fonte",
+                    help="caminho do video. Padrao: a fonte do config.json")
     args = ap.parse_args()
 
-    caminho = args.fonte
-    if not Path(caminho).exists():
-        print(f"[ERRO] Arquivo nao encontrado: {caminho}")
-        return 1
+    from motor.config import Config
+
+    caminho = args.fonte or Config.carregar().camera.fonte
+    if not Path(caminho).is_absolute():
+        caminho = str(RAIZ / caminho)
 
     cap = cv2.VideoCapture(caminho)
     if not cap.isOpened():
@@ -99,16 +93,18 @@ def main() -> int:
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     largura = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     altura = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    indice = total // 3  # comeca num ponto do video com chance de ter gente
+    indice = total // 3  # comeca num ponto com chance de ter gente
 
-    janela = "Calibrador - clique nos pontos"
+    janela = "Calibrador - clique nos dois pontos da linha"
     cv2.namedWindow(janela, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(janela, min(largura, 1100), min(altura, 1250))
     cv2.setMouseCallback(janela, callback_mouse)
 
     print(f"Video: {largura}x{altura}, {total} frames")
-    print("Navegue ate um frame com pessoas visiveis, pause (espaco) e clique.\n")
+    print("Navegue ate um frame com pessoas visiveis, pause (espaco) "
+          "e clique os dois pontos.\n")
 
+    frame_atual = None
     ok = False
     while True:
         if not ok:
@@ -123,22 +119,13 @@ def main() -> int:
 
         if tecla in (27, ord("q")):
             break
-        elif tecla == ord(" "):
-            tecla2 = cv2.waitKey(0) & 0xFF  # pausa ate proxima tecla
-            if tecla2 in (27, ord("q")):
+        if tecla == ord(" "):
+            tecla = cv2.waitKey(0) & 0xFF  # pausa ate a proxima tecla
+            if tecla in (27, ord("q")):
                 break
-            tecla = tecla2
 
-        if tecla == ord("r"):
-            modo = "roi"
-            pontos = []
-            print("-> modo ROI: clique canto superior-esquerdo, depois inferior-direito")
-        elif tecla == ord("l"):
-            modo = "linha"
-            pontos = []
-            print("-> modo LINHA: clique ponto A, depois ponto B do portao")
-        elif tecla == ord("c"):
-            pontos = []
+        if tecla == ord("c"):
+            pontos.clear()
         elif tecla in (81, 2424832):  # seta esquerda (varia por SO)
             indice = max(0, indice - 30)
             ok = False

@@ -75,7 +75,7 @@ Conforme especificado no documento do TCC:
 
 ## Estado atual do projeto
 
-Este é um TCC em duas etapas. **O que está implementado até aqui** é a fundação de visão computacional; API, banco de dados e frontend fazem parte da próxima etapa (TCC II).
+Este é um TCC em duas etapas. **O que está implementado até aqui** é a fundação de visão computacional, que já conta de ponta a ponta. Persistência, estimativa de comunhão e dashboard já existem como peças isoladas, mas só se conectam quando a API do TCC II for escrita.
 
 | Componente | Status |
 |---|---|
@@ -84,11 +84,11 @@ Este é um TCC em duas etapas. **O que está implementado até aqui** é a funda
 | Rastreamento com ID persistente (ByteTrack) | ✅ Implementado |
 | Contagem por cruzamento de linha virtual (entrada/saída) | ✅ Implementado |
 | Painel de monitoramento em tempo real (janela local) | ✅ Implementado |
+| Persistência (SQLite) | 🚧 Schema e CRUD prontos em [`backend/db/`](./backend/db/), ainda não ligados ao motor |
+| Estimativa de comunhão e hóstias sugeridas | 🚧 Coeficiente e regressão prontos, à espera da API |
+| Dashboard web (React) | 🚧 Telas prontas sobre mocks, à espera da API |
 | API (FastAPI) | ⏳ Planejado — TCC II |
-| Persistência (SQLite) | ⏳ Planejado — TCC II |
 | Agendamento automático (APScheduler) | ⏳ Planejado — TCC II |
-| Estimativa de comunhão e hóstias sugeridas | ⏳ Planejado — TCC II |
-| Dashboard web (React) | ⏳ Planejado — TCC II |
 | Empacotamento (PyInstaller) | ⏳ Planejado — TCC II |
 
 Detalhes de uso, configuração e arquitetura interna do módulo de visão computacional estão em [`backend/README.md`](./backend/README.md).
@@ -99,32 +99,39 @@ Detalhes de uso, configuração e arquitetura interna do módulo de visão compu
 
 ```
 EucharistCount-TCC/
-├── EucharistCountDocument.pdf   # especificação oficial do TCC
 ├── README.md                    # este arquivo
 │
 ├── backend/
 │   ├── main.py                  # ponto de entrada do monitoramento
 │   ├── config.json              # parâmetros ajustáveis (câmera, modelo, contagem)
+│   ├── bytetrack_ajustado.yaml  # tracker ajustado para esta cena
+│   ├── counting_people.csv      # contagem manual de referência (validação)
 │   ├── requirements.txt
 │   ├── README.md                # documentação detalhada do backend
 │   ├── DOCUMENTACAO_TECNICA.md  # o porquê de cada decisão do motor
 │   │
 │   ├── motor/                    # Motor de Visao Computacional (nome alinhado ao TCC)
-│   │   ├── config.py            # carrega/salva config.json
+│   │   ├── config.py            # carrega o config.json
 │   │   ├── camera.py            # captura: arquivo, webcam ou RTSP
 │   │   ├── detector.py          # YOLO + ByteTrack → lista de Pessoa
 │   │   ├── contador.py          # contagem por cruzamento de linha virtual
 │   │   ├── visual.py            # desenho (janela de monitoramento)
 │   │   └── monitor.py           # orquestra o ciclo completo
 │   │
+│   ├── db/                      # camada de persistência SQLite (TCC II)
+│   │   ├── schema.sql           # tabelas, índices e a view do histórico
+│   │   ├── crud.py              # uma função por operação, para a API usar
+│   │   └── ...                  # importação do CSV e estimativa de comunhão
+│   │
 │   ├── scripts/
 │   │   ├── preparar_modelo.py   # exporta o modelo YOLO para ONNX
-│   │   └── calibrar.py          # testa combinações de modelo/resolução/confiança
+│   │   ├── calibrar.py          # testa combinações de modelo/resolução/confiança
+│   │   └── calibrar_linha.py    # marca a linha de contagem por clique
 │   │
 │   ├── modelos/                 # modelos .onnx (fora do Git)
 │   └── videos/                  # vídeos de teste (fora do Git)
 │
-└── frontend/                    # scaffold React + TypeScript + Vite (TCC II)
+└── frontend/                    # React + TypeScript + Vite, ainda sobre mocks
 ```
 
 ---
@@ -144,7 +151,7 @@ python main.py
 
 Instruções completas — calibração de modelo, ajuste da linha de contagem e parâmetros de `config.json` — estão em [`backend/README.md`](./backend/README.md).
 
-O frontend (`frontend/`) é um scaffold Vite + React + TypeScript ainda não integrado à API, reservado para a próxima etapa do TCC.
+O frontend (`frontend/`) tem as telas montadas em React + TypeScript, mas ainda consome dados fictícios: a integração com a API é da próxima etapa do TCC. Instruções em [`frontend/README.md`](./frontend/README.md).
 
 ---
 
@@ -196,7 +203,9 @@ Conforme o objetivo específico *e*, a validação do sistema em campo (igreja c
 
 ## Referências técnicas
 
-A fundamentação bibliográfica completa (YOLO, ByteTrack, crowd counting, SQLite, FastAPI, React, entre outras) está no capítulo de Referências do [`EucharistCountDocument.pdf`](./EucharistCountDocument.pdf).
+A fundamentação bibliográfica completa (YOLO, ByteTrack, crowd counting, SQLite, FastAPI, React, entre outras) está no capítulo de Referências do documento do TCC, entregue à parte.
+
+O porquê de cada decisão do motor de visão computacional — fórmulas, parâmetros e as medições que os justificam — está em [`backend/DOCUMENTACAO_TECNICA.md`](./backend/DOCUMENTACAO_TECNICA.md).
 
 ---
 

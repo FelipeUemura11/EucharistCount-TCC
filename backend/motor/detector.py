@@ -35,18 +35,6 @@ class Pessoa:
     confianca: float
 
     @property
-    def largura(self) -> int:
-        return self.x2 - self.x1
-
-    @property
-    def altura(self) -> int:
-        return self.y2 - self.y1
-
-    @property
-    def centro(self) -> tuple[int, int]:
-        return (self.x1 + self.x2) // 2, (self.y1 + self.y2) // 2
-
-    @property
     def base(self) -> tuple[int, int]:
         """
         Ponto dos pes.
@@ -69,7 +57,6 @@ class DetectorPessoas:
         raiz: Path,
     ):
         self.config = config
-        self.config_rastreio = config_rastreio
         self.config_filtro = config_filtro
 
         caminho = Path(config.modelo)
@@ -81,6 +68,14 @@ class DetectorPessoas:
                 f"Modelo nao encontrado: {caminho}\n"
                 f"Gere-o com: python -m scripts.preparar_modelo"
             )
+
+        # O tracker e um .yaml do proprio projeto, resolvido a partir da
+        # raiz do backend para o main.py funcionar de qualquer diretorio.
+        # Nomes embutidos da Ultralytics (ex.: "bytetrack.yaml") nao
+        # existem em disco e sao repassados como vieram.
+        self.caminho_tracker = raiz / config_rastreio.algoritmo
+        if not self.caminho_tracker.exists():
+            self.caminho_tracker = Path(config_rastreio.algoritmo)
 
         self._limitar_threads()
         self.modelo = YOLO(str(caminho), task="detect") # Carrega a rede neural convolucional (CNN) - ja treinada
@@ -112,37 +107,23 @@ class DetectorPessoas:
 
     # ---------- Inferencia ----------
 
-    def detectar(self, frame: np.ndarray, rastrear: bool = True) -> list[Pessoa]:
+    def detectar(self, frame: np.ndarray) -> list[Pessoa]:
         """
-        Detecta pessoas em um frame.
-
-        Com rastrear=True cada pessoa recebe um ID estavel entre frames
-        (necessario para contar sem duplicar). Com False, so deteccao.
+        Detecta pessoas em um frame, cada uma com um ID estavel entre
+        frames — e o ID que permite contar sem duplicar.
         """
-        if rastrear:
-            resultado = self.modelo.track(
-                frame,
-                imgsz=self.config.imgsz,
-                conf=self.config.confianca,
-                iou=self.config.iou,
-                classes=[CLASSE_PESSOA],
-                max_det=self.config.max_deteccoes,
-                tracker=self.config_rastreio.algoritmo,
-                persist=True,  # mantem os IDs entre chamadas
-                device="cpu",
-                verbose=False,
-            )[0]
-        else:
-            resultado = self.modelo.predict(
-                frame,
-                imgsz=self.config.imgsz,
-                conf=self.config.confianca,
-                iou=self.config.iou,
-                classes=[CLASSE_PESSOA],
-                max_det=self.config.max_deteccoes,
-                device="cpu",
-                verbose=False,
-            )[0]
+        resultado = self.modelo.track(
+            frame,
+            imgsz=self.config.imgsz,
+            conf=self.config.confianca,
+            iou=self.config.iou,
+            classes=[CLASSE_PESSOA],
+            max_det=self.config.max_deteccoes,
+            tracker=str(self.caminho_tracker),
+            persist=True,  # mantem os IDs entre chamadas
+            device="cpu",
+            verbose=False,
+        )[0]
 
         return self._converter(resultado, frame.shape[1], frame.shape[0])
 

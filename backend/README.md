@@ -13,19 +13,24 @@ sem conexão com a nuvem. Nenhuma imagem é armazenada.
 backend/
 ├── main.py                  # ponto de entrada do monitoramento
 ├── config.json              # parâmetros ajustáveis (editável)
+├── bytetrack_ajustado.yaml  # tracker ajustado para esta cena
+├── counting_people.csv      # contagem manual de referência (validação)
 ├── requirements.txt
 │
 ├── motor/                   # Motor de Visão Computacional (OpenCV + YOLO + ByteTrack)
-│   ├── config.py            # carrega/salva config.json
+│   ├── config.py            # carrega o config.json
 │   ├── camera.py            # captura: arquivo, webcam ou RTSP
 │   ├── detector.py          # YOLO + ByteTrack → lista de Pessoa
 │   ├── contador.py          # contagem por cruzamento de linha virtual
 │   ├── visual.py            # desenho (só para monitoramento)
 │   └── monitor.py           # orquestra o ciclo completo
 │
+├── db/                      # persistência SQLite — ver db/README.md
+│
 ├── scripts/
 │   ├── preparar_modelo.py   # baixa e exporta o modelo para ONNX
-│   └── calibrar.py          # descobre a melhor configuração pro seu vídeo
+│   ├── calibrar.py          # descobre a melhor configuração pro seu vídeo
+│   └── calibrar_linha.py    # marca a linha de contagem por clique
 │
 ├── modelos/                 # modelos .onnx (fora do Git)
 └── videos/                  # vídeos de teste (fora do Git)
@@ -77,6 +82,7 @@ Exporta para ONNX, que roda 2 a 4× mais rápido em CPU que o `.pt`.
 ### 3. Posicione a linha de contagem e rode
 
 ```bash
+python -m scripts.calibrar_linha     # opcional: clique os 2 pontos da linha
 python main.py
 ```
 
@@ -84,6 +90,10 @@ Ajuste `contagem.linha` no `config.json` até a linha amarela ficar sobre
 o portão. A seta verde **ENTRA** aponta para a esquerda e a vermelha
 **SAI** para a direita. As duas linhas cinzas ao redor delimitam a zona
 morta (`margem`): quem fica entre elas ainda não foi contado.
+
+O `scripts.calibrar_linha` evita editar as coordenadas no escuro: ele
+pausa o vídeo, você clica os dois pontos sobre o portão e ele imprime a
+tupla pronta para colar no `config.json`.
 
 ---
 
@@ -191,6 +201,15 @@ Se as pessoas do fundo não forem detectadas, o problema quase sempre é o
 - `iou` — limiar do NMS; baixo demais funde pessoas próximas numa caixa só
 - `threads` — limite de núcleos; `0` = automático
 
+**rastreio**
+- `algoritmo` — arquivo do tracker. O padrão é o
+  `bytetrack_ajustado.yaml` do projeto, com limiares mais tolerantes que
+  o `bytetrack.yaml` da Ultralytics porque a nossa `confianca: 0.15` e
+  `fps_processamento: 7.5` produzem detecções mais fracas e com saltos
+  maiores entre frames — o que fazia a mesma pessoa ganhar um ID novo
+  perto do portão. Cada valor está comentado dentro do arquivo. Para
+  voltar ao padrão da biblioteca, use `"bytetrack.yaml"`
+
 **filtro** — descarta caixas com geometria improvável para uma pessoa.
 Os limites são permissivos de propósito: numa igreja há gente sentada,
 de perfil e parcialmente oculta pelos bancos.
@@ -231,12 +250,16 @@ versionados no Git — o `.gitignore` do projeto já bloqueia isso.
 
 Ainda não implementados nesta fase:
 
-- [ ] Persistência em SQLite
 - [ ] API FastAPI
 - [ ] Agendamento automático com APScheduler
-- [ ] Estimativa de comunhão e hóstias sugeridas
-- [ ] Dashboard web (React)
 - [ ] Empacotamento com PyInstaller
+
+Já existem como peças isoladas, à espera da API que as conecta:
+
+- Persistência em SQLite e estimativa de comunhão — ver
+  [`db/README.md`](./db/README.md), incluindo o trecho pronto que liga
+  o `Monitor.executar()` ao banco
+- Dashboard web (React) — ver [`../frontend/README.md`](../frontend/README.md)
 
 A classe `Monitor` já foi desenhada para ser controlada externamente
 (`executar`/`parar`), pronta para ser orquestrada pela API e pelo

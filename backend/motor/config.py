@@ -3,13 +3,12 @@ Configuracao central do Eucharist Count.
 """
 
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 ARQUIVO_CONFIG = RAIZ / "config.json"
 PASTA_MODELOS = RAIZ / "modelos"
-PASTA_VIDEOS = RAIZ / "videos"
 
 
 @dataclass
@@ -33,7 +32,7 @@ class ConfigDeteccao:
     #   480 = maquina fraca, perde pessoas distantes
     #   640 = equilibrio recomendado
     #   960 = melhor alcance, ~2x mais lento
-    imgsz: int = 640
+    imgsz: int = 480
 
     # Limiar de confianca. Mais baixo detecta mais, com mais falsos positivos.
     confianca: float = 0.15
@@ -51,7 +50,13 @@ class ConfigDeteccao:
 @dataclass
 class ConfigRastreio:
     """Tracker escolhido. Como cada pessoa mantem o mesmo ID entre frames."""
-    algoritmo: str = "bytetrack.yaml"
+
+    # Ajuste proprio do projeto: o bytetrack.yaml padrao da Ultralytics
+    # assume deteccoes fortes, e a nossa confianca=0.15 com
+    # fps_processamento=7.5 entrega deteccoes fracas e com saltos
+    # maiores. Os limiares mais tolerantes reduzem a troca de ID perto do
+    # portao. Para voltar ao padrao, use "bytetrack.yaml".
+    algoritmo: str = "bytetrack_ajustado.yaml"
 
 
 @dataclass
@@ -63,12 +68,13 @@ class ConfigFiltro:
     ativo: bool = True
 
     # Area da caixa como fracao da area do frame.
-    area_min: float = 0.0002
+    area_min: float = 0.0001
     area_max: float = 0.35
 
-    # Proporcao largura/altura.
-    aspecto_min: float = 0.15
-    aspecto_max: float = 2.5
+    # Proporcao largura/altura. Limites permissivos de proposito: numa
+    # igreja ha gente sentada, de perfil e parcialmente oculta.
+    aspecto_min: float = 0.10
+    aspecto_max: float = 3.2
 
 
 @dataclass
@@ -147,11 +153,6 @@ class Config:
             contagem=ConfigContagem(**dados.get("contagem", {})),
             visual=ConfigVisual(**dados.get("visual", {})),
         )
-
-    def salvar(self, caminho: Path | None = None) -> None:
-        caminho = caminho or ARQUIVO_CONFIG
-        with open(caminho, "w", encoding="utf-8") as f:
-            json.dump(asdict(self), f, indent=2, ensure_ascii=False)
 
     def caminho_absoluto(self, caminho_relativo: str) -> str:
         """Resolve um caminho da config em relacao a raiz do backend."""
