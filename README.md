@@ -5,7 +5,6 @@ Sistema de contagem de pessoas em tempo real utilizando **visão computacional**
 O objetivo é fornecer uma estimativa automatizada e confiável do número de fiéis presentes, apoiando a equipe litúrgica no dimensionamento de hóstias a serem consagradas e reduzindo o desperdício ou a escassez causados por estimativas puramente visuais.
 
 > Trabalho de Conclusão de Curso — Bacharelado em Ciência da Computação, Universidade Positivo, Curitiba, 2026.
-
 ---
 
 ## Visão geral

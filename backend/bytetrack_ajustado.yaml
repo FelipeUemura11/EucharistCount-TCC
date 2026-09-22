@@ -1,0 +1,39 @@
+# ByteTrack ajustado para o Eucharist Count.
+#
+# O bytetrack.yaml padrao do Ultralytics assume deteccoes fortes (pensado
+# para video de 30fps com modelo grande). Nosso confianca=0.15 e
+# fps_processamento=7.5 produzem deteccoes mais fracas e com saltos maiores
+# entre frames -- por isso os limiares abaixo sao mais tolerantes que o
+# padrao, para reduzir o "nascimento" de IDs novos para a mesma pessoa.
+#
+# Referencia dos valores padrao do Ultralytics (para comparacao):
+#   track_high_thresh: 0.5   track_low_thresh: 0.1
+#   new_track_thresh:  0.6   track_buffer: 30   match_thresh: 0.8
+
+tracker_type: bytetrack
+
+# Confianca minima para uma deteccao entrar na 1a rodada de associacao
+# (a "forte"). Baixado de 0.5 para bater com o confianca=0.15 do detector.
+track_high_thresh: 0.2
+
+# Confianca minima para entrar na 2a rodada (associacao fraca, so
+# reconecta rastreios ja existentes). Mantido baixo de propósito.
+track_low_thresh: 0.1
+
+# Confianca minima para abrir um ID novo do zero. Era 0.6 -- alto demais
+# para o que o detector realmente entrega nessa cena (0.17-0.4 e comum
+# perto da porta). Esse era provavelmente o maior causador da troca de ID.
+new_track_thresh: 0.18
+
+# Quantos frames um rastreio "sumido" fica vivo esperando reaparecer,
+# antes de ser descartado de vez. Dobrado (30->60) para compensar o
+# fps_processamento baixo: cada frame processado representa um salto de
+# tempo maior na cena real.
+track_buffer: 60
+
+# Limiar de IoU para considerar duas caixas a "mesma pessoa" entre
+# frames. Mais alto = mais tolerante a saltos de posicao (aceita
+# corresponder ate com pouca sobreposicao). Subido de 0.8 para 0.9.
+match_thresh: 0.9
+
+fuse_score: true

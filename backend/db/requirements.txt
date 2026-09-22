@@ -1,0 +1,12 @@
+# Dependencias exclusivas de backend/db/ (schema, CRUD e o pipeline de
+# estimativa de comunhao). Nao tem nenhuma relacao com as dependencias do
+# motor de visao computacional (requirements.txt na raiz do backend) —
+# rode este install separadamente, so quem for mexer no banco/regressao
+# precisa disto.
+#
+# Instalacao:
+#   pip install -r requirements.txt
+
+pandas==2.2.3
+scikit-learn==1.5.2
+joblib==1.4.2
