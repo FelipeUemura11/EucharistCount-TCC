@@ -84,12 +84,12 @@ Este é um TCC em duas etapas. **O que está implementado até aqui** é a funda
 | Rastreamento com ID persistente (ByteTrack) | ✅ Implementado |
 | Contagem por cruzamento de linha virtual (entrada/saída) | ✅ Implementado |
 | Painel de monitoramento em tempo real (janela local) | ✅ Implementado |
-| Persistência (SQLite) | 🚧 Schema e CRUD prontos em [`backend/db/`](./backend/db/), ainda não ligados ao motor |
-| Estimativa de comunhão e hóstias sugeridas | 🚧 Coeficiente e regressão prontos, à espera da API |
-| Dashboard web (React) | 🚧 Telas prontas sobre mocks, à espera da API |
-| API (FastAPI) | ⏳ Planejado — TCC II |
-| Agendamento automático (APScheduler) | ⏳ Planejado — TCC II |
-| Empacotamento (PyInstaller) | ⏳ Planejado — TCC II |
+| Persistência (SQLite) | 🚧 Schema e CRUD prontos em [`backend/db/`](./backend/db/), | Em Desenvolvimento |
+| Estimativa de comunhão e hóstias sugeridas | 🚧 Coeficiente e regressão prontos, à espera da API | Em Desenvolvimento |
+| Dashboard web (React) | Em Desenvolvimento |
+| API (FastAPI) | Em Desenvolvimento |
+| Agendamento automático (APScheduler) | Em Desenvolvimento |
+| Empacotamento (PyInstaller) | Em Desenvolvimento |
 
 Detalhes de uso, configuração e arquitetura interna do módulo de visão computacional estão em [`backend/README.md`](./backend/README.md).
 
