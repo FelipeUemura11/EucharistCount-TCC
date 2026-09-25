@@ -201,7 +201,7 @@ def obter_ou_criar_celebracao(conexao: sqlite3.Connection, titulo: str,
     ).fetchone()
     if linha is not None:
         return linha["id"]
-    return criar_celebracao(conexao, titulo, data, horario_missa, **extras);
+    return criar_celebracao(conexao, titulo, data, horario_missa, **extras)
 
 def obter_instantaneos(conexao: sqlite3.Connection, sessao_id: int) -> list[sqlite3.Row]:
     return conexao.execute(
