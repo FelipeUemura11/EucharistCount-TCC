@@ -24,9 +24,17 @@ RESOLUCOES = [480, 640, 960]
 CONFIANCAS = [0.15, 0.25, 0.40]
 
 
+def abrir_captura(caminho: str) -> cv2.VideoCapture:
+    """
+    Abre arquivo, webcam ou URL. Webcam precisa ir como INTEIRO: com a
+    string "0" o OpenCV procura um arquivo chamado "0" e nao abre nada.
+    """
+    return cv2.VideoCapture(int(caminho) if caminho.isdigit() else caminho)
+
+
 def amostrar_frames(caminho: str, quantidade: int) -> list[tuple[int, np.ndarray]]:
     """Extrai frames distribuidos uniformemente ao longo do video."""
-    cap = cv2.VideoCapture(caminho)
+    cap = abrir_captura(caminho)
     if not cap.isOpened():
         return []
 
@@ -52,7 +60,7 @@ def amostrar_frames(caminho: str, quantidade: int) -> list[tuple[int, np.ndarray
 
 
 def descrever_video(caminho: str) -> None:
-    cap = cv2.VideoCapture(caminho)
+    cap = abrir_captura(caminho)
     if not cap.isOpened():
         print(f"[ERRO] Nao consegui abrir: {caminho}")
         return
@@ -140,11 +148,13 @@ def main() -> int:
 
     from motor.config import Config
 
-    caminho = args.fonte or Config.carregar().camera.fonte
-    if not Path(caminho).is_absolute():
-        caminho = str(RAIZ / caminho)
+    config = Config.carregar()
+    # Mesma regra do monitor (correcao A-01): webcam e URL de rede passam
+    # intactas; so arquivo local vira caminho absoluto. Antes, "0" virava
+    # ".../backend/0" e o teste de webcam/RTSP abaixo nunca era verdadeiro.
+    caminho = config.resolver_fonte_camera(args.fonte or config.camera.fonte)
 
-    if not caminho.isdigit() and not caminho.startswith("rtsp"):
+    if not caminho.isdigit() and not caminho.lower().startswith(("rtsp://", "http://", "https://")):
         if not Path(caminho).exists():
             print(f"[ERRO] Arquivo nao encontrado: {caminho}")
             return 1

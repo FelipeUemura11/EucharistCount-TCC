@@ -81,7 +81,7 @@ class Monitor:
 
     def executar(self, ao_atualizar: Callable[[Metricas, float], None] | None = None) -> Metricas:
         cfg = self.config
-        fonte_resolvida = cfg.caminho_absoluto(cfg.camera.fonte)
+        fonte_resolvida = cfg.resolver_fonte_camera(cfg.camera.fonte)
 
         fonte = FonteVideo(
             fonte_resolvida,

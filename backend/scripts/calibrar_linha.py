@@ -81,11 +81,13 @@ def main() -> int:
 
     from motor.config import Config
 
-    caminho = args.fonte or Config.carregar().camera.fonte
-    if not Path(caminho).is_absolute():
-        caminho = str(RAIZ / caminho)
+    config = Config.carregar()
+    # Mesma regra do monitor (correcao A-01): so arquivo local vira caminho
+    # absoluto. Este calibrador navega por frames de um ARQUIVO; webcam e
+    # RTSP abrem, mas sem avancar/voltar (stream nao tem total de frames).
+    caminho = config.resolver_fonte_camera(args.fonte or config.camera.fonte)
 
-    cap = cv2.VideoCapture(caminho)
+    cap = cv2.VideoCapture(int(caminho) if caminho.isdigit() else caminho)
     if not cap.isOpened():
         print(f"[ERRO] Nao consegui abrir: {caminho}")
         return 1

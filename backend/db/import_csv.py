@@ -87,26 +87,70 @@ def importar(caminho_csv: Path, caminho_banco: Path = CAMINHO_BANCO) -> None:
                     )
                     celebracao_id = cursor.lastrowid
 
+                # Mesma logica de dedup da celebracao, agora para a sessao:
+                # sem isso, reimportar o mesmo CSV (ex. depois de corrigir
+                # uma linha) criava uma SESSAO NOVA a cada vez para a MESMA
+                # celebracao ja existente — duplicando o dado no historico
+                # e, mais grave, duplicando o mesmo ponto real quando o
+                # modelo de regressao treina em cima dessas sessoes
+                # (distorce o coeficiente ao dar peso repetido a uma unica
+                # observacao).
                 cursor = conexao.execute(
                     """
-                    INSERT INTO sessao_monitoramento
-                        (celebracao_id, origem_contagem, status, ocupacao_final,
-                         contagem_sistema, observacoes)
-                    VALUES (?, 'manual', 'concluida', ?, ?, ?)
+                    SELECT id FROM sessao_monitoramento
+                    WHERE celebracao_id = ? AND origem_contagem = 'manual'
                     """,
-                    (celebracao_id, pessoas, contagem_sistema, notas),
+                    (celebracao_id,),
                 )
-                sessao_id = cursor.lastrowid
+                sessao_existente = cursor.fetchone()
 
-                if comungantes is not None or hostias_ia is not None:
+                if sessao_existente:
+                    sessao_id = sessao_existente["id"]
                     conexao.execute(
                         """
-                        INSERT INTO estimativa_comunhao
-                            (sessao_id, comungantes_reais, hostias_calculadas)
-                        VALUES (?, ?, ?)
+                        UPDATE sessao_monitoramento
+                        SET ocupacao_final = ?, contagem_sistema = ?, observacoes = ?
+                        WHERE id = ?
                         """,
-                        (sessao_id, comungantes, hostias_ia),
+                        (pessoas, contagem_sistema, notas, sessao_id),
                     )
+                else:
+                    cursor = conexao.execute(
+                        """
+                        INSERT INTO sessao_monitoramento
+                            (celebracao_id, origem_contagem, status, ocupacao_final,
+                             contagem_sistema, observacoes)
+                        VALUES (?, 'manual', 'concluida', ?, ?, ?)
+                        """,
+                        (celebracao_id, pessoas, contagem_sistema, notas),
+                    )
+                    sessao_id = cursor.lastrowid
+
+                if comungantes is not None or hostias_ia is not None:
+                    cursor = conexao.execute(
+                        "SELECT id FROM estimativa_comunhao WHERE sessao_id = ?",
+                        (sessao_id,),
+                    )
+                    estimativa_existente = cursor.fetchone()
+
+                    if estimativa_existente:
+                        conexao.execute(
+                            """
+                            UPDATE estimativa_comunhao
+                            SET comungantes_reais = ?, hostias_calculadas = ?
+                            WHERE sessao_id = ?
+                            """,
+                            (comungantes, hostias_ia, sessao_id),
+                        )
+                    else:
+                        conexao.execute(
+                            """
+                            INSERT INTO estimativa_comunhao
+                                (sessao_id, comungantes_reais, hostias_calculadas)
+                            VALUES (?, ?, ?)
+                            """,
+                            (sessao_id, comungantes, hostias_ia),
+                        )
 
                 importadas += 1
 
