@@ -24,6 +24,8 @@ from .visual import (
     redimensionar,
 )
 
+from typing import Callable
+
 
 @dataclass
 class Metricas:
@@ -78,7 +80,7 @@ class Monitor:
 
     # ---------- Loop principal ----------
 
-    def executar(self) -> Metricas:
+    def executar(self, ao_atualizar: Callable[[Metricas, float], None] | None = None) -> Metricas:
         cfg = self.config
         fonte_resolvida = cfg.caminho_absoluto(cfg.camera.fonte)
 
@@ -142,6 +144,10 @@ class Monitor:
                         )
 
                 self._atualizar_metricas(pessoas, ultimo_instante)
+
+                if ao_atualizar is not None:
+                    ao_atualizar(self.metricas, fonte.tempo_atual)
+
                 ultimo_instante = time.perf_counter()
 
                 if mostrar:

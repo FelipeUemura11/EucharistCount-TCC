@@ -12,6 +12,9 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime
 from typing import List
+import json
+import math
+from dataclasses import asdict
 
 import uvicorn
 from fastapi import FastAPI, Depends
@@ -27,6 +30,30 @@ from motor.monitor import Monitor
 # --- Importações de Banco de Dados ---
 from db import crud
 from db.database import obter_conexao, inicializar_banco
+
+class GravadorSessao:
+    """Liga o Monitor ao banco sem que o Monitor saiba que o banco existe."""
+
+    def __init__(self, conexao, sessao_id: int, intervalo: float = 10.0):
+        self.conexao = conexao
+        self.sessao_id = sessao_id
+        self.intervalo = intervalo      # segundos de VIDEO entre instantaneos
+        self._ultimo = -math.inf        # -inf: o primeiro instante sempre grava
+        self.pico = 0
+
+    def __call__(self, metricas, instante: float) -> None:
+        self.pico = max(self.pico, metricas.dentro)
+
+        if instante - self._ultimo < self.intervalo:
+            return
+        self._ultimo = instante
+
+        crud.registrar_instantaneo(
+            self.conexao, self.sessao_id,
+            ocupacao_atual=metricas.dentro,
+            entradas_acumuladas=metricas.entradas,
+            saidas_acumuladas=metricas.saidas,
+        )
 
 # ============================================================================
 # Resolução de Caminhos Segura para o PyInstaller
@@ -328,7 +355,36 @@ def main() -> int:
         # INíCIO - Lógica Atual (Apresentação TCC e Auditoria)
         # ====================================================================
         monitor = Monitor(config, RAIZ)
-        metricas = monitor.executar()
+
+        conexao = obter_conexao()
+        agora = datetime.now()
+
+        celebracao_id = crud.obter_ou_criar_celebracao(
+            conexao,
+            titulo="Missa (monitoramento automatico)",
+            data=agora.strftime("%Y-%m-%d"),
+            horario_missa=agora.strftime("%H:%M"),
+        )
+        sessao_id = crud.iniciar_sessao(
+            conexao, celebracao_id,
+            origem_contagem="visao_computacional",
+            parametros_contagem=json.dumps(asdict(config)),
+        )
+        gravador = GravadorSessao(conexao, sessao_id)
+        try:
+            metricas = monitor.executar(ao_atualizar=gravador)
+        finally:
+             # Roda mesmo com ESC, erro ou Ctrl+C: nenhuma sessao fica orfa
+             m = monitor.metricas
+             crud.finalizar_sessao(
+                 conexao, sessao_id,
+                 total_entradas=m.entradas,
+                 total_saidas=m.saidas,
+                 ocupacao_final=m.dentro,
+                 ocupacao_maxima=gravador.pico,
+                 contagem_sistema=m.dentro,
+             )
+             conexao.close()
 
         # Excluir depois da apresentação e substituir por:
         #

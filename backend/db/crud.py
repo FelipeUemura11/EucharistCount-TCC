@@ -193,6 +193,15 @@ def registrar_instantaneo(conexao: sqlite3.Connection, sessao_id: int,
     )
     conexao.commit()
 
+def obter_ou_criar_celebracao(conexao: sqlite3.Connection, titulo: str,
+                              data: str, horario_missa: str, **extras) -> int:
+    linha = conexao.execute(
+        "SELECT id FROM celebracao WHERE data = ? AND horario_missa = ?",
+        (data, horario_missa),
+    ).fetchone()
+    if linha is not None:
+        return linha["id"]
+    return criar_celebracao(conexao, titulo, data, horario_missa, **extras);
 
 def obter_instantaneos(conexao: sqlite3.Connection, sessao_id: int) -> list[sqlite3.Row]:
     return conexao.execute(
