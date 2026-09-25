@@ -34,15 +34,15 @@ e) Validar o sistema em uma igreja católica de Curitiba/PR, avaliando acurácia
 ```
 Máquina Local da Igreja
 ┌─────────────────────────────────────────┐
-│  Frontend (React + TypeScript)           │
-│              ↕ HTTP localhost            │
-│  API (FastAPI)                           │
-│              ↕ registra jobs             │
-│  Automação (APScheduler)                 │
-│              ↕ aciona/finaliza           │
-│  Motor IA (OpenCV + YOLO + ByteTrack)    │
-│              ↕ grava contagem            │
-│  Base de Dados (SQLite)                  │
+│  Frontend (React + TypeScript)          │
+│              ↕ HTTP localhost           │
+│  API (FastAPI)                          │
+│              ↕ registra jobs            │
+│  Automação (APScheduler)                │
+│              ↕ aciona/finaliza          │
+│  Motor IA (OpenCV + YOLO + ByteTrack)   │
+│              ↕ grava contagem           │
+│  Base de Dados (SQLite)                 │
 └─────────────────────────────────────────┘
         ↑
    Câmera IP / NVR — stream RTSP
