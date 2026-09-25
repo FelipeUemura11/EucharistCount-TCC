@@ -84,12 +84,12 @@ Este é um TCC em duas etapas. **O que está implementado até aqui** é a funda
 | Rastreamento com ID persistente (ByteTrack) | ✅ Implementado |
 | Contagem por cruzamento de linha virtual (entrada/saída) | ✅ Implementado |
 | Painel de monitoramento em tempo real (janela local) | ✅ Implementado |
-| Persistência (SQLite) | 🚧 Schema e CRUD prontos em [`backend/db/`](./backend/db/), ainda não ligados ao motor |
-| Estimativa de comunhão e hóstias sugeridas | 🚧 Coeficiente e regressão prontos, à espera da API |
-| Dashboard web (React) | 🚧 Telas prontas sobre mocks, à espera da API |
-| API (FastAPI) | ⏳ Planejado — TCC II |
-| Agendamento automático (APScheduler) | ⏳ Planejado — TCC II |
-| Empacotamento (PyInstaller) | ⏳ Planejado — TCC II |
+| Persistência (SQLite) | 🚧 Schema e CRUD prontos em [`backend/db/`](./backend/db/), | Em Desenvolvimento |
+| Estimativa de comunhão e hóstias sugeridas | 🚧 Coeficiente e regressão prontos, à espera da API | Em Desenvolvimento |
+| Dashboard web (React) | Em Desenvolvimento |
+| API (FastAPI) | Em Desenvolvimento |
+| Agendamento automático (APScheduler) | Em Desenvolvimento |
+| Empacotamento (PyInstaller) | Em Desenvolvimento |
 
 Detalhes de uso, configuração e arquitetura interna do módulo de visão computacional estão em [`backend/README.md`](./backend/README.md).
 
@@ -108,7 +108,9 @@ EucharistCount-TCC/
 │   ├── counting_people.csv      # contagem manual de referência (validação)
 │   ├── requirements.txt
 │   ├── README.md                # documentação detalhada do backend
-│   ├── DOCUMENTACAO_TECNICA.md  # o porquê de cada decisão do motor
+│   ├── DOCUMENTACAO_MOTOR.md    # o porquê de cada decisão do motor de visão
+│   ├── DOCUMENTACAO_BANCO.md    # modelo de dados, diagramas e estimativa de comunhão
+│   ├── DOCUMENTACAO_API.md      # API FastAPI, ligação motor → banco e dashboard ao vivo
 │   │
 │   ├── motor/                    # Motor de Visao Computacional (nome alinhado ao TCC)
 │   │   ├── config.py            # carrega o config.json
@@ -174,7 +176,7 @@ A câmera originalmente usada no estudo de caso apresentou problemas e foi subst
 - quem **entra** se desloca da **direita para a esquerda**;
 - quem **sai** se desloca da **esquerda para a direita**.
 
-A câmera é definitiva, então esse sentido é uma regra fixa do código e não uma configuração. A troca exigiu apenas reposicionar a linha de contagem em `backend/config.json`. Os detalhes e a justificativa estão na [documentação técnica do backend](./backend/DOCUMENTACAO_TECNICA.md).
+A câmera é definitiva, então esse sentido é uma regra fixa do código e não uma configuração. A troca exigiu apenas reposicionar a linha de contagem em `backend/config.json`. Os detalhes e a justificativa estão na [documentação técnica do motor](./backend/DOCUMENTACAO_MOTOR.md).
 
 ---
 
@@ -205,7 +207,11 @@ Conforme o objetivo específico *e*, a validação do sistema em campo (igreja c
 
 A fundamentação bibliográfica completa (YOLO, ByteTrack, crowd counting, SQLite, FastAPI, React, entre outras) está no capítulo de Referências do documento do TCC, entregue à parte.
 
-O porquê de cada decisão do motor de visão computacional — fórmulas, parâmetros e as medições que os justificam — está em [`backend/DOCUMENTACAO_TECNICA.md`](./backend/DOCUMENTACAO_TECNICA.md).
+A documentação técnica do backend está dividida por parte:
+
+- [`backend/DOCUMENTACAO_MOTOR.md`](./backend/DOCUMENTACAO_MOTOR.md) — o porquê de cada decisão do motor de visão computacional: fórmulas, parâmetros e as medições que os justificam;
+- [`backend/DOCUMENTACAO_BANCO.md`](./backend/DOCUMENTACAO_BANCO.md) — o modelo de dados com diagramas das tabelas, como uma missa é gravada e a estimativa de comunhão;
+- [`backend/DOCUMENTACAO_API.md`](./backend/DOCUMENTACAO_API.md) — a API FastAPI, a ligação do motor com o banco e o dashboard ao vivo.
 
 ---
 

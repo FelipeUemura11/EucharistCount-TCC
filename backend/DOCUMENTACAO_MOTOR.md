@@ -6,6 +6,14 @@ Este documento explica **como e por que** cada parte do motor de visão computac
 
 Os valores citados aqui refletem a configuração atual do projeto (`config.json`).
 
+Este documento cobre **apenas o motor**: `motor/`, `scripts/`, `config.json` e `bytetrack_ajustado.yaml`. As outras partes do backend têm documentação própria:
+
+| Documento | Cobre |
+|---|---|
+| **`DOCUMENTACAO_MOTOR.md`** (este) | Motor de visão computacional: câmera, detecção, rastreio e contagem |
+| [`DOCUMENTACAO_BANCO.md`](./DOCUMENTACAO_BANCO.md) | Modelo de dados, camada de acesso e estimativa de comunhão |
+| [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md) | Servidor FastAPI, ligação motor → banco e dashboard ao vivo |
+
 ---
 
 ## 1. Visão geral: o caminho de um frame
@@ -26,9 +34,12 @@ ContadorLinha (contador.py)     → verifica se alguma Pessoa trocou de lado
     │                              devolve Eventos (entrada/saída)
     ▼
 Monitor (monitor.py)            → atualiza métricas, desenha na tela
+    │                              avisa quem estiver ouvindo (ao_atualizar)
+    ▼
+(fora do motor: banco e API)
 ```
 
-Cada seta é uma fronteira de responsabilidade: o módulo de captura não sabe o que é uma pessoa; o detector não sabe o que é uma linha de contagem; o contador não sabe o que é OpenCV. Essa separação existe para que cada peça possa ser entendida, testada e ajustada isoladamente — e é o que vai permitir, na próxima etapa, plugar a API FastAPI e o APScheduler por cima sem reescrever nada disto.
+Cada seta é uma fronteira de responsabilidade: o módulo de captura não sabe o que é uma pessoa; o detector não sabe o que é uma linha de contagem; o contador não sabe o que é OpenCV. Essa separação existe para que cada peça possa ser entendida, testada e ajustada isoladamente — e foi o que permitiu ligar o banco de dados e a API por cima do motor sem reescrever nada disto: o motor só avisa, a cada frame, quais são as métricas atuais (seção 13), e continua sem saber que existe um banco.
 
 ---
 
@@ -48,8 +59,8 @@ PIPELINE DE PREPARACAO — offline, executado UMA VEZ
   Download automatico do checkpoint .pt
         │   formato de TREINO: flexivel, pesado, depende do PyTorch inteiro
         ▼
-  modelo.export(format="onnx", imgsz=640, half=False, ...)
-        │   conversao: "congela" a rede numa resolucao fixa,
+  modelo.export(format="onnx", imgsz=640, dynamic=True, half=False, ...)
+        │   conversao: transforma a rede num grafo fixo de operacoes,
         │   descarta tudo que so serve para treinar
         ▼
   arquivo .onnx salvo em modelos/
@@ -93,16 +104,27 @@ caminho_onnx = modelo.export(               # converte para ONNX
     half=False,
     simplify=True,
     opset=12,
+    dynamic=dinamico,                       # True por padrao; --fixo desliga
     device="cpu",
 )
 ```
 
-Um detalhe que decorre diretamente da natureza "congelada" do `.onnx`: ele fixa a resolução de entrada (`imgsz`) no momento da exportação. Mudar de `imgsz=640` para `imgsz=960` exige reexportar — o `.onnx` não aceita variar isso em tempo de execução como o `.pt` aceitaria. É o preço da rigidez que o torna mais rápido.
+### Resolução fixa ou dinâmica
+
+Um grafo ONNX pode ter a resolução de entrada **fixa** ou **dinâmica**, e o script decide isso pela flag `--fixo`:
+
+- **Dinâmica (padrão, `dynamic=True`).** A altura e a largura da entrada ficam como dimensões variáveis dentro do grafo, então o mesmo `.onnx` aceita qualquer `imgsz` múltiplo de 32 em tempo de execução. É isso que permite a configuração atual rodar com **`imgsz: 480`** usando um modelo exportado a 640. Conferido no próprio arquivo: `modelos/yolo11n.onnx` tem as dimensões `height` e `width` declaradas como variáveis.
+- **Fixa (`--fixo`, `dynamic=False`).** O grafo congela no `imgsz` da exportação, e o ONNX Runtime recusa qualquer outro tamanho com o erro `Got invalid dimensions for input`. Mudar de 640 para 960 passa a exigir reexportar.
+
+A opção dinâmica é o padrão porque a resolução é um dos parâmetros que mais se ajusta durante a calibração de uma instalação nova (ver a tabela "Ajustando para máquina fraca" no `README.md`), e reexportar o modelo a cada tentativa seria um atrito sem ganho.
+
+Atenção: `yolo11s.onnx` e `yolov8n.onnx`, que também estão em `modelos/`, foram exportados no modo fixo (só o tamanho do lote é variável). Usá-los exige o mesmo `imgsz` com que foram exportados. A versão dinâmica do modelo `s` é `yolo11s_dyn.onnx`.
 
 ### Por que os parâmetros de exportação são esses
 
 - **`half=False`** — `half` ativaria FP16 (números de 16 bits em vez de 32). Isso acelera bastante em GPU, mas em **CPU comum não traz ganho de velocidade** e ainda reduz a precisão numérica. Como a máquina da paróquia não tem GPU, manter FP32 (`half=False`) é a escolha correta.
 - **`simplify=True`** — remove operações redundantes do grafo (nós que não afetam o resultado final), deixando o modelo mais enxuto e um pouco mais rápido de carregar e executar.
+- **`dynamic=True`** — mantém a resolução de entrada ajustável sem reexportar, como explicado acima.
 - **`opset=12`** — é a "versão da linguagem" do formato ONNX. Um opset mais antigo garante compatibilidade ampla com diferentes versões do ONNX Runtime; um valor muito recente poderia falhar em ambientes mais conservadores, como pode ser o caso de um computador de igreja com Windows desatualizado.
 
 ### Por que isso importa na prática
@@ -131,6 +153,8 @@ resultado = self.modelo.track(
 `classes=[0]` restringe a saída à classe `person` do dataset COCO (no qual o modelo foi originalmente treinado) — o modelo é capaz de reconhecer dezenas de categorias de objetos, mas o sistema descarta tudo que não seja pessoa antes mesmo de o resultado chegar ao resto do código. Isso não só é necessário funcionalmente, como também reduz o processamento de pós-detecção (NMS) a apenas uma classe.
 
 O modelo usado é o **YOLO11n** (variante "nano" da 11ª geração da arquitetura) — a menor e mais rápida disponível, mantendo precisão suficiente para o cenário. Modelos maiores (`s`, `m`, `l`, `x`) trocam velocidade por uma capacidade de detecção maior, principalmente em objetos pequenos e distantes; numa máquina sem GPU, a variante "nano" é o único ponto de operação que ainda permite processamento em tempo aproximado ao real.
+
+A resolução de inferência atual é **`imgsz: 480`**: antes de entrar na rede, cada frame é redimensionado para 480 pixels no lado maior. Resoluções menores rodam mais rápido, mas pessoas pequenas (distantes da câmera) ocupam poucos pixels e deixam de ser detectadas. 640 é o equilíbrio usual, e 960 alcança mais longe a cerca de metade da velocidade. O valor é ajustável sem reexportar o modelo (seção 2).
 
 ---
 
@@ -162,11 +186,27 @@ O parâmetro `iou` no `config.json` está em **0.7** — um valor alto para o pa
 
 Detecção sozinha não é suficiente para contar pessoas: o YOLO analisa cada frame de forma independente, sem nenhuma noção de "essa caixa no frame 50 é a mesma pessoa da caixa no frame 49". Sem rastreamento, uma pessoa parada por vários frames poderia ser contada várias vezes.
 
-O **ByteTrack**, configurado via `tracker: "bytetrack.yaml"` e acionado com `modelo.track(..., persist=True)`, resolve isso associando detecções entre frames consecutivos e atribuindo um **ID numérico estável** a cada pessoa. `persist=True` é o que garante que esse histórico de IDs continue entre uma chamada e outra — sem isso, o rastreador reiniciaria a contagem de IDs a cada frame.
+O **ByteTrack**, configurado pelo arquivo do projeto `bytetrack_ajustado.yaml` (parâmetro `rastreio.algoritmo` do `config.json`) e acionado com `modelo.track(..., persist=True)`, resolve isso associando detecções entre frames consecutivos e atribuindo um **ID numérico estável** a cada pessoa. `persist=True` é o que garante que esse histórico de IDs continue entre uma chamada e outra — sem isso, o rastreador reiniciaria a contagem de IDs a cada frame.
 
 A vantagem específica do ByteTrack sobre alternativas mais pesadas (como o DeepSORT, usado nas versões iniciais deste projeto) é a forma como ele trata detecções de baixa confiança: em vez de descartá-las, ele tenta associá-las a rastros já existentes antes de decidir que são ruído. Isso confere resiliência a oclusão parcial — exatamente o cenário de bancos de igreja e aglomeração no portão — sem o custo computacional de um extrator de aparência visual (rede neural adicional que o DeepSORT usa para "reconhecer" a pessoa por sua aparência, cara demais para uma CPU sem GPU).
 
 O ID atribuído pelo ByteTrack é o que permite ao `ContadorLinha` (seção 8) saber que a mesma pessoa cruzou a linha, e não duas pessoas diferentes.
+
+### 5.1 Por que um ByteTrack ajustado
+
+O `bytetrack.yaml` que vem com a Ultralytics foi calibrado para detecções fortes: vídeo a 30 fps e modelos grandes, que dão confianças altas. Este projeto opera no extremo oposto: `confianca: 0.15`, modelo nano e `fps_processamento: 7.5`. As detecções chegam mais fracas e, entre um frame processado e o seguinte, as pessoas se deslocam mais. Com os limiares padrão, o rastreador tratava essas detecções como insuficientes e **dava um ID novo para a mesma pessoa** perto do portão, justamente onde a contagem acontece. Uma troca de ID no meio da travessia apaga o lado registrado da pessoa, e a travessia não é contada.
+
+O arquivo `bytetrack_ajustado.yaml` afrouxa os limiares para essa realidade:
+
+| Parâmetro | Padrão Ultralytics | Ajustado | O que controla |
+|---|---|---|---|
+| `track_high_thresh` | 0.5 | **0.2** | Confiança mínima para a 1ª rodada de associação (a "forte"). Baixado para ficar perto do `confianca: 0.15` do detector |
+| `track_low_thresh` | 0.1 | 0.1 | Confiança mínima para a 2ª rodada, que só reconecta rastros existentes. Mantido baixo de propósito |
+| `new_track_thresh` | 0.6 | **0.18** | Confiança mínima para **abrir um ID novo**. Com 0.6, pessoas detectadas entre 0.17 e 0.4 perto da porta (o comum nesta cena) nunca ganhavam rastro. Provavelmente o maior causador das trocas de ID |
+| `track_buffer` | 30 | **60** | Quantos frames um rastro "sumido" espera reaparecer. Dobrado porque, a 7,5 fps, 30 frames são 4 s de cena real, contra 1 s a 30 fps |
+| `match_thresh` | 0.8 | **0.9** | Tolerância para associar caixas entre frames. Mais alto aceita correspondências com menos sobreposição, compensando os saltos de posição maiores |
+
+Cada valor está comentado dentro do próprio arquivo. O detector resolve o caminho do `.yaml` a partir da raiz do backend (para funcionar de qualquer diretório) e, se o arquivo não existir, repassa o nome como veio, o que permite voltar ao padrão da biblioteca com `"algoritmo": "bytetrack.yaml"`.
 
 ---
 
@@ -386,6 +426,8 @@ Dois parâmetros temporais governam o ciclo de vida de cada rastro:
 
 **`segundos_cooldown` (3.0s)** — depois de confirmar uma contagem para uma pessoa, o sistema ignora novos eventos dela por esse período. Isso evita contar a mesma pessoa duas vezes caso ela volte a atravessar a faixa logo após ser contada — alguém que para na porta, hesita e volta, por exemplo.
 
+> **Limitação conhecida.** O cooldown suprime o evento de volta, mas o lado registrado da pessoa é atualizado mesmo assim (`contador.py`, a atribuição `rastro.lado = lado` vem antes do teste de cooldown). Se ela entra, recua para fora dentro dos 3 s e entra de novo depois deles, a segunda entrada é contada e a saída não: **2 entradas e 0 saídas para uma pessoa só**, o que infla a ocupação. Reproduzido com uma trajetória sintética. A correção é só atualizar o lado depois de passar pelo cooldown.
+
 **`segundos_esquecer` (10.0s)** — pessoas que somem do enquadramento (ou que o rastreador simplesmente perde) têm seu rastro apagado após esse tempo:
 
 ```python
@@ -440,7 +482,11 @@ if agora - ultimo_envio < intervalo_minimo:
 
 ### 9.2 Reconexão automática
 
-Se um stream RTSP cair no meio de uma celebração, o sistema não encerra — ele espera `segundos_reconexao` (3.0s) e tenta reabrir a conexão automaticamente, indefinidamente, até conseguir. Isso é essencial num cenário de uso real: uma queda momentânea de rede Wi-Fi não pode exigir intervenção manual de alguém da equipe litúrgica no meio da missa.
+Se um stream ao vivo (RTSP ou webcam) parar de entregar frames no meio de uma celebração, o sistema não encerra na hora: ele espera `segundos_reconexao` (3.0s) e tenta reabrir a conexão automaticamente. Isso cobre o caso mais comum, uma queda momentânea da rede Wi-Fi, sem exigir que alguém da equipe litúrgica intervenha no meio da missa.
+
+Para arquivos de vídeo não há reconexão: o fim da leitura é o fim do vídeo.
+
+> **Limitação conhecida.** A reconexão é tentada **uma única vez**. Se a câmera ainda estiver fora do ar depois dos 3 segundos, `_reconectar()` devolve `False`, o loop termina e a sessão é fechada. Uma queda de rede mais longa encerra a contagem daquela missa. Para tornar a reconexão persistente, `_reconectar()` precisaria repetir a tentativa até conseguir ou até `Monitor.parar()` ser chamado.
 
 ---
 
@@ -463,7 +509,7 @@ Essa separação não é só estética. Ela tem três consequências práticas d
 
 1. **Testabilidade.** `ContadorLinha`, por exemplo, recebe objetos `Pessoa` (dataclasses simples) e devolve `Evento`s — nada de OpenCV, nada de YOLO. É possível escrever um teste automatizado que simula uma "pessoa" andando por posições específicas e verificar se a contagem funciona corretamente, sem precisar rodar um vídeo real. Isso será importante na fase de validação de acurácia do TCC II.
 2. **Substituibilidade.** Se um dia o projeto trocar o algoritmo de rastreamento, ou adicionar suporte a múltiplas câmeras, as mudanças ficam isoladas em `detector.py`/`camera.py` sem tocar na lógica de contagem.
-3. **Integração futura.** A classe `Monitor` já expõe `executar()`/`parar()` como uma interface pronta para ser controlada externamente — é exatamente o formato que o APScheduler vai precisar para iniciar e encerrar o monitoramento automaticamente no horário de cada celebração, sem que essa integração exija reescrever o motor de visão computacional.
+3. **Integração.** A classe `Monitor` expõe uma interface pequena para ser controlada de fora: `executar(ao_atualizar=...)` para rodar e publicar as métricas a cada frame, e `parar()` para encerrar. Foi por essa interface que o banco de dados e a API foram ligados ao motor sem alterar a lógica de visão (seção 13), e é o formato que o APScheduler vai precisar para iniciar e encerrar o monitoramento no horário de cada celebração.
 
 ---
 
@@ -473,6 +519,49 @@ Esta não é uma configuração que pode ser ligada ou desligada — é uma aus�
 
 Essa é a base técnica direta da conformidade com a LGPD que o TCC declara: sem retenção de imagem, não existe dado biométrico ou identificável sendo armazenado, e portanto não há tratamento de dado pessoal nos termos da lei.
 
+Esses números agregados são o que o motor entrega ao banco de dados (seção 13). O banco, por sua vez, não tem nenhuma coluna capaz de guardar imagem, nem sequer os IDs de rastreio individuais (ver `DOCUMENTACAO_BANCO.md`, seção 11).
+
+---
+
+## 13. Como o motor entrega os números para fora
+
+O motor não grava nada em banco, nem conhece a API. Para que os números cheguem ao dashboard durante a missa, o `Monitor.executar()` aceita um parâmetro opcional, `ao_atualizar`: uma função que ele chama **uma vez a cada frame processado**, logo depois de atualizar as métricas.
+
+```python
+def executar(self, ao_atualizar: Callable[[Metricas, float], None] | None = None) -> Metricas:
+    ...
+    self._atualizar_metricas(pessoas, ultimo_instante)
+    if ao_atualizar is not None:
+        ao_atualizar(self.metricas, fonte.tempo_atual)
+```
+
+O contrato é simples:
+
+| Argumento | O que é |
+|---|---|
+| `metricas` | O objeto `Metricas` atual: `entradas`, `saidas`, `dentro`, `pessoas_no_frame`, `fps` |
+| `instante` | O instante do frame em **segundos de vídeo** (`FonteVideo.tempo_atual`, seção 8.8), para que quem escuta possa medir intervalos com o mesmo relógio reprodutível que o contador usa |
+
+Esse padrão se chama **callback**: o motor avisa "atualizei", e quem passou a função decide o que fazer com o aviso. O motor continua sem importar nada de `db/`, e continua testável sem banco.
+
+Quem escuta, hoje, é o `GravadorSessao` do `main.py`, que grava os totais no banco a cada passagem pela linha e um ponto do gráfico a cada 5 segundos de vídeo. Esse lado está descrito em [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md), seção 5, e o motivo do intervalo de 5 segundos em [`DOCUMENTACAO_BANCO.md`](./DOCUMENTACAO_BANCO.md), seção 7.3.
+
+O parâmetro é opcional: chamar `executar()` sem ele, como fazem os scripts de calibração, funciona exatamente como antes.
+
+---
+
+## 14. Limitações conhecidas do motor
+
+Pontos identificados em revisão e ainda não corrigidos no código:
+
+| Onde | Limitação | Efeito |
+|---|---|---|
+| `config.py` — `caminho_absoluto()` | Junta a raiz do backend a qualquer fonte que não seja um caminho absoluto, inclusive `"0"` e `"rtsp://..."` | **Câmera IP e webcam não abrem**: chegam ao `FonteVideo` como caminhos de arquivo inexistentes. Só arquivos de vídeo funcionam. Correção: devolver a fonte intacta quando for dígito ou URL. O mesmo vale para `scripts/calibrar.py` e `scripts/calibrar_linha.py` |
+| `contador.py` — cooldown | Atualiza o lado antes de testar o cooldown | Quem hesita na porta pode ser contado duas vezes (seção 8.7) |
+| `camera.py` — `_reconectar()` | Uma única tentativa | Queda de rede longa encerra a contagem (seção 9.2) |
+| `monitor.py` — `executar()` | Não reinicia `_parar` nem as `Metricas` | Reusar a mesma instância de `Monitor` para duas missas acumula as contagens. Criar um `Monitor` novo por missa evita o problema |
+| `config.py` — `Config.carregar()` | Repassa as chaves do JSON direto para os dataclasses | Uma chave desconhecida no `config.json` (um erro de digitação, por exemplo) impede o programa de iniciar, com `TypeError` |
+
 ---
 
 ## Resumo das decisões-chave
@@ -481,10 +570,13 @@ Essa é a base técnica direta da conformidade com a LGPD que o TCC declara: sem
 |---|---|---|
 | Formato de inferência | ONNX (a partir de `.pt`) | 2–4× mais rápido em CPU, sem GPU disponível |
 | `half` na exportação | `False` | FP16 não acelera em CPU e perde precisão |
+| `dynamic` na exportação | `True` | Permite ajustar `imgsz` sem reexportar o modelo |
 | Modelo | YOLO11n | Menor variante viável para tempo real sem GPU |
+| `imgsz` | 480 | Velocidade na máquina fraca, ao custo de alcance |
 | `confianca` | 0.15 | Ambiente com oclusão parcial exige limiar permissivo |
 | `iou` (NMS) | 0.7 | Evita fundir pessoas próximas numa única detecção |
 | Rastreador | ByteTrack | Resiliente a oclusão, sem custo de extrator de aparência |
+| Limiares do rastreador | `bytetrack_ajustado.yaml` | Evita troca de ID com detecções fracas e fps baixo |
 | Ponto de referência | Pés (base da caixa) | Mais estável que o centro sob oclusão parcial |
 | Cálculo de lado da linha | Distância com sinal (produto vetorial) | Uma fórmula dá lado e distância, em qualquer ângulo |
 | Posição da linha | Vertical em `x = 0.25` | Perto do portão, mas fora da zona onde o rastreio morre |
@@ -493,3 +585,4 @@ Essa é a base técnica direta da conformidade com a LGPD que o TCC declara: sem
 | Enquadramento | Câmera apontada para a entrada | Resolve fisicamente o que a ROI compensava em software |
 | Base de tempo da contagem | Tempo do vídeo, não da CPU | Reprodutibilidade entre execuções e hardwares |
 | Armazenamento de imagem | Inexistente no código | Conformidade estrutural com a LGPD |
+| Saída de dados do motor | Callback `ao_atualizar` | Liga banco e API sem o motor depender deles |

@@ -15,6 +15,7 @@ __pycache__/
 *.bin
 backend/modelos/
 *_openvino_model/
+.aiassistant
 
 # Videos — NUNCA versionar filmagens de fieis (LGPD)
 backend/videos/

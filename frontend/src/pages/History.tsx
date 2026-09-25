@@ -3,7 +3,9 @@ import HistoryFilters from '../components/history/HistoryFilters';
 import HistoryRecordsTable from '../components/history/HistoryRecordsTable';
 import PageHeader from '../components/layout/PageHeader';
 import { useHistoryData } from '../hooks/useHistoryData';
+import { useSystemStatus } from "../hooks/useSystemStatus";
 import type { HistoryRecord } from '../types/history';
+
 
 interface HistoryFilterState {
   searchTerm: string;
@@ -32,6 +34,7 @@ function getLatestRecordDate(records: HistoryRecord[]) {
 
 export default function History() {
   const { records, isLoading } = useHistoryData();
+  const isActiveGlobal = useSystemStatus();
   const [draftSearchTerm, setDraftSearchTerm] = useState('');
   const [draftPeriodInDays, setDraftPeriodInDays] = useState(30);
   const [appliedFilters, setAppliedFilters] = useState<HistoryFilterState>({
@@ -70,7 +73,7 @@ export default function History() {
 
   return (
     <div>
-      <PageHeader title={isLoading ? 'Carregando histórico...' : 'Histórico'} isActive={false} />
+      <PageHeader title={isLoading ? 'Carregando histórico...' : 'Histórico'} isActive={isActiveGlobal} />
 
       <main className="min-w-0 flex-1 overflow-x-hidden px-8 pt-7 pb-10 max-[640px]:px-4">
         <HistoryFilters

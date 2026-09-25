@@ -24,12 +24,13 @@ from .visual import (
     redimensionar,
 )
 
+from typing import Callable
+
 
 @dataclass
 class Metricas:
     """Estado observavel do monitoramento."""
 
-    frames_processados: int = 0
     pessoas_no_frame: int = 0
     ids_unicos: set[int] = field(default_factory=set)
     fps: float = 0.0
@@ -78,7 +79,7 @@ class Monitor:
 
     # ---------- Loop principal ----------
 
-    def executar(self) -> Metricas:
+    def executar(self, ao_atualizar: Callable[[Metricas, float], None] | None = None) -> Metricas:
         cfg = self.config
         fonte_resolvida = cfg.caminho_absoluto(cfg.camera.fonte)
 
@@ -142,6 +143,10 @@ class Monitor:
                         )
 
                 self._atualizar_metricas(pessoas, ultimo_instante)
+
+                if ao_atualizar is not None:
+                    ao_atualizar(self.metricas, fonte.tempo_atual)
+
                 ultimo_instante = time.perf_counter()
 
                 if mostrar:
@@ -162,7 +167,6 @@ class Monitor:
         self, pessoas: list[Pessoa], instante_anterior: float
     ) -> None:
         m = self.metricas
-        m.frames_processados += 1
         m.pessoas_no_frame = len(pessoas)
 
         for p in pessoas:
@@ -200,7 +204,6 @@ class Monitor:
                 f"Pessoas no frame : {m.pessoas_no_frame}",
                 f"IDs unicos       : {m.total_ids}",
                 f"FPS              : {m.fps:.1f}",
-                f"Frame            : {m.frames_processados}",
             ]
 
         desenhar_painel(frame, linhas_painel)

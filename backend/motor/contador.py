@@ -59,14 +59,9 @@ Segmento = tuple[Ponto, Ponto]
 
 
 class Sentido(Enum):
-    """
-    Direcao do cruzamento. O valor e o lado da linha para onde a pessoa foi:
-    +1 = esquerda do quadro (entrou), -1 = direita (saiu).
-    """
-
     ENTRADA = 1
     SAIDA = -1
-
+    
 
 @dataclass
 class Evento:

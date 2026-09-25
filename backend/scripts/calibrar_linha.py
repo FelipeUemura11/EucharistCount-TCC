@@ -2,7 +2,7 @@
 Calibrador visual da linha de contagem, por clique do mouse.
 
 Descobrir a posicao certa da linha e o ajuste de maior impacto do
-sistema (ver DOCUMENTACAO_TECNICA, secao 7.2). Este script evita o
+sistema (ver DOCUMENTACAO_MOTOR, secao 7.2). Este script evita o
 vai-e-vem de editar o config.json no escuro: pausa o video num momento
 com gente, voce clica os dois pontos sobre o portao e ele imprime a
 tupla pronta para colar.

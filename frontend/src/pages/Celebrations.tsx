@@ -13,7 +13,10 @@ import {
 } from '../data/celebrationsMock';
 import type { CelebrationMassScheduleChanges } from '../types/celebrations';
 
+import { useSystemStatus } from "../hooks/useSystemStatus";
+
 export default function Celebrations() {
+  const isActiveGlobal = useSystemStatus();
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [daySchedules, setDaySchedules] = useState(createInitialDaySchedules);
 
@@ -72,7 +75,7 @@ export default function Celebrations() {
 
   return (
     <div>
-      <PageHeader title="Celebrações" isActive={false} />
+      <PageHeader title="Celebrações" isActive={isActiveGlobal} />
 
       <main className="flex-1 px-8 pt-7 pb-10">
         <div className="mb-6">

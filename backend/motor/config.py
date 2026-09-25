@@ -97,7 +97,7 @@ class ConfigContagem:
     # Linha de contagem: x1, y1, x2, y2 (fracoes do frame).
     # Vertical na porcao esquerda do quadro, um pouco a direita do
     # portao: colada no portao o rastreio morre na oclusao e a travessia
-    # nao chega a ser confirmada (ver DOCUMENTACAO_TECNICA, secao 7.1).
+    # nao chega a ser confirmada (ver DOCUMENTACAO_MOTOR, secao 7.2).
     linha: tuple[float, float, float, float] = (0.25, 0.0, 0.25, 1.00)
 
     # Meia-largura da zona morta em volta da linha, em fracao da largura

@@ -1,52 +1,20 @@
-import { useState } from 'react';
-import CameraProcessingSection from '../components/settings/CameraProcessingSection';
-import SettingsActions from '../components/settings/SettingsActions';
-import SystemHealthSection from '../components/settings/SystemHealthSection';
-import WeeklyMassScheduleSection from '../components/settings/WeeklyMassScheduleSection';
 import PageHeader from '../components/layout/PageHeader';
-import { createDefaultWeeklySchedule } from '../data/settingsMock';
-import type { MassScheduleChanges, WeekdayId } from '../types/settings';
+import { useSystemStatus } from "../hooks/useSystemStatus";
 
 export default function Settings() {
-  const [weeklySchedule, setWeeklySchedule] = useState(createDefaultWeeklySchedule);
-
-  const updateMassSchedule = (
-    dayId: WeekdayId,
-    massId: string,
-    changes: MassScheduleChanges
-  ) => {
-    setWeeklySchedule((currentSchedule) =>
-      currentSchedule.map((day) => {
-        if (day.id !== dayId) {
-          return day;
-        }
-
-        return {
-          ...day,
-          masses: day.masses.map((mass) =>
-            mass.id === massId ? { ...mass, ...changes } : mass
-          ),
-        };
-      })
-    );
-  };
-
-  const resetSettings = () => {
-    setWeeklySchedule(createDefaultWeeklySchedule());
-  };
+  const isActiveGlobal = useSystemStatus();
 
   return (
     <div>
-      <PageHeader title="Configurações" isActive={false} />
+      <PageHeader title="Configurações" isActive={isActiveGlobal} />
 
-      <main className="flex-1 px-8 pt-7 pb-10">
-        <WeeklyMassScheduleSection
-          weeklySchedule={weeklySchedule}
-          onMassChange={updateMassSchedule}
-        />
-        <CameraProcessingSection />
-        <SystemHealthSection />
-        <SettingsActions onReset={resetSettings} />
+      <main className="min-w-0 flex-1 overflow-x-hidden px-8 pt-7 pb-10 max-[640px]:px-4">
+        <div className="grid gap-6">
+          {/* Pode colocar os formulários de configuração aqui futuramente */}
+          <p className="text-gray-500">
+             O painel de configurações estará disponível em breve pela equipe de desenvolvimento.
+          </p>
+        </div>
       </main>
     </div>
   );
