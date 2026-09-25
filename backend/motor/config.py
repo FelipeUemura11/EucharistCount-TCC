@@ -158,3 +158,23 @@ class Config:
         """Resolve um caminho da config em relacao a raiz do backend."""
         p = Path(caminho_relativo)
         return str(p if p.is_absolute() else RAIZ / p)
+
+    def resolver_fonte_camera(self, fonte: str) -> str:
+        """
+        Resolve a fonte da camera para um caminho absoluto, SEM mexer em
+        indice de webcam ("0", "1", ...) nem em URL de rede (rtsp://,
+        http://, https://).
+
+        Bug original: caminho_absoluto() tratava QUALQUER fonte como
+        caminho de arquivo relativo. Um indice de webcam virava algo como
+        ".../backend/0" (deixa de ser digito puro) e uma URL RTSP virava
+        ".../backend/rtsp:/192.168.0.10/stream" (colon quebra Path no
+        Windows) — por isso camera IP e webcam nunca abriam, so arquivo
+        de video funcionava. So arquivo local precisa virar caminho
+        absoluto; webcam e URL de rede devem passar intactos.
+        """
+        if fonte.isdigit():
+            return fonte
+        if fonte.lower().startswith(("rtsp://", "http://", "https://")):
+            return fonte
+        return self.caminho_absoluto(fonte)

@@ -285,8 +285,16 @@ def obter_sessao(conexao: sqlite3.Connection, sessao_id: int) -> sqlite3.Row | N
 # ============================================================================
 
 def obter_configuracao_estimativa_vigente(conexao: sqlite3.Connection) -> sqlite3.Row | None:
+    # `id DESC` como criterio de desempate: `vigente_desde` tem precisao de
+    # segundo (strftime %Y-%m-%dT%H:%M:%S no schema). Quando o modelo e
+    # treinado e a config e gravada no mesmo segundo que a config anterior
+    # (comum, ja que treinar+gravar e rapido), duas linhas empatam em
+    # vigente_desde e o SQLite pode devolver a mais antiga — o coeficiente
+    # fixo antigo continuava "vigente" e o modelo de regressao recem
+    # treinado nunca entrava em vigor. `id` e AUTOINCREMENT, entao a maior
+    # id e sempre a insercao mais recente, mesmo empatada no timestamp.
     return conexao.execute(
-        "SELECT * FROM configuracao_estimativa ORDER BY vigente_desde DESC LIMIT 1"
+        "SELECT * FROM configuracao_estimativa ORDER BY vigente_desde DESC, id DESC LIMIT 1"
     ).fetchone()
 
 
