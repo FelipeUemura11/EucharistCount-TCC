@@ -11,11 +11,16 @@ sem conexão com a nuvem. Nenhuma imagem é armazenada.
 
 ```
 backend/
-├── main.py                  # ponto de entrada do monitoramento
+├── main.py                  # ponto de entrada: motor + API + dashboard
+├── gerar_dados.py           # popula o banco com dados de demonstração
 ├── config.json              # parâmetros ajustáveis (editável)
 ├── bytetrack_ajustado.yaml  # tracker ajustado para esta cena
 ├── counting_people.csv      # contagem manual de referência (validação)
 ├── requirements.txt
+│
+├── DOCUMENTACAO_MOTOR.md    # o porquê de cada decisão do motor
+├── DOCUMENTACAO_BANCO.md    # modelo de dados, com diagramas das tabelas
+├── DOCUMENTACAO_API.md      # API, ligação motor → banco, dashboard ao vivo
 │
 ├── motor/                   # Motor de Visão Computacional (OpenCV + YOLO + ByteTrack)
 │   ├── config.py            # carrega o config.json
@@ -248,19 +253,16 @@ versionados no Git — o `.gitignore` do projeto já bloqueia isso.
 
 ## Próximas etapas (TCC II)
 
-Ainda não implementados nesta fase:
-
-- [ ] API FastAPI
+- [x] API FastAPI servindo o dashboard — ver [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md)
+- [x] Motor gravando no banco durante a missa, com dashboard ao vivo
 - [ ] Agendamento automático com APScheduler
 - [ ] Empacotamento com PyInstaller
 
-Já existem como peças isoladas, à espera da API que as conecta:
+`python main.py` já sobe tudo junto: o motor conta, grava no SQLite, e o
+dashboard em `http://127.0.0.1:8000` acompanha a contagem ao vivo. Ver
+[`DOCUMENTACAO_BANCO.md`](./DOCUMENTACAO_BANCO.md) para o modelo de dados
+e [`../frontend/README.md`](../frontend/README.md) para o dashboard.
 
-- Persistência em SQLite e estimativa de comunhão — ver
-  [`db/README.md`](./db/README.md), incluindo o trecho pronto que liga
-  o `Monitor.executar()` ao banco
-- Dashboard web (React) — ver [`../frontend/README.md`](../frontend/README.md)
-
-A classe `Monitor` já foi desenhada para ser controlada externamente
-(`executar`/`parar`), pronta para ser orquestrada pela API e pelo
-APScheduler sem refatoração.
+A classe `Monitor` é controlada de fora por `executar(ao_atualizar=...)`
+e `parar()`, a mesma interface que o APScheduler vai usar para iniciar e
+encerrar o monitoramento no horário de cada missa.

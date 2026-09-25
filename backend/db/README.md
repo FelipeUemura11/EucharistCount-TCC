@@ -119,22 +119,24 @@ hostias = math.ceil(estimativa * (1 + config["margem_hostias"]))
 Isso é trabalho de quem for montar a API — aqui só fica documentado o
 contrato (o que ler de `configuracao_estimativa` e como aplicar).
 
-## Ponto em aberto: ligar o motor de visão ao banco
+## Ligação com o motor de visão
 
-O `Monitor.executar()` (em `backend/motor/monitor.py`) hoje só devolve um
-objeto `Metricas` em memória — nada é persistido ainda. Quando alguém for
-integrar, o fluxo é:
+O motor já grava no banco durante a missa. O `main.py` abre uma sessão,
+passa um `GravadorSessao` como callback para `Monitor.executar()`, e fecha
+a sessão no fim:
 
 ```python
 sessao_id = crud.iniciar_sessao(conexao, celebracao_id, origem_contagem="visao_computacional")
-metricas = monitor.executar()
-crud.finalizar_sessao(
-    conexao, sessao_id,
-    total_entradas=metricas.entradas,
-    total_saidas=metricas.saidas,
-    ocupacao_final=metricas.dentro,
-)
+gravador = GravadorSessao(conexao, sessao_id)   # totais a cada passagem, grafico a cada 5 s
+try:
+    metricas = monitor.executar(ao_atualizar=gravador)
+finally:
+    crud.finalizar_sessao(conexao, sessao_id, ...)
 ```
+
+O detalhamento (sequência completa, por que 5 segundos, o que vai em cada
+coluna) está em [`../DOCUMENTACAO_BANCO.md`](../DOCUMENTACAO_BANCO.md),
+seção 7, e o lado da API em [`../DOCUMENTACAO_API.md`](../DOCUMENTACAO_API.md).
 
 ## Convenções
 
