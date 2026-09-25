@@ -31,7 +31,6 @@ from typing import Callable
 class Metricas:
     """Estado observavel do monitoramento."""
 
-    frames_processados: int = 0
     pessoas_no_frame: int = 0
     ids_unicos: set[int] = field(default_factory=set)
     fps: float = 0.0
@@ -168,7 +167,6 @@ class Monitor:
         self, pessoas: list[Pessoa], instante_anterior: float
     ) -> None:
         m = self.metricas
-        m.frames_processados += 1
         m.pessoas_no_frame = len(pessoas)
 
         for p in pessoas:
@@ -206,7 +204,6 @@ class Monitor:
                 f"Pessoas no frame : {m.pessoas_no_frame}",
                 f"IDs unicos       : {m.total_ids}",
                 f"FPS              : {m.fps:.1f}",
-                f"Frame            : {m.frames_processados}",
             ]
 
         desenhar_painel(frame, linhas_painel)

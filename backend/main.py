@@ -34,16 +34,31 @@ from db.database import obter_conexao, inicializar_banco
 class GravadorSessao:
     """Liga o Monitor ao banco sem que o Monitor saiba que o banco existe."""
 
-    def __init__(self, conexao, sessao_id: int, intervalo: float = 10.0):
+    def __init__(self, conexao, sessao_id: int, intervalo: float = 5.0):
         self.conexao = conexao
         self.sessao_id = sessao_id
         self.intervalo = intervalo      # segundos de VIDEO entre instantaneos
         self._ultimo = -math.inf        # -inf: o primeiro instante sempre grava
         self.pico = 0
+        self._totais = (0, 0)           # (entradas, saidas) ja gravados
 
     def __call__(self, metricas, instante: float) -> None:
         self.pico = max(self.pico, metricas.dentro)
 
+        # Alguem cruzou a linha: atualiza os totais na hora, para o
+        # Dashboard mudar sem esperar o proximo instantaneo.
+        totais = (metricas.entradas, metricas.saidas)
+        if totais != self._totais:
+            self._totais = totais
+            crud.atualizar_totais_sessao(
+                self.conexao, self.sessao_id,
+                total_entradas=metricas.entradas,
+                total_saidas=metricas.saidas,
+                ocupacao_atual=metricas.dentro,
+                ocupacao_maxima=self.pico,
+            )
+
+        # O grafico nao precisa de cada frame: um ponto por intervalo basta.
         if instante - self._ultimo < self.intervalo:
             return
         self._ultimo = instante
@@ -178,12 +193,13 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
     instantaneos = crud.obter_instantaneos(db, sessao_id)
 
     occ_data = []
+    # A sessao e atualizada a cada entrada/saida; os instantaneos, so a cada
+    # intervalo. Por isso o valor atual vem da sessao, nao do ultimo ponto.
     latest_occupancy = sessao["ocupacao_final"]
     for inst in instantaneos:
         timestamp = inst["registrado_em"]
         hora = timestamp.split("T")[1][:5] if "T" in timestamp else timestamp.split(" ")[1][:5]
         occ_data.append(OccupancyDataPoint(time=hora, value=inst["ocupacao_atual"]))
-        latest_occupancy = inst["ocupacao_atual"]
 
     celebracao = crud.obter_celebracao(db, sessao["celebracao_id"])
     titulo = celebracao["titulo"] if celebracao else "Desconhecido"
@@ -417,7 +433,6 @@ def main() -> int:
     print(" >>> Sessão Concluída ")
     # Só exibe se as métricas foram de facto extraídas (remover no futuro APScheduler)
     if 'metricas' in locals():
-        print(f"Frames processados : {metricas.frames_processados}")
         print(f"Entradas           : {metricas.entradas}")
         print(f"Saídas             : {metricas.saidas}")
         print(f"Dentro da igreja   : {metricas.dentro}")

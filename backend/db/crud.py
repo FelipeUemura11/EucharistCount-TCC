@@ -193,6 +193,28 @@ def registrar_instantaneo(conexao: sqlite3.Connection, sessao_id: int,
     )
     conexao.commit()
 
+
+def atualizar_totais_sessao(conexao: sqlite3.Connection, sessao_id: int,
+                             total_entradas: int, total_saidas: int,
+                             ocupacao_atual: int, ocupacao_maxima: int) -> None:
+    """
+    Mantem os totais da sessao ativa em dia durante a missa — e o que o
+    Dashboard ao vivo le. Chamado a cada entrada/saida, nao a cada frame.
+    """
+    conexao.execute(
+        """
+        UPDATE sessao_monitoramento
+        SET total_entradas = ?,
+            total_saidas = ?,
+            ocupacao_final = ?,
+            ocupacao_maxima = ?
+        WHERE id = ?
+        """,
+        (total_entradas, total_saidas, ocupacao_atual, ocupacao_maxima, sessao_id),
+    )
+    conexao.commit()
+
+
 def obter_ou_criar_celebracao(conexao: sqlite3.Connection, titulo: str,
                               data: str, horario_missa: str, **extras) -> int:
     linha = conexao.execute(

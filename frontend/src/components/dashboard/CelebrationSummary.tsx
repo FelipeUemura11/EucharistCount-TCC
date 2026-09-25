@@ -6,8 +6,7 @@ interface CelebrationSummaryProps {
   onEndCount?: () => void;
 }
 
-export default function CelebrationSummary({
-  items,}: CelebrationSummaryProps) {
+export default function CelebrationSummary({ items }: CelebrationSummaryProps) {
   return (
     <div className="bg-white rounded-lg p-6 shadow-sm border border-border flex flex-col h-full">
       <div className="mb-5">
