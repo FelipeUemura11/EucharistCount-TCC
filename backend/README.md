@@ -11,7 +11,8 @@ sem conexão com a nuvem. Nenhuma imagem é armazenada.
 
 ```
 backend/
-├── main.py                  # ponto de entrada: motor + API + dashboard
+├── main.py                  # ponto de entrada: só orquestra (argumentos → banco → API → motor)
+├── cli.py                   # argumentos de linha de comando → Config
 ├── gerar_dados.py           # popula o banco com dados de demonstração
 ├── config.json              # parâmetros ajustáveis (editável)
 ├── bytetrack_ajustado.yaml  # tracker ajustado para esta cena
@@ -29,6 +30,19 @@ backend/
 │   ├── contador.py          # contagem por cruzamento de linha virtual
 │   ├── visual.py            # desenho (só para monitoramento)
 │   └── monitor.py           # orquestra o ciclo completo
+│
+├── api/                     # servidor FastAPI — ver DOCUMENTACAO_API.md
+│   ├── app.py               # criar_app(): monta o FastAPI
+│   ├── servidor.py          # sobe o uvicorn numa thread
+│   ├── dependencias.py      # obter_db (uma conexão por requisição)
+│   ├── schemas.py           # modelos Pydantic (contrato com o frontend)
+│   ├── formatacao.py        # datas, hora local, dia da semana, status
+│   ├── frontend.py          # serve o React compilado (frontend/dist)
+│   └── rotas/               # uma rota por tela: status, dashboard, celebracoes, historico
+│
+├── integracao/              # ponte motor ↔ banco
+│   ├── sessao.py            # GravadorSessao, abrir/fechar sessão, sessões presas
+│   └── estimativa.py        # estimativa de comunhão e hóstias
 │
 ├── db/                      # persistência SQLite — ver db/README.md
 │
@@ -118,10 +132,22 @@ python main.py --linha 0.25,0.0,0.25,1.0
 python main.py --imgsz 480 --threads 2 --sem-janela
 ```
 
-**Teclas:** `ESC`/`Q` sair · `ESPAÇO` pausar
+**Teclas (janela do vídeo):** `ESC`/`Q` encerra a contagem · `ESPAÇO` pausa
+
+Quando o vídeo acaba (ou com `ESC`), a contagem é encerrada e gravada no
+banco, mas **o programa continua rodando**: o dashboard em
+`http://127.0.0.1:8000` segue no ar mostrando os números finais da missa.
+Para fechar o programa, `Ctrl+C` no terminal.
+
+Se a execução anterior tiver sido encerrada à força (queda de energia,
+terminal fechado no X), a sessão que ficou aberta é fechada como
+`interrompida` na inicialização seguinte, com um aviso no terminal.
 
 A janela apenas exibe o vídeo na tela — nada do que é mostrado é gravado
 ou salvo em arquivo.
+
+Depois de qualquer mudança no frontend, rode `npm run build` na pasta
+`frontend`: o `main.py` serve a versão compilada (`frontend/dist`).
 
 ---
 
@@ -259,7 +285,10 @@ versionados no Git — o `.gitignore` do projeto já bloqueia isso.
 - [ ] Empacotamento com PyInstaller
 
 `python main.py` já sobe tudo junto: o motor conta, grava no SQLite, e o
-dashboard em `http://127.0.0.1:8000` acompanha a contagem ao vivo. Ver
+dashboard em `http://127.0.0.1:8000` acompanha a contagem ao vivo e, ao fim
+do vídeo, continua mostrando o resultado da última missa. Ver
+[`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md) para a organização do
+código em `api/` e `integracao/`,
 [`DOCUMENTACAO_BANCO.md`](./DOCUMENTACAO_BANCO.md) para o modelo de dados
 e [`../frontend/README.md`](../frontend/README.md) para o dashboard.
 
