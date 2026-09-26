@@ -7,7 +7,7 @@ import sys
 
 from api.app import criar_app
 from api.servidor import iniciar_em_background
-from integracao.cli import aplicar_argumentos, montar_argumentos
+from cli import aplicar_argumentos, montar_argumentos
 from db.database import inicializar_banco
 from integracao.sessao import sessao_de_monitoramento
 from motor.config import RAIZ, Config
