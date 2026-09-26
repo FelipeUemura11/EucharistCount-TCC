@@ -100,3 +100,11 @@ def sessao_de_monitoramento(monitor: Monitor, config: Config) -> Iterator[Gravad
             status=status,
         )
         conexao.close()
+
+def fechar_sessoes_presas() -> int:
+    """Fecha sessoes de execucoes anteriores que nao terminaram. Ver crud.interromper_sessoes_orfas."""
+    conexao = obter_conexao()
+    try:
+        return crud.interromper_sessoes_orfas(conexao)
+    finally:
+        conexao.close()

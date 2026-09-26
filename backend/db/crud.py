@@ -281,6 +281,46 @@ def obter_sessao_ativa(conexao: sqlite3.Connection) -> sqlite3.Row | None:
         "SELECT * FROM sessao_monitoramento WHERE status = 'em_andamento' ORDER BY iniciado_em DESC LIMIT 1"
     ).fetchone()
 
+def interromper_sessoes_orfas(conexao: sqlite3.Connection) -> int:
+    """
+    Fecha como 'interrompida' toda sessao que ficou 'em_andamento' de uma
+    execucao anterior (queda de energia, processo encerrado a forca, bug).
+
+    Chamar no inicio do programa: como so um processo roda o motor, nesse
+    momento nenhuma sessao pode estar legitimamente em andamento.
+    Devolve quantas sessoes foram fechadas.
+    """
+    # Celebracoes primeiro: o filtro depende das sessoes ainda em andamento.
+    conexao.execute(
+        """
+        UPDATE celebracao SET status = 'finalizada'
+        WHERE id IN (SELECT celebracao_id FROM sessao_monitoramento
+                     WHERE status = 'em_andamento')
+        """
+    )
+    cursor = conexao.execute(
+        """
+        UPDATE sessao_monitoramento
+        SET status = 'interrompida', finalizado_em = ?
+        WHERE status = 'em_andamento'
+        """,
+        (_agora(),),
+    )
+    conexao.commit()
+    return cursor.rowcount
+
+def obter_ultima_sessao_concluida(conexao: sqlite3.Connection) -> sqlite3.Row | None:
+    """
+    A ultima contagem que ocorreu para aparecer no Dashboard
+    """
+    return conexao.execute(
+        """
+        SELECT * FROM sessao_monitoramento
+        WHERE status= 'concluida' AND origem_contagem = 'visao_computacional'
+        ORDER BY finalizado_em DESC, id DESC
+        LIMIT 1
+        """
+    ).fetchone()
 
 def obter_sessao(conexao: sqlite3.Connection, sessao_id: int) -> sqlite3.Row | None:
     return conexao.execute("SELECT * FROM sessao_monitoramento WHERE id = ?", (sessao_id,)).fetchone()

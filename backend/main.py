@@ -8,11 +8,14 @@ import time
 
 from api.app import criar_app
 from api.servidor import iniciar_em_background
+
 from cli import aplicar_argumentos, montar_argumentos
-from db.database import inicializar_banco
-from integracao.sessao import sessao_de_monitoramento
-from motor.config import RAIZ, Config
+from integracao.sessao import fechar_sessoes_presas, sessao_de_monitoramento
+
 from motor.monitor import Metricas, Monitor
+from motor.config import RAIZ, Config
+
+from db.database import inicializar_banco
 
 
 def imprimir_resumo(metricas: Metricas) -> None:
@@ -37,6 +40,11 @@ def main() -> int:
 
     try:
         inicializar_banco()
+
+        presas = fechar_sessoes_presas()
+        if presas:
+            print(f"[!] {presas} sessao(oes) de uma execucao anterior nao tinha(m) "
+                  f"terminado e foi(ram) fechada(s) como interrompida(s).")
 
         iniciar_em_background(criar_app())
         print("\n[✓] Dashboard: http://127.0.0.1:8000")
