@@ -1,0 +1,1 @@
+"""Ligacao entre o motor de visao e o banco de dados"""

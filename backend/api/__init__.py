@@ -1,0 +1,1 @@
+"""Servidor FastAPI do dashboard: rotas, modelos e frontend"""
