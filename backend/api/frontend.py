@@ -8,7 +8,7 @@ app (ver api/app.py): se viesse antes, capturaria tambem /api/*.
 import sys
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
 from motor.config import RAIZ
@@ -31,7 +31,11 @@ def serve_frontend_spa(catchall: str):
     o index.html, para o React Router desenhar a tela (F5 em /historico
     nao da 404).
     """
+    if catchall == "api" or catchall.startswith("api/"):
+        raise HTTPException(status_code=404, detail="Rota da API nao encontrada")
+    
     requested_path = FRONTEND_DIST_DIR / catchall
+    
     if requested_path.is_file():
         return FileResponse(requested_path)
 

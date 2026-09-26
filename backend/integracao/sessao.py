@@ -90,6 +90,6 @@ def sessao_de_monitoramento(monitor: Monitor, config: Config) -> Iterator[Gravad
             total_saidas=m.saidas,
             ocupacao_final=m.dentro,
             ocupacao_maxima=gravador.pico,
-            contagem_sistem=m.dentro,
+            contagem_sistema=m.dentro,
         )
         conexao.close()

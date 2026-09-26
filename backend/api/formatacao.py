@@ -6,7 +6,7 @@ frontend espera datas em dd/mm/aaaa e status em ingles. Funcoes puras:
 recebem um valor, devolvem outro, sem tocar em banco nem em rede.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 DIAS_SEMANA = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira",
                "Sexta-feira", "Sábado", "Domingo"]
@@ -37,9 +37,14 @@ def dia_do_mes(data_iso: str) -> int:
 
 
 def hora_de_timestamp(timestamp: str) -> str:
-    """'2026-09-21T18:05:33' (ou com espaco) -> '18:05'."""
-    separador = "T" if "T" in timestamp else " "
-    return timestamp.split(separador)[1][:5]
+    """
+    '2026-09-26T21:00:00' (UTC, como o banco grava) -> '18:00' (hora local).
+
+    O banco grava todo carimbo em UTC (DOCUMENTACAO_BANCO, secao 8); a
+    conversao para o fuso da maquina acontece so aqui, na exibicao.
+    """
+    em_utc = datetime.fromisoformat(timestamp).replace(tzinfo=timezone.utc)
+    return em_utc.astimezone().strftime("%H:%M")
 
 
 def mapear_status(status_db: str) -> str:

@@ -11,7 +11,7 @@ from db import crud
 
 router = APIRouter()
 
-router.get("/history", response_model=list[HistoryRecord])
+@router.get("/history", response_model=list[HistoryRecord])
 def get_history(db: sqlite3.Connection = Depends(obter_db)):
     return [
         HistoryRecord(

@@ -16,6 +16,8 @@ from db import crud
 
 router = APIRouter()
 
+COEFICIENTE_PADRAO = 0.78
+
 @router.get("/dashboard", response_model=DashboardOverview)
 def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
     sessao = crud.obter_sessao_ativa(db)
@@ -38,20 +40,24 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
     ]
 
     celebracao = crud.obter_celebracao(db, sessao["celebracao_id"])
-    titulo = celebracao["titulo"] if celebracao else "Desconhecido"
+    
+    if celebracao:
+        titulo = celebracao["titulo"]
+        inicio = celebracao["horario_inicio_monitoramento"] or ""
+        fim = celebracao["horario_fim_monitoramento"] or ""
+    else:
+        titulo, inicio, fim = "Desconhecido", "", ""
 
     resumo = [
         CelebrationSummaryItem(icon="Church", label="Missa Atual", value=titulo),
-        CelebrationSummaryItem(icon="ClockArrowUp", label="Início do monitor",
-                               value=celebracao["horario_inicio_monitoramento"] or ""),
-        CelebrationSummaryItem(icon="ClockArrowDown", label="Fim do monitor",
-                               value=celebracao["horario_fim_monitoramento"] or ""),
+        CelebrationSummaryItem(icon="ClockArrowUp", label="Início do monitor", value=inicio),
+        CelebrationSummaryItem(icon="ClockArrowDown", label="Fim do monitor", value=fim),
         CelebrationSummaryItem(icon="Users", label="Pessoas presentes",
                                value=f"{ocupacao_atual} pessoas"),
     ]
 
     config_est = crud.obter_configuracao_estimativa_vigente(db)
-    coef = config_est["coeficiente_comunhao"] if config_est else 0.4
+    coef = config_est["coeficiente_comunhao"] if config_est else COEFICIENTE_PADRAO
 
     return DashboardOverview(
         metrics=DashboardMetrics(
