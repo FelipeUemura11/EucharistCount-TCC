@@ -241,12 +241,19 @@ def finalizar_sessao(
     ocupacao_maxima: int | None = None,
     contagem_sistema: int | None = None,
     observacoes: str | None = None,
+    status: str = "concluida",
 ) -> None:
-    """Fecha a sessao e marca a celebracao como 'finalizada'."""
+    """
+    Fecha a sessao e marca a celebracao como 'finalizada'.
+
+    `status` e 'concluida' quando a contagem terminou normalmente e
+    'interrompida' quando terminou por erro — so as concluidas entram
+    no historico (vw_historico).
+    """
     conexao.execute(
         """
         UPDATE sessao_monitoramento
-        SET status = 'concluida',
+        SET status = ?,
             finalizado_em = ?,
             total_entradas = ?,
             total_saidas = ?,
@@ -256,7 +263,7 @@ def finalizar_sessao(
             observacoes = COALESCE(?, observacoes)
         WHERE id = ?
         """,
-        (_agora(), total_entradas, total_saidas, ocupacao_final,
+        (status, _agora(), total_entradas, total_saidas, ocupacao_final,
          ocupacao_maxima, contagem_sistema, observacoes, sessao_id),
     )
     conexao.execute(
@@ -267,7 +274,6 @@ def finalizar_sessao(
         (sessao_id,),
     )
     conexao.commit()
-
 
 def obter_sessao_ativa(conexao: sqlite3.Connection) -> sqlite3.Row | None:
     """A sessao 'em_andamento' agora, se houver — para o Dashboard ao vivo."""

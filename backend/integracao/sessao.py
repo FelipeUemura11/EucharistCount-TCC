@@ -80,8 +80,14 @@ def sessao_de_monitoramento(monitor: Monitor, config: Config) -> Iterator[Gravad
 
     gravador = GravadorSessao(conexao, sessao_id)
 
+    status = "concluida"
     try:
         yield gravador
+    except BaseException:
+        # Erro, Ctrl+C ou fonte que nao abriu: a contagem nao terminou
+        # normalmente e nao deve entrar no historico como se fosse valida.
+        status = "interrompida"
+        raise
     finally:
         m = monitor.metricas
         crud.finalizar_sessao(
@@ -91,5 +97,6 @@ def sessao_de_monitoramento(monitor: Monitor, config: Config) -> Iterator[Gravad
             ocupacao_final=m.dentro,
             ocupacao_maxima=gravador.pico,
             contagem_sistema=m.dentro,
+            status=status,
         )
         conexao.close()
