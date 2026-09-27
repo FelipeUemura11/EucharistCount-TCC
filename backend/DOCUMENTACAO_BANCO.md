@@ -405,7 +405,6 @@ Toda função recebe a conexão como primeiro argumento (não abre nem fecha con
 
 | Grupo | Função | Quem usa hoje |
 |---|---|---|
-| Paróquia | `obter_paroquia`, `definir_paroquia` | — |
 | Agenda | `criar_horario_padrao`, `listar_horarios_padrao`, `remover_horario_padrao` | — |
 | Celebração | `criar_celebracao`, `obter_ou_criar_celebracao` | `integracao/sessao.py` |
 | | `obter_celebracao` | `api/rotas/dashboard.py` |
