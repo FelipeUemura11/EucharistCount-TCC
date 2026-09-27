@@ -40,31 +40,6 @@ def _agora() -> str:
 
 
 # ============================================================================
-# Paroquia
-# ============================================================================
-
-def obter_paroquia(conexao: sqlite3.Connection) -> sqlite3.Row | None:
-    return conexao.execute("SELECT * FROM paroquia WHERE id = 1").fetchone()
-
-
-def definir_paroquia(conexao: sqlite3.Connection, nome: str, cidade: str | None = None,
-                      logotipo_path: str | None = None) -> None:
-    conexao.execute(
-        """
-        INSERT INTO paroquia (id, nome, cidade, logotipo_path, atualizado_em)
-        VALUES (1, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-            nome = excluded.nome,
-            cidade = excluded.cidade,
-            logotipo_path = excluded.logotipo_path,
-            atualizado_em = excluded.atualizado_em
-        """,
-        (nome, cidade, logotipo_path, _agora()),
-    )
-    conexao.commit()
-
-
-# ============================================================================
 # Agenda padrao (horario_padrao) — tela Configuracoes
 # ============================================================================
 

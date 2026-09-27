@@ -26,20 +26,6 @@
 PRAGMA foreign_keys = ON;
 
 -- -----------------------------------------------------------------------------
--- 1. paroquia
--- -----------------------------------------------------------------------------
--- Configuracao de identidade da paroquia (nome/logo exibidos no menu lateral).
--- Tabela de linha unica: o app sempre le/atualiza o registro id = 1.
--- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS paroquia (
-    id              INTEGER PRIMARY KEY CHECK (id = 1),
-    nome            TEXT NOT NULL,
-    cidade          TEXT,
-    logotipo_path   TEXT,
-    atualizado_em   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now'))
-);
-
--- -----------------------------------------------------------------------------
 -- 2. horario_padrao
 -- -----------------------------------------------------------------------------
 -- Agenda semanal padrao (tela "Configuracoes"). Cada linha e uma missa fixa
