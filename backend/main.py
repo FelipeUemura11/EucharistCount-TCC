@@ -12,21 +12,10 @@ from api.servidor import iniciar_em_background
 from cli import aplicar_argumentos, montar_argumentos
 from integracao.sessao import fechar_sessoes_presas, sessao_de_monitoramento
 
-from motor.monitor import Metricas, Monitor
+from motor.monitor import Monitor
 from motor.config import RAIZ, Config
 
 from db.database import inicializar_banco
-
-
-def imprimir_resumo(metricas: Metricas) -> None:
-    print("\n" + "=" * 52)
-    print(" >>> Sessão Concluída ")
-    print(f"Entradas           : {metricas.entradas}")
-    print(f"Saídas             : {metricas.saidas}")
-    print(f"Dentro da igreja   : {metricas.dentro}")
-    print(f"FPS médio          : {metricas.fps:.1f}")
-    print("=" * 52)
-
 
 def main() -> int:
     multiprocessing.freeze_support()
@@ -58,7 +47,13 @@ def main() -> int:
         with sessao_de_monitoramento(monitor, config) as gravador:
             metricas = monitor.executar(ao_atualizar=gravador)
 
-        imprimir_resumo(metricas)
+        print("\n" + "=" * 52)
+        print(" >>> Sessão Concluída ")
+        print(f"Entradas           : {metricas.entradas}")
+        print(f"Saídas             : {metricas.saidas}")
+        print(f"Dentro da igreja   : {metricas.dentro}")
+        print(f"FPS médio          : {metricas.fps:.1f}")
+        print("=" * 52)
 
         # O video acabou, mas o dashboard continua no ar: e agora que os
         # numeros finais existem. A thread da API e daemon, entao o processo

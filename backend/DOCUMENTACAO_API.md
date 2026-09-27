@@ -98,7 +98,7 @@ O que `main()` faz, em ordem:
 | 5 | `iniciar_em_background(criar_app())` | `api/` | O dashboard fica no ar antes do motor começar |
 | 6 | `Monitor(config, RAIZ)` | `motor/` | Carrega o modelo YOLO. **Vem antes de abrir a sessão** (seção 6.5) |
 | 7 | `with sessao_de_monitoramento(...)` + `monitor.executar(...)` | `integracao/sessao.py` | Abre a sessão, conta até o vídeo acabar e fecha a sessão, aconteça o que acontecer |
-| 8 | `imprimir_resumo(metricas)` | `main.py` | Entradas, saídas, dentro e FPS médio no terminal |
+| 8 | Imprime o resumo | `main.py` | Entradas, saídas, dentro e FPS médio no terminal, quando o vídeo acaba |
 | 9 | `while True: time.sleep(1)` | `main.py` | Mantém o dashboard no ar até o Ctrl+C (seção 2.1) |
 
 Se o modelo não existir (`FileNotFoundError`) ou a fonte de vídeo não abrir (`RuntimeError`), o programa imprime o erro e sai com código 1. O Ctrl+C, a qualquer momento, encerra com código 0.
@@ -247,7 +247,7 @@ Lista as celebrações do **mês atual** (`crud.listar_celebracoes_do_mes`, que 
 
 ### 4.5 `GET /api/history`
 
-Lê a view `vw_historico` (`DOCUMENTACAO_BANCO.md`, seção 3.9): só sessões `concluida`, de celebrações `finalizada`, da data mais recente para a mais antiga.
+Lê a view `vw_historico` (`DOCUMENTACAO_BANCO.md`, seção 3.8): só sessões `concluida`, de celebrações `finalizada`, da data mais recente para a mais antiga.
 
 | Campo | Origem |
 |---|---|

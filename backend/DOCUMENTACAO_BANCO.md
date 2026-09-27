@@ -54,14 +54,6 @@ erDiagram
     configuracao_estimativa |o--o{ estimativa_comunhao : "calcula"
     sessao_monitoramento |o--o{ evento_sistema : "registra"
 
-    paroquia {
-        INTEGER id PK "sempre 1"
-        TEXT nome
-        TEXT cidade
-        TEXT logotipo_path
-        TEXT atualizado_em
-    }
-
     horario_padrao {
         INTEGER id PK
         INTEGER dia_semana "0=domingo ... 6=sabado"
@@ -178,11 +170,7 @@ A mesma separação permite que a contagem manual de hoje (o "olhômetro", impor
 
 ## 3. As tabelas, uma a uma
 
-### 3.1 `paroquia`
-
-Identidade da paróquia exibida no menu lateral (nome, cidade, logotipo). É uma **tabela de linha única**: `CHECK (id = 1)` impede uma segunda linha, e `crud.definir_paroquia()` usa `INSERT ... ON CONFLICT(id) DO UPDATE` para criar ou atualizar sempre o registro 1. Ainda não é usada pela API.
-
-### 3.2 `horario_padrao`
+### 3.1 `horario_padrao`
 
 A agenda semanal fixa (tela Configurações): cada linha é uma missa recorrente num dia da semana, com a janela de gravação associada.
 
@@ -191,7 +179,7 @@ A agenda semanal fixa (tela Configurações): cada linha é uma missa recorrente
 
 Ainda não é usada pela API nem pelo motor. A tela de Configurações está em construção.
 
-### 3.3 `celebracao`
+### 3.2 `celebracao`
 
 Uma data concreta com missa.
 
@@ -207,7 +195,7 @@ Uma data concreta com missa.
 
 `atualizado_em` é mantido por um gatilho (seção 4.3).
 
-### 3.4 `sessao_monitoramento`
+### 3.3 `sessao_monitoramento`
 
 **A tabela central do sistema**: uma execução real da contagem para uma celebração.
 
@@ -226,7 +214,7 @@ Uma data concreta com missa.
 
 **Por que guardar `parametros_contagem`:** a contagem depende de parâmetros ajustáveis, como posição da linha, margem e confiança (ver `DOCUMENTACAO_MOTOR.md`, seção 7.2). Guardar a configuração exata junto de cada sessão torna cada número **auditável e reproduzível**: é possível saber, meses depois, com que ajuste uma contagem antiga foi feita, e rodar o mesmo vídeo com os mesmos parâmetros para conferir. O motor grava ali `json.dumps(asdict(config))`, um retrato de todo o `config.json` efetivo, já com os argumentos de linha de comando aplicados.
 
-### 3.5 `instantaneo_ocupacao`
+### 3.4 `instantaneo_ocupacao`
 
 A **série temporal** da ocupação dentro de uma sessão, que desenha o gráfico "Evolução da ocupação" do dashboard. Cada linha é uma fotografia numérica: quantas pessoas estavam dentro, e quantas tinham entrado e saído até aquele momento.
 
@@ -234,7 +222,7 @@ O motor grava uma linha **a cada 5 segundos de vídeo**. A justificativa desse i
 
 O índice `idx_instantaneo_sessao_tempo (sessao_id, registrado_em)` cobre exatamente a consulta do gráfico: "todos os instantâneos desta sessão, em ordem de tempo".
 
-### 3.6 `configuracao_estimativa`
+### 3.5 `configuracao_estimativa`
 
 Os parâmetros que convertem ocupação em estimativa de comungantes e de hóstias.
 
@@ -248,7 +236,7 @@ Os parâmetros que convertem ocupação em estimativa de comungantes e de hósti
 
 **É uma tabela *append-only*:** para mudar o coeficiente, insere-se uma linha nova em vez de fazer `UPDATE`. A versão vigente é sempre a mais recente. Isso preserva o histórico: dá para saber qual coeficiente valia quando cada sessão antiga foi estimada, e a coluna `estimativa_comunhao.configuracao_estimativa_id` aponta exatamente para ele.
 
-### 3.7 `estimativa_comunhao`
+### 3.6 `estimativa_comunhao`
 
 Uma linha por sessão (`sessao_id` é `UNIQUE`), com **três fontes de valor lado a lado, de propósito**:
 
@@ -262,11 +250,11 @@ Guardar as três separadas, em vez de sobrescrever uma com a outra, é o que sus
 
 `crud.registrar_estimativa()` grava com `INSERT ... ON CONFLICT(sessao_id) DO UPDATE SET coluna = COALESCE(novo, atual)`: cria a linha se não existir, e numa atualização **só sobrescreve os campos informados**. Assim, o registro manual de `comungantes_reais` e o cálculo automático podem acontecer em momentos diferentes sem um apagar o outro.
 
-### 3.8 `evento_sistema`
+### 3.7 `evento_sistema`
 
 Um log leve de saúde e operação (câmera, modelo, reconexões, erros), pensado para alimentar a seção "Saúde do sistema" com dados reais em vez de valores fixos na tela. A tabela e as funções (`registrar_evento_sistema`, `ultimo_evento_por_componente`) existem, mas **ainda não são usadas** pelo motor nem pela API.
 
-### 3.9 `vw_historico` (view)
+### 3.8 `vw_historico` (view)
 
 Uma consulta salva que entrega a tela **Histórico** já pronta, sem nenhum `JOIN` na API:
 
@@ -303,7 +291,6 @@ Regras colocadas no schema valem para qualquer código que escreva no banco: API
 | `CHECK` de domínio | `status`, `origem`, `origem_contagem`, `metodo`, `nivel`, `ativo`, `dia_semana` | Um valor fora da lista (ex.: `status = 'terminada'`) é recusado com erro |
 | `UNIQUE` | `celebracao (data, horario_missa)` | Não há duas missas no mesmo horário |
 | `UNIQUE` | `estimativa_comunhao (sessao_id)` | No máximo uma estimativa por sessão |
-| `CHECK (id = 1)` | `paroquia` | Tabela de linha única |
 | `NOT NULL` + FK | `sessao_monitoramento.celebracao_id` | Não existe sessão sem celebração |
 
 ### 4.2 O que acontece ao apagar uma linha
@@ -543,7 +530,7 @@ O `check_same_thread=False` em `obter_conexao()` desliga uma verificação do Py
 | Maior `dentro` já visto | `ocupacao_maxima` | Cada passagem / fim |
 | `Metricas.dentro` | `contagem_sistema` | Fim |
 
-No fim, `ocupacao_final` e `contagem_sistema` recebem o mesmo valor. A diferença entre elas só aparece se a equipe registrar depois a contagem manual daquela missa em `ocupacao_final` (seção 3.4).
+No fim, `ocupacao_final` e `contagem_sistema` recebem o mesmo valor. A diferença entre elas só aparece se a equipe registrar depois a contagem manual daquela missa em `ocupacao_final` (seção 3.3).
 
 ---
 
