@@ -1,8 +1,8 @@
-import type { HistoryRecord } from '../types/history';
+import type { RegistroHistorico } from '../types/history';
 
-export async function getHistoryRecords(): Promise<HistoryRecord[]> {
+export async function buscarHistorico(): Promise<RegistroHistorico[]> {
   try {
-    const response = await fetch('http://127.0.0.1:8000/api/history');
+    const response = await fetch('http://127.0.0.1:8000/api/historico');
     if (!response.ok) {
       throw new Error(`Erro de rede: ${response.status}`);
     }

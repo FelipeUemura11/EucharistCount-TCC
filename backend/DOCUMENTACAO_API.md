@@ -128,8 +128,8 @@ A configuração efetiva, já com os argumentos aplicados, fica gravada em `sess
 |---|---|---|---|
 | `GET /api/status` | `rotas/status.py` | Se há contagem ativa | Selo "Contagem ativa" no topo das páginas (a cada 5 s) |
 | `GET /api/dashboard` | `rotas/dashboard.py` | Métricas, gráfico e resumo da missa atual ou da última | Página Dashboard (a cada 2 s) |
-| `GET /api/celebrations` | `rotas/celebracoes.py` | Celebrações do mês corrente | Ainda não usado (a página Celebrações usa dados fixos) |
-| `GET /api/history` | `rotas/historico.py` | Missas encerradas, com os resultados | Página Histórico |
+| `GET /api/celebracoes` | `rotas/celebracoes.py` | Celebrações do mês corrente | Ainda não usado (a página Celebrações usa dados fixos) |
+| `GET /api/historico` | `rotas/historico.py` | Missas encerradas, com os resultados | Página Histórico |
 | `GET /api/<inexistente>` | `frontend.py` | **404** | — |
 | `GET /{qualquer outro caminho}` | `frontend.py` | O frontend compilado | O navegador |
 | `GET /docs` | automático | Documentação interativa (Swagger) | Desenvolvimento |
@@ -155,7 +155,7 @@ def criar_app() -> FastAPI:
 - **A ordem importa.** O FastAPI testa as rotas na ordem em que foram registradas, e a rota do frontend aceita qualquer caminho. Se ela viesse antes, capturaria também as chamadas da API.
 - **`criar_app()` é uma *app factory*.** Em vez de uma variável global `app`, é uma função que monta um app novo a cada chamada. Um teste pode criar o seu app sem importar o `main.py`, o que evita carregar o YOLO e subir o motor.
 
-As respostas são descritas pelos **modelos Pydantic** de `api/schemas.py` (`DashboardOverview`, `Celebration`, `HistoryRecord`…). Eles espelham, campo a campo e com os mesmos nomes em *camelCase*, as interfaces TypeScript de `frontend/src/types/`. O FastAPI usa esses modelos para validar a saída: um campo com o tipo errado dá erro no servidor, e não vira um bug silencioso na tela.
+As respostas são descritas pelos **modelos Pydantic** de `api/schemas.py` (`DadosDashboard`, `Celebracao`, `RegistroHistorico`…). Eles espelham, campo a campo e com os mesmos nomes em português e *camelCase*, as interfaces TypeScript de `frontend/src/types/`. O FastAPI usa esses modelos para validar a saída: um campo com o tipo errado dá erro no servidor, e não vira um bug silencioso na tela.
 
 As conversões de formato ficam em `api/formatacao.py`, como **funções puras** (recebem um valor e devolvem outro, sem tocar em banco nem rede). As rotas só as chamam:
 
@@ -165,12 +165,13 @@ As conversões de formato ficam em `api/formatacao.py`, como **funções puras**
 | `formatar_dia_semana()` | `2026-09-21` → `Segunda-feira` |
 | `dia_do_mes()` | `2026-09-21` → `21` |
 | `hora_de_timestamp()` | `2026-09-26T21:00:00` (UTC) → `18:00` (hora local) |
-| `mapear_status()` | `em_andamento` → `active` (o banco fala português, o frontend inglês) |
+
+O status das celebrações não precisa de conversão: a API devolve o mesmo valor do banco (`agendada`, `em_andamento`, `finalizada`, `cancelada`).
 
 ### 4.2 `GET /api/status`
 
 ```json
-{ "isCountingActive": true }
+{ "contagemAtiva": true }
 ```
 
 `true` se existir alguma sessão com `status = 'em_andamento'` (`crud.obter_sessao_ativa`). Reflete **só** a contagem ativa: quando o vídeo acaba, o selo desliga, mesmo que o dashboard continue mostrando os números da missa que terminou.
@@ -191,24 +192,23 @@ Exemplo, com uma contagem em andamento:
 
 ```json
 {
-  "metrics": {
-    "currentOccupancy": 42,
-    "estimatedCommunicants": 32,
-    "entries": 50,
-    "exits": 8,
-    "isCountingActive": true
+  "metricas": {
+    "ocupacaoAtual": 42,
+    "estimativaComunhao": 32,
+    "entradas": 50,
+    "saidas": 8,
+    "contagemAtiva": true
   },
-  "occupancyData": [
-    { "time": "18:30", "value": 12 },
-    { "time": "18:30", "value": 25 },
-    { "time": "18:31", "value": 42 }
+  "graficoOcupacao": [
+    { "hora": "18:30", "ocupacao": 12 },
+    { "hora": "18:30", "ocupacao": 25 },
+    { "hora": "18:31", "ocupacao": 42 }
   ],
-  "celebrationSummary": [
-    { "icon": "Church",         "label": "Missa atual",       "value": "Missa (monitoramento automatico)" },
-    { "icon": "ClockArrowUp",   "label": "Início do monitor", "value": "" },
-    { "icon": "ClockArrowDown", "label": "Fim do monitor",    "value": "" },
-    { "icon": "Users",          "label": "Pessoas presentes", "value": "42 pessoas" }
-  ]
+  "resumoCelebracao": {
+    "titulo": "Missa (monitoramento automatico)",
+    "inicioMonitoramento": "",
+    "fimMonitoramento": ""
+  }
 }
 ```
 
@@ -216,48 +216,46 @@ De onde vem cada campo:
 
 | Campo | Origem | Atualizado |
 |---|---|---|
-| `currentOccupancy` | `sessao_monitoramento.ocupacao_final` | A cada passagem pela linha |
-| `entries` / `exits` | `sessao_monitoramento.total_entradas` / `total_saidas` | A cada passagem pela linha |
-| `estimatedCommunicants` | `calcular_estimativa(db, ocupação).comungantes` (seção 8) | Junto com a ocupação |
-| `isCountingActive` | `sessao["status"] == "em_andamento"` | `false` quando mostra a última missa encerrada |
-| `occupancyData[]` | `instantaneo_ocupacao`: `time` = `hora_de_timestamp(registrado_em)`, `value` = `ocupacao_atual` | A cada 5 s de vídeo |
-| `celebrationSummary[]` | Título e janela de monitoramento da celebração, e a ocupação | — |
+| `ocupacaoAtual` | `sessao_monitoramento.ocupacao_final` | A cada passagem pela linha |
+| `entradas` / `saidas` | `sessao_monitoramento.total_entradas` / `total_saidas` | A cada passagem pela linha |
+| `estimativaComunhao` | `calcular_estimativa(db, ocupação).comungantes` (seção 8) | Junto com a ocupação |
+| `contagemAtiva` | `sessao["status"] == "em_andamento"` | `false` quando mostra a última missa encerrada |
+| `graficoOcupacao[]` | `instantaneo_ocupacao`: `hora` = `hora_de_timestamp(registrado_em)`, `ocupacao` = `ocupacao_atual` | A cada 5 s de vídeo |
+| `resumoCelebracao` | Título e janela de monitoramento da celebração | — |
 
 Três detalhes:
 
 - **A ocupação atual vem da sessão, e não do último ponto do gráfico.** A sessão é atualizada no instante em que alguém cruza a linha; o gráfico, só a cada 5 segundos de vídeo. Ler do gráfico deixaria o número principal até 5 segundos atrasado em relação aos cartões de entradas e saídas.
-- **O rótulo muda com o estado:** "Missa atual" durante a contagem, "Última missa" depois.
+- **A API manda só os valores do resumo.** Ícones e rótulos ficam fixos em `ResumoDaCelebracao.tsx`. O rótulo da primeira linha muda com `contagemAtiva` ("Missa atual" durante a contagem, "Última missa" depois), e a linha "Pessoas presentes" usa `metricas.ocupacaoAtual`.
 - **Celebração inexistente não derruba a rota.** Se a sessão apontar para uma celebração removida, título e horários saem como "Desconhecido" e vazios, em vez de lançar `TypeError`.
 
-`icon` é o **nome** de um ícone da biblioteca lucide, em texto: o JSON não tem como transportar um componente React. Cabe ao frontend traduzir o nome no componente (seção 10).
+Sem nenhuma sessão (nem ativa, nem encerrada), a rota devolve o mesmo formato, zerado, com o gráfico vazio e `resumoCelebracao: null`. O frontend mostra "Nenhuma missa registrada ainda." no lugar do resumo.
 
-Sem nenhuma sessão (nem ativa, nem encerrada), a rota devolve o mesmo formato, zerado, com listas vazias. O frontend nunca precisa tratar um formato diferente.
-
-### 4.4 `GET /api/celebrations`
+### 4.4 `GET /api/celebracoes`
 
 Lista as celebrações do **mês atual** (`crud.listar_celebracoes_do_mes`, que filtra por `data LIKE 'AAAA-MM%'`).
 
 | Campo | Origem |
 |---|---|
-| `id`, `title` | `celebracao.id`, `titulo` |
-| `day`, `weekday` | Derivados de `celebracao.data` (`dia_do_mes`, `formatar_dia_semana`) |
-| `startTime`, `monitorStart`, `monitorEnd` | `horario_missa`, `horario_inicio/fim_monitoramento` |
-| `expectedPeople`, `capacity` | `pessoas_esperadas`, `capacidade` (`0` se vazios) |
-| `status` | `mapear_status`: `agendada` → `scheduled`, `em_andamento` → `active`, `finalizada` → `finished` |
+| `id`, `titulo` | `celebracao.id`, `titulo` |
+| `dia`, `diaSemana` | Derivados de `celebracao.data` (`dia_do_mes`, `formatar_dia_semana`) |
+| `horarioMissa`, `inicioMonitoramento`, `fimMonitoramento` | `horario_missa`, `horario_inicio/fim_monitoramento` |
+| `pessoasEsperadas`, `capacidade` | `pessoas_esperadas`, `capacidade` (`0` se vazios) |
+| `status` | `celebracao.status`, sem conversão: `agendada`, `em_andamento`, `finalizada` ou `cancelada` |
 
-### 4.5 `GET /api/history`
+### 4.5 `GET /api/historico`
 
 Lê a view `vw_historico` (`DOCUMENTACAO_BANCO.md`, seção 3.8): só sessões `concluida`, de celebrações `finalizada`, da data mais recente para a mais antiga.
 
 | Campo | Origem |
 |---|---|
 | `id` | `sessao_id` |
-| `date` | `data` convertida para `dd/mm/aaaa` |
-| `weekday` | Dia da semana por extenso |
-| `celebration`, `startTime` | Título e horário da missa |
-| `totalPeople` | `ocupacao_final` |
-| `estimatedCommunicants`, `suggestedHosts` | Já priorizados pela view: ajustado → calculado → real. Para contagens da câmera, dependem de a estimativa ter sido gravada em `estimativa_comunhao` (seção 8); sem ela, saem `0` |
-| `entries`, `exits` | `total_entradas`, `total_saidas` |
+| `data` | `data` convertida para `dd/mm/aaaa` |
+| `diaSemana` | Dia da semana por extenso |
+| `celebracao`, `horarioMissa` | Título e horário da missa |
+| `totalPessoas` | `ocupacao_final` |
+| `estimativaComunhao`, `hostiasSugeridas` | Já priorizados pela view: ajustado → calculado → real. Para contagens da câmera, dependem de a estimativa ter sido gravada em `estimativa_comunhao` (seção 8); sem ela, saem `0` |
+| `entradas`, `saidas` | `total_entradas`, `total_saidas` |
 
 ### 4.6 Uma conexão por requisição (`api/dependencias.py`)
 
@@ -291,7 +289,7 @@ A rota `/{catchall:path}` segue esta regra, na ordem:
 3. Se `frontend/dist/index.html` não existe, devolve um aviso pedindo `npm run build`.
 4. Senão, devolve o `index.html`.
 
-- **O passo 1 existe por causa de um bug real.** Antes dele, uma rota da API inexistente devolvia o `index.html` com status 200. O frontend recebia HTML onde esperava JSON, o erro era engolido, e a tela ficava vazia sem nenhum aviso. Foi assim que a rota `/api/history`, quebrada na reorganização por um `@` que faltava, passou despercebida.
+- **O passo 1 existe por causa de um bug real.** Antes dele, uma rota da API inexistente devolvia o `index.html` com status 200. O frontend recebia HTML onde esperava JSON, o erro era engolido, e a tela ficava vazia sem nenhum aviso. Foi assim que a rota do histórico (na época `/api/history`), quebrada na reorganização por um `@` que faltava, passou despercebida.
 - **O passo 4 faz as rotas do React funcionarem ao recarregar a página.** `/historico` não é um arquivo, e sim uma tela que o React desenha no navegador; sem essa regra, apertar F5 em `/historico` daria 404.
 
 **O frontend precisa estar compilado.** O servidor entrega a pasta `dist/`, e não o código-fonte React. Mudanças no frontend só aparecem em `:8000` depois de `npm run build` na pasta `frontend`. Durante o desenvolvimento, `npm run dev` serve o frontend com recarga automática na porta 5173, consumindo a API em `:8000`.
@@ -464,7 +462,7 @@ stateDiagram-v2
 
 ### 7.3 Consulta repetida (*polling*)
 
-O frontend busca `/api/dashboard` a cada 2 segundos (`frontend/src/hooks/useDashboardData.ts`, constante `INTERVALO_ATUALIZACAO_MS`). O selo de status no topo das páginas faz o mesmo com `/api/status`, a cada 5 segundos.
+O frontend busca `/api/dashboard` a cada 2 segundos (`frontend/src/hooks/useDashboard.ts`, constante `INTERVALO_ATUALIZACAO_MS`). O selo de status no topo das páginas faz o mesmo com `/api/status`, a cada 5 segundos.
 
 A alternativa seria o servidor **empurrar** os dados para o navegador, por WebSocket ou *Server-Sent Events*. A consulta repetida foi escolhida porque, neste cenário, as vantagens do *push* não compensam a complexidade:
 
@@ -473,7 +471,7 @@ A alternativa seria o servidor **empurrar** os dados para o navegador, por WebSo
 - **2 segundos já parece instantâneo** para um painel de ocupação. Se for preciso mais rápido, basta mudar a constante.
 - **O banco continua sendo a única interface.** Com *push*, a API teria que ser avisada pelo motor de cada mudança, o que acoplaria as duas threads.
 
-Se a API não responder, o hook **mantém na tela os últimos dados recebidos** e tenta de novo no ciclo seguinte. Antes da primeira resposta, o Dashboard mostra tudo zerado e o Histórico, uma lista vazia. Os estados iniciais dos dois hooks (`useDashboardData`, `useHistoryData`) foram trocados de dados de demonstração para valores vazios justamente para que números fictícios nunca apareçam como se fossem uma contagem real.
+Se a API não responder, o hook **mantém na tela os últimos dados recebidos** e tenta de novo no ciclo seguinte. Antes da primeira resposta, o Dashboard mostra tudo zerado e o Histórico, uma lista vazia. Os estados iniciais dos dois hooks (`useDashboard`, `useHistorico`) foram trocados de dados de demonstração para valores vazios justamente para que números fictícios nunca apareçam como se fossem uma contagem real.
 
 ---
 
@@ -536,9 +534,7 @@ O modelo de regressão (`metodo = 'regressao'`, com o arquivo `.joblib`) ainda n
 | `crud.obter_historico` | Ordena só por `data DESC` | Missas do mesmo dia aparecem em ordem arbitrária no Histórico. Correção: `ORDER BY data DESC, horario_missa DESC` |
 | `vw_historico` | Junta **todas** as sessões concluídas da celebração | Uma missa com monitoramento reiniciado aparece duas vezes no Histórico |
 | `integracao/estimativa.py` | Sempre usa o coeficiente, mesmo com `metodo = 'regressao'` | O modelo treinado por `treinar_regressao.py` ainda não é usado |
-| `CommunionEstimate.tsx` | O frontend calcula as hóstias do dashboard com `× 1,1` fixo | Se a `margem_hostias` do banco mudar, o dashboard e o Histórico sugerem números diferentes. A rota do dashboard poderia enviar as hóstias já calculadas |
-| `CelebrationSummary.tsx` | Renderiza `<item.icon />`, mas a API manda o nome do ícone em texto | Os ícones do resumo não aparecem. Falta um mapa nome → componente no frontend |
-| `useHistoryData.ts` | Busca o histórico uma vez só, ao abrir a página | Uma missa que termina com a página aberta só aparece ao recarregar |
-| `mapear_status()` | `cancelada` não está no mapa | Celebrações canceladas aparecem como `scheduled` |
+| `EstimativaComunhao.tsx` | O frontend calcula as hóstias do dashboard com `× 1,1` fixo | Se a `margem_hostias` do banco mudar, o dashboard e o Histórico sugerem números diferentes. A rota do dashboard poderia enviar as hóstias já calculadas |
+| `useHistorico.ts` | Busca o histórico uma vez só, ao abrir a página | Uma missa que termina com a página aberta só aparece ao recarregar |
 | `api/servidor.py` | Escuta em `0.0.0.0` | O dashboard fica acessível para qualquer máquina da rede da paróquia, sem autenticação. Para uso só local, `host="127.0.0.1"` |
 | Frontend | Os *services* chamam `http://127.0.0.1:8000` com endereço fixo | Abrir o dashboard de outra máquina da rede não funciona. Endereços relativos (`/api/...`) resolveriam |

@@ -4,7 +4,7 @@ import { TriangleAlert } from 'lucide-react';
 interface Props { children: ReactNode }
 interface State { hasError: boolean }
 
-export default class ErrorBoundary extends Component<Props, State> {
+export default class CapturaDeErros extends Component<Props, State> {
   state: State = { hasError: false };
 
   static getDerivedStateFromError(): State {
@@ -12,7 +12,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('ErrorBoundary:', error, info);
+    console.error('CapturaDeErros:', error, info);
   }
 
   render() {

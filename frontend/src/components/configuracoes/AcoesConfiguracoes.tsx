@@ -1,10 +1,10 @@
 import { RotateCcw, Save } from 'lucide-react';
 
-interface SettingsActionsProps {
+interface AcoesConfiguracoesProps {
   onReset: () => void;
 }
 
-export default function SettingsActions({ onReset }: SettingsActionsProps) {
+export default function AcoesConfiguracoes({ onReset }: AcoesConfiguracoesProps) {
   return (
     <section className="flex justify-end gap-3">
       <button

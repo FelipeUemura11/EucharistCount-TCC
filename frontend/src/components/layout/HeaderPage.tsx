@@ -1,10 +1,10 @@
-interface HeaderProps {
+interface HeaderPageProps {
     title: string
     isActive: boolean
     showStatus?: boolean
 }
 
-export default function PageHeader({ title, isActive, showStatus = true }: HeaderProps){   
+export default function HeaderPage({ title, isActive, showStatus = true }: HeaderPageProps){   
     return (
         <header className="bg-white px-8 py-5 flex items-center justify-between border-b border-text-dark/10 sticky top-0 z-50">
             <div className="flex items-center gap-4">

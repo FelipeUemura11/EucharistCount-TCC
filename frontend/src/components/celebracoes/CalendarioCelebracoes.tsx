@@ -1,7 +1,7 @@
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { CalendarDay } from '../../types/celebrations';
 
-interface CelebrationCalendarSectionProps {
+interface CalendarioCelebracoesProps {
   calendarDays: CalendarDay[];
   monthLabel: string;
   selectedDay: number | null;
@@ -9,13 +9,13 @@ interface CelebrationCalendarSectionProps {
   onSelectDay: (day: number) => void;
 }
 
-export default function CelebrationCalendarSection({
+export default function CalendarioCelebracoes({
   calendarDays,
   monthLabel,
   selectedDay,
   weekDays,
   onSelectDay,
-}: CelebrationCalendarSectionProps) {
+}: CalendarioCelebracoesProps) {
   return (
     <section className="rounded-lg border border-border bg-white p-6 shadow-sm">
       <div className="mb-5 flex items-center justify-between">

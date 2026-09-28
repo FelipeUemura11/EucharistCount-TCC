@@ -10,10 +10,10 @@ from fastapi import APIRouter, Depends
 from api.dependencias import obter_db
 from api.formatacao import hora_de_timestamp
 from api.schemas import (
-    CelebrationSummaryItem,
-    DashboardMetrics,
-    DashboardOverview,
-    OccupancyDataPoint,
+    DadosDashboard,
+    MetricasDashboard,
+    PontoOcupacao,
+    ResumoCelebracao,
 )
 from db import crud
 from integracao.estimativa import calcular_estimativa
@@ -21,56 +21,50 @@ from integracao.estimativa import calcular_estimativa
 router = APIRouter()
 
 
-@router.get("/dashboard", response_model=DashboardOverview)
+@router.get("/dashboard", response_model=DadosDashboard)
 def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
     # Sem contagem ativa, mostra a ultima missa encerrada: e logo depois do
     # video que a equipe quer ver o resultado final.
     sessao = crud.obter_sessao_ativa(db) or crud.obter_ultima_sessao_concluida(db)
 
     if not sessao:
-        return DashboardOverview(
-            metrics=DashboardMetrics(
-                currentOccupancy=0, estimatedCommunicants=0,
-                entries=0, exits=0, isCountingActive=False,
+        return DadosDashboard(
+            metricas=MetricasDashboard(
+                ocupacaoAtual=0, estimativaComunhao=0,
+                entradas=0, saidas=0, contagemAtiva=False,
             ),
-            occupancyData=[], celebrationSummary=[],
+            graficoOcupacao=[], resumoCelebracao=None,
         )
 
     ativa = sessao["status"] == "em_andamento"
     ocupacao = sessao["ocupacao_final"]
 
     grafico = [
-        OccupancyDataPoint(time=hora_de_timestamp(inst["registrado_em"]),
-                           value=inst["ocupacao_atual"])
+        PontoOcupacao(hora=hora_de_timestamp(inst["registrado_em"]),
+                      ocupacao=inst["ocupacao_atual"])
         for inst in crud.obter_instantaneos(db, sessao["id"])
     ]
 
+    # So os valores: icones e rotulos do resumo ficam fixos no frontend.
     celebracao = crud.obter_celebracao(db, sessao["celebracao_id"])
     if celebracao:
-        titulo = celebracao["titulo"]
-        inicio = celebracao["horario_inicio_monitoramento"] or ""
-        fim = celebracao["horario_fim_monitoramento"] or ""
+        resumo = ResumoCelebracao(
+            titulo=celebracao["titulo"],
+            inicioMonitoramento=celebracao["horario_inicio_monitoramento"] or "",
+            fimMonitoramento=celebracao["horario_fim_monitoramento"] or "",
+        )
     else:
-        titulo, inicio, fim = "Desconhecido", "", ""
+        resumo = ResumoCelebracao(titulo="Desconhecido",
+                                  inicioMonitoramento="", fimMonitoramento="")
 
-    resumo = [
-        CelebrationSummaryItem(icon="Church",
-                               label="Missa atual" if ativa else "Última missa",
-                               value=titulo),
-        CelebrationSummaryItem(icon="ClockArrowUp", label="Início do monitor", value=inicio),
-        CelebrationSummaryItem(icon="ClockArrowDown", label="Fim do monitor", value=fim),
-        CelebrationSummaryItem(icon="Users", label="Pessoas presentes",
-                               value=f"{ocupacao} pessoas"),
-    ]
-
-    return DashboardOverview(
-        metrics=DashboardMetrics(
-            currentOccupancy=ocupacao,
-            estimatedCommunicants=calcular_estimativa(db, ocupacao).comungantes,
-            entries=sessao["total_entradas"],
-            exits=sessao["total_saidas"],
-            isCountingActive=ativa,
+    return DadosDashboard(
+        metricas=MetricasDashboard(
+            ocupacaoAtual=ocupacao,
+            estimativaComunhao=calcular_estimativa(db, ocupacao).comungantes,
+            entradas=sessao["total_entradas"],
+            saidas=sessao["total_saidas"],
+            contagemAtiva=ativa,
         ),
-        occupancyData=grafico,
-        celebrationSummary=resumo,
+        graficoOcupacao=grafico,
+        resumoCelebracao=resumo,
     )

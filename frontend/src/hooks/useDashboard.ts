@@ -1,21 +1,21 @@
 import { useEffect, useState } from 'react';
 import { dashboardMock } from '../data/dashboardMock';
-import { getDashboardOverview } from '../services/dashboardService';
-import type { DashboardOverview } from '../types/dashboard';
+import { buscarDashboard } from '../services/dashboard';
+import type { DadosDashboard } from '../types/dashboard';
 
 const INTERVALO_ATUALIZACAO_MS = 2000;
 
-export function useDashboardData() {
-  const [data, setData] = useState<DashboardOverview>(dashboardMock);
+export function useDashboard() {
+  const [dados, setDados] = useState<DadosDashboard>(dashboardMock);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadDashboard() {
+    async function carregarDashboard() {
       try {
-        const overview = await getDashboardOverview();
-        if (isMounted) setData(overview);
+        const novosDados = await buscarDashboard();
+        if (isMounted) setDados(novosDados);
       } catch {
         // API fora do ar: mantem os ultimos dados e tenta de novo no proximo ciclo.
       } finally {
@@ -23,8 +23,8 @@ export function useDashboardData() {
       }
     }
 
-    void loadDashboard();
-    const interval = setInterval(loadDashboard, INTERVALO_ATUALIZACAO_MS);
+    void carregarDashboard();
+    const interval = setInterval(carregarDashboard, INTERVALO_ATUALIZACAO_MS);
 
     return () => {
       isMounted = false;
@@ -33,7 +33,7 @@ export function useDashboardData() {
   }, []);
 
   return {
-    data,
+    dados,
     isLoading,
   };
 }

@@ -1,7 +1,7 @@
 import { CalendarDays } from 'lucide-react';
 import type { MassScheduleChanges, WeekdayId, WeeklyScheduleDay } from '../../types/settings';
 
-interface WeeklyMassScheduleSectionProps {
+interface SecaoHorariosSemanaisProps {
   weeklySchedule: WeeklyScheduleDay[];
   onMassChange: (dayId: WeekdayId, massId: string, changes: MassScheduleChanges) => void;
 }
@@ -16,10 +16,10 @@ function getMassCountLabel(count: number) {
   return count === 1 ? '1 missa' : `${count} missas`;
 }
 
-export default function WeeklyMassScheduleSection({
+export default function SecaoHorariosSemanais({
   weeklySchedule,
   onMassChange,
-}: WeeklyMassScheduleSectionProps) {
+}: SecaoHorariosSemanaisProps) {
   return (
     <section className="mb-6 rounded-lg border border-border bg-white p-6 shadow-sm">
       <div className="mb-5 flex items-center gap-3">

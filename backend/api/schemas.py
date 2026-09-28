@@ -8,52 +8,52 @@ TypeScript de frontend/src/types/. Mudou um lado, mude o outro.
 from pydantic import BaseModel
 
 
-class OccupancyDataPoint(BaseModel):
-    time: str
-    value: int
+class PontoOcupacao(BaseModel):
+    hora: str
+    ocupacao: int
 
 
-class CelebrationSummaryItem(BaseModel):
-    icon: str
-    label: str
-    value: str
+class ResumoCelebracao(BaseModel):
+    titulo: str
+    inicioMonitoramento: str
+    fimMonitoramento: str
 
 
-class DashboardMetrics(BaseModel):
-    currentOccupancy: int
-    estimatedCommunicants: int
-    entries: int
-    exits: int
-    isCountingActive: bool
+class MetricasDashboard(BaseModel):
+    ocupacaoAtual: int
+    estimativaComunhao: int
+    entradas: int
+    saidas: int
+    contagemAtiva: bool
 
 
-class DashboardOverview(BaseModel):
-    metrics: DashboardMetrics
-    occupancyData: list[OccupancyDataPoint]
-    celebrationSummary: list[CelebrationSummaryItem]
+class DadosDashboard(BaseModel):
+    metricas: MetricasDashboard
+    graficoOcupacao: list[PontoOcupacao]
+    resumoCelebracao: ResumoCelebracao | None
 
 
-class Celebration(BaseModel):
+class Celebracao(BaseModel):
     id: int
-    title: str
-    day: int
-    weekday: str
-    startTime: str
-    monitorStart: str
-    monitorEnd: str
-    expectedPeople: int
-    capacity: int
+    titulo: str
+    dia: int
+    diaSemana: str
+    horarioMissa: str
+    inicioMonitoramento: str
+    fimMonitoramento: str
+    pessoasEsperadas: int
+    capacidade: int
     status: str
 
 
-class HistoryRecord(BaseModel):
+class RegistroHistorico(BaseModel):
     id: int
-    date: str
-    weekday: str
-    celebration: str
-    startTime: str
-    totalPeople: int
-    estimatedCommunicants: int
-    suggestedHosts: int
-    entries: int
-    exits: int
+    data: str
+    diaSemana: str
+    celebracao: str
+    horarioMissa: str
+    totalPessoas: int
+    estimativaComunhao: int
+    hostiasSugeridas: int
+    entradas: int
+    saidas: int

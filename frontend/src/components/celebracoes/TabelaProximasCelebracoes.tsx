@@ -1,11 +1,11 @@
 import { CheckCircle2 } from 'lucide-react';
-import type { Celebration } from '../../types/celebrations';
+import type { Celebracao } from '../../types/celebrations';
 
-interface UpcomingCelebrationsTableProps {
-  celebrations: Celebration[];
+interface TabelaProximasCelebracoesProps {
+  celebracoes: Celebracao[];
 }
 
-export default function UpcomingCelebrationsTable({ celebrations }: UpcomingCelebrationsTableProps) {
+export default function TabelaProximasCelebracoes({ celebracoes }: TabelaProximasCelebracoesProps) {
   return (
     <section className="mt-6 rounded-lg border border-border bg-white p-6 shadow-sm">
       <div className="mb-5 flex items-center justify-between gap-4">
@@ -28,13 +28,13 @@ export default function UpcomingCelebrationsTable({ celebrations }: UpcomingCele
             </tr>
           </thead>
           <tbody>
-            {celebrations.map((celebration) => (
-              <tr key={celebration.id} className="border-b border-border-light last:border-0">
-                <td className="py-4 pr-4 text-sm font-bold text-text-dark">{celebration.title}</td>
-                <td className="py-4 pr-4 text-sm text-text-muted">{celebration.weekday}, {celebration.day}/05</td>
-                <td className="py-4 pr-4 text-sm text-text-dark">{celebration.startTime}</td>
-                <td className="py-4 pr-4 text-sm text-text-muted">{celebration.monitorStart} - {celebration.monitorEnd}</td>
-                <td className="py-4 text-sm font-semibold text-text-dark">{celebration.capacity}</td>
+            {celebracoes.map((celebracao) => (
+              <tr key={celebracao.id} className="border-b border-border-light last:border-0">
+                <td className="py-4 pr-4 text-sm font-bold text-text-dark">{celebracao.titulo}</td>
+                <td className="py-4 pr-4 text-sm text-text-muted">{celebracao.diaSemana}, {celebracao.dia}/05</td>
+                <td className="py-4 pr-4 text-sm text-text-dark">{celebracao.horarioMissa}</td>
+                <td className="py-4 pr-4 text-sm text-text-muted">{celebracao.inicioMonitoramento} - {celebracao.fimMonitoramento}</td>
+                <td className="py-4 text-sm font-semibold text-text-dark">{celebracao.capacidade}</td>
               </tr>
             ))}
           </tbody>

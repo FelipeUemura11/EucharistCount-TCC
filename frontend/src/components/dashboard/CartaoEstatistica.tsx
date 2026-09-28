@@ -1,33 +1,33 @@
 import type { LucideIcon } from 'lucide-react';
 
-export type StatCardColor = 'primary' | 'secondary' | 'green' | 'red';
-export type StatCardType = 'simple' | 'progress';
+export type CartaoEstatisticaColor = 'primary' | 'secondary' | 'green' | 'red';
+export type CartaoEstatisticaType = 'simple' | 'progress';
 
-interface StatCardProps {
+interface CartaoEstatisticaProps {
   title: string;
   value: string | number;
   icon: LucideIcon;
-  color?: StatCardColor;
-  type?: StatCardType;
+  color?: CartaoEstatisticaColor;
+  type?: CartaoEstatisticaType;
   progress?: number;
   maxValue?: number;
 }
 
-const iconBg: Record<StatCardColor, string> = {
+const iconBg: Record<CartaoEstatisticaColor, string> = {
   primary:  'bg-primary text-white',
   secondary: 'bg-secondary text-white',
   green: 'bg-emerald-50 text-emerald-500',
   red:   'bg-red-50 text-red-500',
 };
 
-const progressGradient: Record<StatCardColor, string> = {
+const progressGradient: Record<CartaoEstatisticaColor, string> = {
   primary:  'from-primary to-tertiary',
   secondary: 'from-secondary to-tertiary',
   green: 'from-emerald-500 to-emerald-400',
   red:   'from-red-500 to-red-400',
 };
 
-export default function StatCard({
+export default function CartaoEstatistica({
   title,
   value,
   icon: Icon,
@@ -35,7 +35,7 @@ export default function StatCard({
   type = 'simple',
   progress,
   maxValue
-}: StatCardProps) {
+}: CartaoEstatisticaProps) {
   const progressPercent = progress !== undefined && maxValue
     ? Math.min(Math.max((progress / maxValue) * 100, 0), 100)
     : 0;

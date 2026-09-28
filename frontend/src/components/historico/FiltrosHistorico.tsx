@@ -1,6 +1,6 @@
 import { Filter, Search } from 'lucide-react';
 
-interface HistoryFiltersProps {
+interface FiltrosHistoricoProps {
   searchTerm: string;
   periodInDays: number;
   onSearchTermChange: (value: string) => void;
@@ -14,13 +14,13 @@ const periodOptions = [
   { label: 'Últimos 90 dias', value: 90 },
 ];
 
-export default function HistoryFilters({
+export default function FiltrosHistorico({
   searchTerm,
   periodInDays,
   onSearchTermChange,
   onPeriodInDaysChange,
   onApplyFilters,
-}: HistoryFiltersProps) {
+}: FiltrosHistoricoProps) {
   return (
     <section className="mb-6 rounded-lg border border-border bg-white p-5 shadow-sm">
       <div className="grid grid-cols-[minmax(0,1fr)_180px_180px_auto] items-end gap-4 max-[1100px]:grid-cols-2 max-[640px]:grid-cols-1">

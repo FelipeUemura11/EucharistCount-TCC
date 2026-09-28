@@ -8,28 +8,28 @@ import {
   ResponsiveContainer,
   ReferenceLine
 } from 'recharts';
-import type { OccupancyDataPoint } from '../../types/dashboard';
+import type { PontoOcupacao } from '../../types/dashboard';
 
-interface OccupancyChartProps {
-  data: OccupancyDataPoint[];
+interface GraficoOcupacaoProps {
+  pontos: PontoOcupacao[];
   maxCapacity?: number;
   currentValue?: number;
 }
 
-const defaultData: OccupancyDataPoint[] = [
-  { time: '18:00', value: 35 },
-  { time: '18:10', value: 75 },
-  { time: '18:20', value: 115 },
-  { time: '18:30', value: 140 },
-  { time: '18:40', value: 165 },
-  { time: '18:50', value: 184 },
+const pontosPadrao: PontoOcupacao[] = [
+  { hora: '18:00', ocupacao: 35 },
+  { hora: '18:10', ocupacao: 75 },
+  { hora: '18:20', ocupacao: 115 },
+  { hora: '18:30', ocupacao: 140 },
+  { hora: '18:40', ocupacao: 165 },
+  { hora: '18:50', ocupacao: 184 },
 ];
 
-export default function OccupancyChart({
-  data = defaultData,
+export default function GraficoOcupacao({
+  pontos = pontosPadrao,
   maxCapacity = 300,
   currentValue = 184
-}: OccupancyChartProps) {
+}: GraficoOcupacaoProps) {
   const capacityTicks = Array.from({ length: 5 }, (_, index) => Math.round((maxCapacity / 4) * index));
 
   return (
@@ -49,7 +49,7 @@ export default function OccupancyChart({
       <div className="w-full">
         <ResponsiveContainer width="100%" height={280}>
           <AreaChart
-            data={data}
+            data={pontos}
             margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
           >
             <defs>
@@ -66,7 +66,7 @@ export default function OccupancyChart({
             />
             
             <XAxis 
-              dataKey="time" 
+              dataKey="hora"
               axisLine={false}
               tickLine={false}
               tick={{ fill: '#9ca3af', fontSize: 12 }}
@@ -108,7 +108,7 @@ export default function OccupancyChart({
             
             <Area
               type="monotone"
-              dataKey="value"
+              dataKey="ocupacao"
               stroke="var(--color-secondary)"
               strokeWidth={3}
               fill="url(#colorOccupancy)"

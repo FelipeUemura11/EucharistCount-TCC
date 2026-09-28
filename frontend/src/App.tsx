@@ -1,21 +1,21 @@
 import { Navigate, Route, Routes } from "react-router";
-import AppLayout from "./components/layout/AppLayout";
+import LayoutPrincipal from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
-import Celebrations from "./pages/Celebrations";
-import History from "./pages/History";
-import Settings from "./pages/Settings";
+import Celebracoes from "./pages/Celebracoes";
+import Historico from "./pages/Historico";
+import Configuracoes from "./pages/Configuracoes";
 
 function App() {
     return (
-        <AppLayout>
+        <LayoutPrincipal>
             <Routes>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/celebracoes" element={<Celebrations />} />
-                <Route path="/historico" element={<History />} />
-                <Route path="/configuracoes" element={<Settings />} />
+                <Route path="/celebracoes" element={<Celebracoes />} />
+                <Route path="/historico" element={<Historico />} />
+                <Route path="/configuracoes" element={<Configuracoes />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-        </AppLayout>
+        </LayoutPrincipal>
     );
 }
 

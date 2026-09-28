@@ -1,12 +1,12 @@
-﻿export interface HistoryRecord {
+export interface RegistroHistorico {
   id: number;
-  date: string;
-  weekday: string;
-  celebration: string;
-  startTime: string;
-  totalPeople: number;
-  estimatedCommunicants: number;
-  suggestedHosts: number;
-  entries: number;
-  exits: number;
+  data: string;
+  diaSemana: string;
+  celebracao: string;
+  horarioMissa: string;
+  totalPessoas: number;
+  estimativaComunhao: number;
+  hostiasSugeridas: number;
+  entradas: number;
+  saidas: number;
 }

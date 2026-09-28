@@ -6,7 +6,7 @@ import type {
   CelebrationMassScheduleChanges,
 } from '../../types/celebrations';
 
-interface DayScheduleModalProps {
+interface ModalHorariosDiaProps {
   dayInfo: CelebrationDayInfo;
   schedules: CelebrationMassSchedule[];
   onAddSchedule: () => void;
@@ -18,7 +18,7 @@ interface DayScheduleModalProps {
 
 const timeInputClassName = 'w-full rounded-lg border border-border bg-white px-3 py-2 text-sm font-bold text-text-dark outline-none [&::-webkit-calendar-picker-indicator]:cursor-pointer';
 
-export default function DayScheduleModal({
+export default function ModalHorariosDia({
   dayInfo,
   schedules,
   onAddSchedule,
@@ -26,7 +26,7 @@ export default function DayScheduleModal({
   onRemoveSchedule,
   onSave,
   onUpdateSchedule,
-}: DayScheduleModalProps) {
+}: ModalHorariosDiaProps) {
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
 
   return (

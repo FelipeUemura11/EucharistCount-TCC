@@ -12,4 +12,4 @@ router = APIRouter()
 @router.get("/status")
 def get_status(db: sqlite3.Connection = Depends(obter_db)):
     sessao = crud.obter_sessao_ativa(db)
-    return { "isCountingActive": sessao is not None }
+    return { "contagemAtiva": sessao is not None }

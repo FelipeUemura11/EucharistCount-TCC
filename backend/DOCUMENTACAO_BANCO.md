@@ -263,7 +263,7 @@ flowchart LR
     C["celebracao<br/>status = 'finalizada'"] -->|JOIN| V[["vw_historico"]]
     S["sessao_monitoramento<br/>status = 'concluida'"] -->|JOIN| V
     E["estimativa_comunhao"] -->|LEFT JOIN| V
-    V -->|"SELECT * (crud.obter_historico)"| A["GET /api/history"]
+    V -->|"SELECT * (crud.obter_historico)"| A["GET /api/historico"]
 ```
 
 Duas decisões merecem destaque:

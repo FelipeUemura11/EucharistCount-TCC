@@ -1,8 +1,8 @@
 """
 Conversoes de formato entre o banco e o frontend.
 
-O banco guarda datas em ISO (2026-09-21) e status em portugues; o
-frontend espera datas em dd/mm/aaaa e status em ingles. Funcoes puras:
+O banco guarda datas em ISO (2026-09-21) e carimbos em UTC; o frontend
+espera datas em dd/mm/aaaa e horas locais. Funcoes puras:
 recebem um valor, devolvem outro, sem tocar em banco nem em rede.
 """
 
@@ -45,9 +45,3 @@ def hora_de_timestamp(timestamp: str) -> str:
     """
     em_utc = datetime.fromisoformat(timestamp).replace(tzinfo=timezone.utc)
     return em_utc.astimezone().strftime("%H:%M")
-
-
-def mapear_status(status_db: str) -> str:
-    """Status do banco (portugues) -> status do frontend (ingles)."""
-    mapa = {"agendada": "scheduled", "em_andamento": "active", "finalizada": "finished"}
-    return mapa.get(status_db, "scheduled")

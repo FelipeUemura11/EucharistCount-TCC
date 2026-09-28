@@ -1,16 +1,16 @@
 import { HandHeart, LogIn, LogOut, Users } from 'lucide-react';
-import type { DashboardOverview } from '../types/dashboard';
+import type { DadosDashboard } from '../types/dashboard';
 
-export const dashboardMock: DashboardOverview = {
-  metrics: {
-    currentOccupancy: 0,
-    estimatedCommunicants: 0,
-    entries: 0,
-    exits: 0,
-    isCountingActive: false,
+export const dashboardMock: DadosDashboard = {
+  metricas: {
+    ocupacaoAtual: 0,
+    estimativaComunhao: 0,
+    entradas: 0,
+    saidas: 0,
+    contagemAtiva: false,
   },
-  occupancyData: [],
-  celebrationSummary: [],
+  graficoOcupacao: [],
+  resumoCelebracao: null,
 };
 
 export const dashboardMetricCards = {

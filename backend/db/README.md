@@ -25,9 +25,9 @@ em `backend/api/rotas/` recebem uma conexão por requisição pela dependência
 
 ```python
 # backend/api/rotas/historico.py (resumido)
-@router.get("/history", response_model=list[HistoryRecord])
-def get_history(db: sqlite3.Connection = Depends(obter_db)):
-    return [HistoryRecord(...) for r in crud.obter_historico(db)]
+@router.get("/historico", response_model=list[RegistroHistorico])
+def get_historico(db: sqlite3.Connection = Depends(obter_db)):
+    return [RegistroHistorico(...) for r in crud.obter_historico(db)]
 ```
 
 Para uma rota nova, siga o mesmo padrão: se faltar uma operação, crie a

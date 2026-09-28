@@ -1,12 +1,12 @@
 import { Download } from 'lucide-react';
-import type { HistoryRecord } from '../../types/history';
+import type { RegistroHistorico } from '../../types/history';
 
-interface HistoryRecordsTableProps {
-  records: HistoryRecord[];
+interface TabelaHistoricoProps {
+  registros: RegistroHistorico[];
   onExport: () => void;
 }
 
-export default function HistoryRecordsTable({ records, onExport }: HistoryRecordsTableProps) {
+export default function TabelaHistorico({ registros, onExport }: TabelaHistoricoProps) {
   return (
     <section className="min-w-0">
       <div className="min-w-0 rounded-lg border border-border bg-white p-6 shadow-sm">
@@ -49,28 +49,28 @@ export default function HistoryRecordsTable({ records, onExport }: HistoryRecord
               </tr>
             </thead>
             <tbody>
-              {records.length === 0 ? (
+              {registros.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-sm font-semibold text-text-muted">
                     Nenhum registro encontrado para os filtros aplicados.
                   </td>
                 </tr>
               ) : (
-                records.map((record) => (
+                registros.map((registro) => (
                   <tr
-                    key={record.id}
+                    key={registro.id}
                     className="border-b border-border-light transition last:border-0 hover:bg-app-bg"
                   >
-                    <td className="px-4 py-4 text-left text-sm font-semibold text-text-dark">{record.date}</td>
+                    <td className="px-4 py-4 text-left text-sm font-semibold text-text-dark">{registro.data}</td>
                     <td className="px-4 py-4 text-left">
-                      <p className="m-0 text-sm font-bold text-text-dark">{record.celebration}</p>
-                      <p className="m-0 mt-0.5 text-xs text-text-muted">{record.weekday}, {record.startTime}</p>
+                      <p className="m-0 text-sm font-bold text-text-dark">{registro.celebracao}</p>
+                      <p className="m-0 mt-0.5 text-xs text-text-muted">{registro.diaSemana}, {registro.horarioMissa}</p>
                     </td>
-                    <td className="px-4 py-4 text-right text-sm font-semibold text-text-dark">{record.totalPeople}</td>
-                    <td className="px-4 py-4 text-right text-sm font-semibold text-secondary">{record.estimatedCommunicants}</td>
-                    <td className="px-4 py-4 text-right text-sm font-semibold text-primary">{record.suggestedHosts}</td>
-                    <td className="px-4 py-4 text-right text-sm text-text-dark">{record.entries}</td>
-                    <td className="px-4 py-4 text-right text-sm text-text-dark">{record.exits}</td>
+                    <td className="px-4 py-4 text-right text-sm font-semibold text-text-dark">{registro.totalPessoas}</td>
+                    <td className="px-4 py-4 text-right text-sm font-semibold text-secondary">{registro.estimativaComunhao}</td>
+                    <td className="px-4 py-4 text-right text-sm font-semibold text-primary">{registro.hostiasSugeridas}</td>
+                    <td className="px-4 py-4 text-right text-sm text-text-dark">{registro.entradas}</td>
+                    <td className="px-4 py-4 text-right text-sm text-text-dark">{registro.saidas}</td>
                   </tr>
                 ))
               )}

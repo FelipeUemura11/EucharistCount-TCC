@@ -8,7 +8,7 @@ interface SystemStatus {
     icon: ElementType;
 }
 
-interface ConfigSystemProps {
+interface StatusSistemaProps {
   statuses?: SystemStatus[];
 }
 
@@ -18,7 +18,7 @@ const defaultStatuses: SystemStatus[] = [
     { label: 'Banco de dados', isOnline: true, icon: Database },
 ]
 
-export default function ConfigSystem({statuses = defaultStatuses}: ConfigSystemProps) {
+export default function StatusSistema({statuses = defaultStatuses}: StatusSistemaProps) {
     return (
         <div className="bg-white rounded-xl p-4 shadow-sm border border-border h-full">
             <div className="mb-5">

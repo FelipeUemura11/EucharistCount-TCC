@@ -1,34 +1,34 @@
 import { dashboardMetricCards } from '../../data/dashboardMock';
-import type { DashboardMetrics } from '../../types/dashboard';
-import StatCard from './StatCard';
+import type { MetricasDashboard } from '../../types/dashboard';
+import CartaoEstatistica from './CartaoEstatistica';
 
-interface DashboardStatsProps {
-  metrics: DashboardMetrics;
+interface EstatisticasDashboardProps {
+  metricas: MetricasDashboard;
 }
 
-export default function DashboardStats({ metrics }: DashboardStatsProps) {
+export default function EstatisticasDashboard({ metricas }: EstatisticasDashboardProps) {
   return (
     <section>
       <div className="mx-auto grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-5">
-        <StatCard
+        <CartaoEstatistica
           title={dashboardMetricCards.occupancy.title}
-          value={metrics.currentOccupancy}
+          value={metricas.ocupacaoAtual}
           icon={dashboardMetricCards.occupancy.icon}
           color="secondary"
           type="simple"
         />
        
         
-        <StatCard
+        <CartaoEstatistica
           title={dashboardMetricCards.entries.title}
-          value={metrics.entries}
+          value={metricas.entradas}
           icon={dashboardMetricCards.entries.icon}
           color="green"
           type="simple"
         />
-        <StatCard
+        <CartaoEstatistica
           title={dashboardMetricCards.exits.title}
-          value={metrics.exits}
+          value={metricas.saidas}
           icon={dashboardMetricCards.exits.icon}
           color="red"
           type="simple"

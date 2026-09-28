@@ -1,16 +1,16 @@
-export type CelebrationStatus = 'scheduled' | 'active' | 'finished';
+export type StatusCelebracao = 'agendada' | 'em_andamento' | 'finalizada' | 'cancelada';
 
-export interface Celebration {
+export interface Celebracao {
   id: number;
-  title: string;
-  day: number;
-  weekday: string;
-  startTime: string;
-  monitorStart: string;
-  monitorEnd: string;
-  expectedPeople: number;
-  capacity: number;
-  status: CelebrationStatus;
+  titulo: string;
+  dia: number;
+  diaSemana: string;
+  horarioMissa: string;
+  inicioMonitoramento: string;
+  fimMonitoramento: string;
+  pessoasEsperadas: number;
+  capacidade: number;
+  status: StatusCelebracao;
 }
 
 export interface CalendarDay {

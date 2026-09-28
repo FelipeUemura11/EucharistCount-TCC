@@ -1,20 +1,20 @@
 import { HandHeart, Percent, HandPlatter } from "lucide-react";
-import type { DashboardMetrics } from "../../types/dashboard";
+import type { MetricasDashboard } from "../../types/dashboard";
 
-interface CommunionEstimateProps {
-    metrics: DashboardMetrics;
+interface EstimativaComunhaoProps {
+    metricas: MetricasDashboard;
 }
 
-export default function CommunionEstimate({ metrics }: CommunionEstimateProps) {
-    const communionPercent = metrics.currentOccupancy > 0
-        ? Math.round((metrics.estimatedCommunicants / metrics.currentOccupancy) * 100)
+export default function EstimativaComunhao({ metricas }: EstimativaComunhaoProps) {
+    const communionPercent = metricas.ocupacaoAtual > 0
+        ? Math.round((metricas.estimativaComunhao / metricas.ocupacaoAtual) * 100)
         : 0;
-    const suggestedHosts = Math.ceil(metrics.estimatedCommunicants * 1.1);
+    const suggestedHosts = Math.ceil(metricas.estimativaComunhao * 1.1);
 
     const communionStats = [
         {
             label: 'Estimativa para comunhão',
-            value: metrics.estimatedCommunicants,
+            value: metricas.estimativaComunhao,
             suffix: 'pessoas',
             icon: HandHeart,
         },
