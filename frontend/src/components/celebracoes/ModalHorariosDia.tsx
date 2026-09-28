@@ -30,7 +30,7 @@ export default function ModalHorariosDia({
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4 py-6">
+    <div className="fixed inset-0 z-100] flex items-center justify-center bg-black/40 px-4 py-6">
       <section className="max-h-full w-full max-w-4xl overflow-y-auto rounded-lg bg-white shadow-sm">
         <div className="border-b border-border p-6">
           <div>

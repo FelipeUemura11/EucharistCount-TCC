@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import FiltrosHistorico from "../components/historico/FiltrosHistorico";
 import TabelaHistorico from "../components/historico/TabelaHistorico";
-import HeaderPage from "../components/layout/HeaderPage";
 import { useHistorico } from "../hooks/useHistorico";
 import { useStatusContagem } from "../hooks/useStatusContagem";
 import type { RegistroHistorico } from "../types/history";
+import HeaderPage from "../components/layout/HeaderPage";
 
 interface HistoryFilterState {
     searchTerm: string;

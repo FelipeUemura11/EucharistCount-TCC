@@ -2,15 +2,15 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import CapturaDeErros from "./components/CapturaDeErros.tsx";
+import ErrorBoundary from "./components/ErrorBoundary.tsx";
 import { BrowserRouter } from "react-router";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
-        <CapturaDeErros>
+        <ErrorBoundary>
             <BrowserRouter>
                 <App />
             </BrowserRouter>
-        </CapturaDeErros>
+        </ErrorBoundary>
     </React.StrictMode>,
 );
