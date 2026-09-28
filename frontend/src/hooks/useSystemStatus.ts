@@ -1,31 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
 export function useSystemStatus() {
-  const [isActive, setIsActive] = useState(false);
+    const [isActive, setIsActive] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
-    
-    async function checkStatus() {
-      try {
-        const response = await fetch('http://127.0.0.1:8000/api/status');
-        if (response.ok) {
-          const data = await response.json();
-          if (mounted) setIsActive(data.isCountingActive);
+    useEffect(() => {
+        let mounted = true;
+
+        async function checkStatus() {
+            try {
+                const response = await fetch(
+                    "http://127.0.0.1:8000/api/status",
+                );
+                if (response.ok) {
+                    const data = await response.json();
+                    if (mounted) setIsActive(data.isCountingActive);
+                }
+            } catch (error) {
+                console.error(error);
+                if (mounted) setIsActive(false);
+            }
         }
-      } catch (error) {
-        if (mounted) setIsActive(false);
-      }
-    }
 
-    checkStatus();
-    const interval = setInterval(checkStatus, 5000);
-    
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, []);
+        checkStatus();
+        const interval = setInterval(checkStatus, 5000);
 
-  return isActive;
+        return () => {
+            mounted = false;
+            clearInterval(interval);
+        };
+    }, []);
+
+    return isActive;
 }

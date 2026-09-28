@@ -36,7 +36,8 @@ def main() -> int:
                   f"terminado e foi(ram) fechada(s) como interrompida(s).")
 
         iniciar_em_background(criar_app())
-        print("\n[✓] Dashboard: http://127.0.0.1:8000")
+        print("\n")
+        print("[✓] Dashboard: http://127.0.0.1:8000")
         print("[✓] Documentação da API: http://127.0.0.1:8000/docs")
         print("[✓] Puxando motor visual e câmeras...\n")
 

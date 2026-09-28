@@ -1,16 +1,22 @@
-import { useState } from 'react'
-import { pageRegistry } from './app/pageRegistry'
-import AppLayout from './components/layout/AppLayout'
-import type { PageId } from './types/navigation'
+import { Navigate, Route, Routes } from "react-router";
+import AppLayout from "./components/layout/AppLayout";
+import Dashboard from "./pages/Dashboard";
+import Celebrations from "./pages/Celebrations";
+import History from "./pages/History";
+import Settings from "./pages/Settings";
 
 function App() {
-  const [activePage, setActivePage] = useState<PageId>('dashboard')
-
-  return (
-    <AppLayout activePage={activePage} onNavigate={setActivePage}>
-      {pageRegistry[activePage]}
-    </AppLayout>
-  )
+    return (
+        <AppLayout>
+            <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/celebracoes" element={<Celebrations />} />
+                <Route path="/historico" element={<History />} />
+                <Route path="/configuracoes" element={<Settings />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+        </AppLayout>
+    );
 }
 
-export default App
+export default App;

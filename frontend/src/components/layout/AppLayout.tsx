@@ -1,20 +1,17 @@
-import type { ReactNode } from 'react';
-import Sidebar from './Sidebar';
-import type { PageId } from '../../types/navigation';
+import type { ReactNode } from "react";
+import Sidebar from "./Sidebar";
 
 interface AppLayoutProps {
-  activePage: PageId;
-  onNavigate: (id: PageId) => void;
-  children: ReactNode;
+    children: ReactNode;
 }
 
-export default function AppLayout({ activePage, onNavigate, children }: AppLayoutProps) {
-  return (
-    <div className="flex min-h-screen bg-app-bg">
-      <Sidebar active={activePage} onNavigate={onNavigate} />
-      <div className="ml-70 flex min-h-screen min-w-0 flex-1 flex-col lg:ml-70">
-        {children}
-      </div>
-    </div>
-  );
+export default function AppLayout({ children }: AppLayoutProps) {
+    return (
+        <div className="flex min-h-screen bg-app-bg">
+            <Sidebar />
+            <div className="ml-70 flex min-h-screen min-w-0 flex-1 flex-col lg:ml-70">
+                {children}
+            </div>
+        </div>
+    );
 }
