@@ -75,7 +75,7 @@ Conforme especificado no documento do TCC:
 
 ## Estado atual do projeto
 
-Este é um TCC em duas etapas. **O que está implementado até aqui** é a fundação de visão computacional, que já conta de ponta a ponta. Persistência, estimativa de comunhão e dashboard já existem como peças isoladas, mas só se conectam quando a API do TCC II for escrita.
+Este é um TCC em duas etapas. **O que está implementado até aqui:** a visão computacional conta de ponta a ponta, grava cada missa no SQLite durante a contagem, e a API serve o dashboard, que acompanha a contagem ao vivo e mostra o histórico das missas encerradas. Tudo sobe com um único `python main.py`.
 
 | Componente | Status |
 |---|---|
@@ -84,10 +84,10 @@ Este é um TCC em duas etapas. **O que está implementado até aqui** é a funda
 | Rastreamento com ID persistente (ByteTrack) | ✅ Implementado |
 | Contagem por cruzamento de linha virtual (entrada/saída) | ✅ Implementado |
 | Painel de monitoramento em tempo real (janela local) | ✅ Implementado |
-| Persistência (SQLite) | 🚧 Schema e CRUD prontos em [`backend/db/`](./backend/db/), | Em Desenvolvimento |
-| Estimativa de comunhão e hóstias sugeridas | 🚧 Coeficiente e regressão prontos, à espera da API | Em Desenvolvimento |
-| Dashboard web (React) | Em Desenvolvimento |
-| API (FastAPI) | Em Desenvolvimento |
+| Persistência (SQLite) — o motor grava cada missa durante a contagem | ✅ Implementado |
+| API (FastAPI) — status, dashboard, celebrações e histórico, em [`backend/api/`](./backend/api/) | ✅ Implementado |
+| Dashboard web (React) — Dashboard ao vivo e Histórico ligados à API | 🚧 Celebrações e Configurações ainda com dados fictícios |
+| Estimativa de comunhão e hóstias sugeridas | 🚧 Coeficiente fixo calculado e exibido; gravação automática no histórico e uso da regressão pendentes |
 | Agendamento automático (APScheduler) | Em Desenvolvimento |
 | Empacotamento (PyInstaller) | Em Desenvolvimento |
 
@@ -102,7 +102,8 @@ EucharistCount-TCC/
 ├── README.md                    # este arquivo
 │
 ├── backend/
-│   ├── main.py                  # ponto de entrada do monitoramento
+│   ├── main.py                  # ponto de entrada: sobe banco, API e motor
+│   ├── cli.py                   # argumentos de linha de comando
 │   ├── config.json              # parâmetros ajustáveis (câmera, modelo, contagem)
 │   ├── bytetrack_ajustado.yaml  # tracker ajustado para esta cena
 │   ├── counting_people.csv      # contagem manual de referência (validação)
@@ -120,6 +121,9 @@ EucharistCount-TCC/
 │   │   ├── visual.py            # desenho (janela de monitoramento)
 │   │   └── monitor.py           # orquestra o ciclo completo
 │   │
+│   ├── api/                     # servidor FastAPI: uma rota por tela + frontend compilado
+│   ├── integracao/              # ponte motor ↔ banco: sessão, sessões presas, estimativa
+│   │
 │   ├── db/                      # camada de persistência SQLite (TCC II)
 │   │   ├── schema.sql           # tabelas, índices e a view do histórico
 │   │   ├── crud.py              # uma função por operação, para a API usar
@@ -133,12 +137,12 @@ EucharistCount-TCC/
 │   ├── modelos/                 # modelos .onnx (fora do Git)
 │   └── videos/                  # vídeos de teste (fora do Git)
 │
-└── frontend/                    # React + TypeScript + Vite, ainda sobre mocks
+└── frontend/                    # React + TypeScript + Vite (servido pelo backend em :8000)
 ```
 
 ---
 
-## Como executar (etapa atual: visão computacional)
+## Como executar
 
 ```bash
 cd backend
@@ -148,12 +152,16 @@ python -m venv .venv
 pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
 
 python -m scripts.preparar_modelo --modelo yolo11n --imgsz 640
+
+cd ../frontend && npm install && npm run build && cd ../backend
 python main.py
 ```
 
+O dashboard fica em `http://127.0.0.1:8000`. Quando o vídeo termina, ele continua no ar mostrando o resultado da missa; `Ctrl+C` no terminal encerra o programa.
+
 Instruções completas — calibração de modelo, ajuste da linha de contagem e parâmetros de `config.json` — estão em [`backend/README.md`](./backend/README.md).
 
-O frontend (`frontend/`) tem as telas montadas em React + TypeScript, mas ainda consome dados fictícios: a integração com a API é da próxima etapa do TCC. Instruções em [`frontend/README.md`](./frontend/README.md).
+O frontend (`frontend/`) é servido já compilado pelo próprio backend, na mesma porta da API: depois de qualquer mudança nele, é preciso rodar `npm run build` de novo. As telas Dashboard e Histórico consomem a API; Celebrações e Configurações ainda usam dados fictícios. Instruções em [`frontend/README.md`](./frontend/README.md).
 
 ---
 

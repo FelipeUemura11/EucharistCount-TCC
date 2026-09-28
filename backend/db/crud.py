@@ -40,31 +40,6 @@ def _agora() -> str:
 
 
 # ============================================================================
-# Paroquia
-# ============================================================================
-
-def obter_paroquia(conexao: sqlite3.Connection) -> sqlite3.Row | None:
-    return conexao.execute("SELECT * FROM paroquia WHERE id = 1").fetchone()
-
-
-def definir_paroquia(conexao: sqlite3.Connection, nome: str, cidade: str | None = None,
-                      logotipo_path: str | None = None) -> None:
-    conexao.execute(
-        """
-        INSERT INTO paroquia (id, nome, cidade, logotipo_path, atualizado_em)
-        VALUES (1, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-            nome = excluded.nome,
-            cidade = excluded.cidade,
-            logotipo_path = excluded.logotipo_path,
-            atualizado_em = excluded.atualizado_em
-        """,
-        (nome, cidade, logotipo_path, _agora()),
-    )
-    conexao.commit()
-
-
-# ============================================================================
 # Agenda padrao (horario_padrao) — tela Configuracoes
 # ============================================================================
 
@@ -241,12 +216,19 @@ def finalizar_sessao(
     ocupacao_maxima: int | None = None,
     contagem_sistema: int | None = None,
     observacoes: str | None = None,
+    status: str = "concluida",
 ) -> None:
-    """Fecha a sessao e marca a celebracao como 'finalizada'."""
+    """
+    Fecha a sessao e marca a celebracao como 'finalizada'.
+
+    `status` e 'concluida' quando a contagem terminou normalmente e
+    'interrompida' quando terminou por erro — so as concluidas entram
+    no historico (vw_historico).
+    """
     conexao.execute(
         """
         UPDATE sessao_monitoramento
-        SET status = 'concluida',
+        SET status = ?,
             finalizado_em = ?,
             total_entradas = ?,
             total_saidas = ?,
@@ -256,7 +238,7 @@ def finalizar_sessao(
             observacoes = COALESCE(?, observacoes)
         WHERE id = ?
         """,
-        (_agora(), total_entradas, total_saidas, ocupacao_final,
+        (status, _agora(), total_entradas, total_saidas, ocupacao_final,
          ocupacao_maxima, contagem_sistema, observacoes, sessao_id),
     )
     conexao.execute(
@@ -268,13 +250,52 @@ def finalizar_sessao(
     )
     conexao.commit()
 
-
 def obter_sessao_ativa(conexao: sqlite3.Connection) -> sqlite3.Row | None:
     """A sessao 'em_andamento' agora, se houver — para o Dashboard ao vivo."""
     return conexao.execute(
         "SELECT * FROM sessao_monitoramento WHERE status = 'em_andamento' ORDER BY iniciado_em DESC LIMIT 1"
     ).fetchone()
 
+def interromper_sessoes_orfas(conexao: sqlite3.Connection) -> int:
+    """
+    Fecha como 'interrompida' toda sessao que ficou 'em_andamento' de uma
+    execucao anterior (queda de energia, processo encerrado a forca, bug).
+
+    Chamar no inicio do programa: como so um processo roda o motor, nesse
+    momento nenhuma sessao pode estar legitimamente em andamento.
+    Devolve quantas sessoes foram fechadas.
+    """
+    # Celebracoes primeiro: o filtro depende das sessoes ainda em andamento.
+    conexao.execute(
+        """
+        UPDATE celebracao SET status = 'finalizada'
+        WHERE id IN (SELECT celebracao_id FROM sessao_monitoramento
+                     WHERE status = 'em_andamento')
+        """
+    )
+    cursor = conexao.execute(
+        """
+        UPDATE sessao_monitoramento
+        SET status = 'interrompida', finalizado_em = ?
+        WHERE status = 'em_andamento'
+        """,
+        (_agora(),),
+    )
+    conexao.commit()
+    return cursor.rowcount
+
+def obter_ultima_sessao_concluida(conexao: sqlite3.Connection) -> sqlite3.Row | None:
+    """
+    A ultima contagem que ocorreu para aparecer no Dashboard
+    """
+    return conexao.execute(
+        """
+        SELECT * FROM sessao_monitoramento
+        WHERE status= 'concluida' AND origem_contagem = 'visao_computacional'
+        ORDER BY finalizado_em DESC, id DESC
+        LIMIT 1
+        """
+    ).fetchone()
 
 def obter_sessao(conexao: sqlite3.Connection, sessao_id: int) -> sqlite3.Row | None:
     return conexao.execute("SELECT * FROM sessao_monitoramento WHERE id = ?", (sessao_id,)).fetchone()

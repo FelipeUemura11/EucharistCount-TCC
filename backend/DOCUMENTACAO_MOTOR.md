@@ -488,6 +488,19 @@ Para arquivos de vídeo não há reconexão: o fim da leitura é o fim do vídeo
 
 > **Limitação conhecida.** A reconexão é tentada **uma única vez**. Se a câmera ainda estiver fora do ar depois dos 3 segundos, `_reconectar()` devolve `False`, o loop termina e a sessão é fechada. Uma queda de rede mais longa encerra a contagem daquela missa. Para tornar a reconexão persistente, `_reconectar()` precisaria repetir a tentativa até conseguir ou até `Monitor.parar()` ser chamado.
 
+
+### 9.3 De onde vem o frame: arquivo, webcam ou câmera IP
+
+A mesma configuração `camera.fonte` aceita três tipos de fonte, e cada um precisa chegar ao OpenCV de um jeito:
+
+| Fonte | Exemplo | Como chega ao `FonteVideo` |
+|---|---|---|
+| Arquivo de vídeo | `videos/20-09-teste.mp4` | Caminho absoluto, resolvido a partir da pasta `backend/` |
+| Webcam | `0`, `1` | Intacta: o `FonteVideo` a converte para o índice inteiro que o OpenCV espera |
+| Câmera IP | `rtsp://usuario:senha@192.168.1.50:554/stream1` | Intacta, aberta com o FFmpeg por TCP |
+
+Quem decide é `Config.resolver_fonte_camera()`: dígitos e URLs (`rtsp://`, `http://`, `https://`) passam sem mudança, e só o resto é tratado como arquivo. A regra existe por causa de um bug real: a versão anterior aplicava `caminho_absoluto()` a qualquer fonte, e no Windows isso transformava `"0"` em `...\backend\0` e `rtsp://...` em `...\backend\rtsp:\...`. **Webcam e câmera IP nunca abriam**, e só arquivos de vídeo funcionavam, justamente o contrário do que a instalação na paróquia precisa. Os scripts `calibrar.py` e `calibrar_linha.py` usam a mesma função.
+
 ---
 
 ## 10. Limitação de threads de CPU
@@ -544,7 +557,7 @@ O contrato é simples:
 
 Esse padrão se chama **callback**: o motor avisa "atualizei", e quem passou a função decide o que fazer com o aviso. O motor continua sem importar nada de `db/`, e continua testável sem banco.
 
-Quem escuta, hoje, é o `GravadorSessao` do `main.py`, que grava os totais no banco a cada passagem pela linha e um ponto do gráfico a cada 5 segundos de vídeo. Esse lado está descrito em [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md), seção 5, e o motivo do intervalo de 5 segundos em [`DOCUMENTACAO_BANCO.md`](./DOCUMENTACAO_BANCO.md), seção 7.3.
+Quem escuta, hoje, é o `GravadorSessao` de `integracao/sessao.py`, que grava os totais no banco a cada passagem pela linha e um ponto do gráfico a cada 5 segundos de vídeo. Esse lado está descrito em [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md), seção 6, e o motivo do intervalo de 5 segundos em [`DOCUMENTACAO_BANCO.md`](./DOCUMENTACAO_BANCO.md), seção 7.3.
 
 O parâmetro é opcional: chamar `executar()` sem ele, como fazem os scripts de calibração, funciona exatamente como antes.
 
@@ -556,7 +569,6 @@ Pontos identificados em revisão e ainda não corrigidos no código:
 
 | Onde | Limitação | Efeito |
 |---|---|---|
-| `config.py` — `caminho_absoluto()` | Junta a raiz do backend a qualquer fonte que não seja um caminho absoluto, inclusive `"0"` e `"rtsp://..."` | **Câmera IP e webcam não abrem**: chegam ao `FonteVideo` como caminhos de arquivo inexistentes. Só arquivos de vídeo funcionam. Correção: devolver a fonte intacta quando for dígito ou URL. O mesmo vale para `scripts/calibrar.py` e `scripts/calibrar_linha.py` |
 | `contador.py` — cooldown | Atualiza o lado antes de testar o cooldown | Quem hesita na porta pode ser contado duas vezes (seção 8.7) |
 | `camera.py` — `_reconectar()` | Uma única tentativa | Queda de rede longa encerra a contagem (seção 9.2) |
 | `monitor.py` — `executar()` | Não reinicia `_parar` nem as `Metricas` | Reusar a mesma instância de `Monitor` para duas missas acumula as contagens. Criar um `Monitor` novo por missa evita o problema |

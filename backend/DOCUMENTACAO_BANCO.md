@@ -54,14 +54,6 @@ erDiagram
     configuracao_estimativa |o--o{ estimativa_comunhao : "calcula"
     sessao_monitoramento |o--o{ evento_sistema : "registra"
 
-    paroquia {
-        INTEGER id PK "sempre 1"
-        TEXT nome
-        TEXT cidade
-        TEXT logotipo_path
-        TEXT atualizado_em
-    }
-
     horario_padrao {
         INTEGER id PK
         INTEGER dia_semana "0=domingo ... 6=sabado"
@@ -178,11 +170,7 @@ A mesma separação permite que a contagem manual de hoje (o "olhômetro", impor
 
 ## 3. As tabelas, uma a uma
 
-### 3.1 `paroquia`
-
-Identidade da paróquia exibida no menu lateral (nome, cidade, logotipo). É uma **tabela de linha única**: `CHECK (id = 1)` impede uma segunda linha, e `crud.definir_paroquia()` usa `INSERT ... ON CONFLICT(id) DO UPDATE` para criar ou atualizar sempre o registro 1. Ainda não é usada pela API.
-
-### 3.2 `horario_padrao`
+### 3.1 `horario_padrao`
 
 A agenda semanal fixa (tela Configurações): cada linha é uma missa recorrente num dia da semana, com a janela de gravação associada.
 
@@ -191,7 +179,7 @@ A agenda semanal fixa (tela Configurações): cada linha é uma missa recorrente
 
 Ainda não é usada pela API nem pelo motor. A tela de Configurações está em construção.
 
-### 3.3 `celebracao`
+### 3.2 `celebracao`
 
 Uma data concreta com missa.
 
@@ -207,7 +195,7 @@ Uma data concreta com missa.
 
 `atualizado_em` é mantido por um gatilho (seção 4.3).
 
-### 3.4 `sessao_monitoramento`
+### 3.3 `sessao_monitoramento`
 
 **A tabela central do sistema**: uma execução real da contagem para uma celebração.
 
@@ -226,7 +214,7 @@ Uma data concreta com missa.
 
 **Por que guardar `parametros_contagem`:** a contagem depende de parâmetros ajustáveis, como posição da linha, margem e confiança (ver `DOCUMENTACAO_MOTOR.md`, seção 7.2). Guardar a configuração exata junto de cada sessão torna cada número **auditável e reproduzível**: é possível saber, meses depois, com que ajuste uma contagem antiga foi feita, e rodar o mesmo vídeo com os mesmos parâmetros para conferir. O motor grava ali `json.dumps(asdict(config))`, um retrato de todo o `config.json` efetivo, já com os argumentos de linha de comando aplicados.
 
-### 3.5 `instantaneo_ocupacao`
+### 3.4 `instantaneo_ocupacao`
 
 A **série temporal** da ocupação dentro de uma sessão, que desenha o gráfico "Evolução da ocupação" do dashboard. Cada linha é uma fotografia numérica: quantas pessoas estavam dentro, e quantas tinham entrado e saído até aquele momento.
 
@@ -234,7 +222,7 @@ O motor grava uma linha **a cada 5 segundos de vídeo**. A justificativa desse i
 
 O índice `idx_instantaneo_sessao_tempo (sessao_id, registrado_em)` cobre exatamente a consulta do gráfico: "todos os instantâneos desta sessão, em ordem de tempo".
 
-### 3.6 `configuracao_estimativa`
+### 3.5 `configuracao_estimativa`
 
 Os parâmetros que convertem ocupação em estimativa de comungantes e de hóstias.
 
@@ -248,7 +236,7 @@ Os parâmetros que convertem ocupação em estimativa de comungantes e de hósti
 
 **É uma tabela *append-only*:** para mudar o coeficiente, insere-se uma linha nova em vez de fazer `UPDATE`. A versão vigente é sempre a mais recente. Isso preserva o histórico: dá para saber qual coeficiente valia quando cada sessão antiga foi estimada, e a coluna `estimativa_comunhao.configuracao_estimativa_id` aponta exatamente para ele.
 
-### 3.7 `estimativa_comunhao`
+### 3.6 `estimativa_comunhao`
 
 Uma linha por sessão (`sessao_id` é `UNIQUE`), com **três fontes de valor lado a lado, de propósito**:
 
@@ -262,11 +250,11 @@ Guardar as três separadas, em vez de sobrescrever uma com a outra, é o que sus
 
 `crud.registrar_estimativa()` grava com `INSERT ... ON CONFLICT(sessao_id) DO UPDATE SET coluna = COALESCE(novo, atual)`: cria a linha se não existir, e numa atualização **só sobrescreve os campos informados**. Assim, o registro manual de `comungantes_reais` e o cálculo automático podem acontecer em momentos diferentes sem um apagar o outro.
 
-### 3.8 `evento_sistema`
+### 3.7 `evento_sistema`
 
 Um log leve de saúde e operação (câmera, modelo, reconexões, erros), pensado para alimentar a seção "Saúde do sistema" com dados reais em vez de valores fixos na tela. A tabela e as funções (`registrar_evento_sistema`, `ultimo_evento_por_componente`) existem, mas **ainda não são usadas** pelo motor nem pela API.
 
-### 3.9 `vw_historico` (view)
+### 3.8 `vw_historico` (view)
 
 Uma consulta salva que entrega a tela **Histórico** já pronta, sem nenhum `JOIN` na API:
 
@@ -275,7 +263,7 @@ flowchart LR
     C["celebracao<br/>status = 'finalizada'"] -->|JOIN| V[["vw_historico"]]
     S["sessao_monitoramento<br/>status = 'concluida'"] -->|JOIN| V
     E["estimativa_comunhao"] -->|LEFT JOIN| V
-    V -->|"SELECT * (crud.obter_historico)"| A["GET /api/history"]
+    V -->|"SELECT * (crud.obter_historico)"| A["GET /api/historico"]
 ```
 
 Duas decisões merecem destaque:
@@ -303,7 +291,6 @@ Regras colocadas no schema valem para qualquer código que escreva no banco: API
 | `CHECK` de domínio | `status`, `origem`, `origem_contagem`, `metodo`, `nivel`, `ativo`, `dia_semana` | Um valor fora da lista (ex.: `status = 'terminada'`) é recusado com erro |
 | `UNIQUE` | `celebracao (data, horario_missa)` | Não há duas missas no mesmo horário |
 | `UNIQUE` | `estimativa_comunhao (sessao_id)` | No máximo uma estimativa por sessão |
-| `CHECK (id = 1)` | `paroquia` | Tabela de linha única |
 | `NOT NULL` + FK | `sessao_monitoramento.celebracao_id` | Não existe sessão sem celebração |
 
 ### 4.2 O que acontece ao apagar uma linha
@@ -365,12 +352,24 @@ stateDiagram-v2
 stateDiagram-v2
     [*] --> em_andamento : iniciar_sessao()
     em_andamento --> em_andamento : atualizar_totais_sessao()
-    em_andamento --> concluida : finalizar_sessao()
-    em_andamento --> interrompida : (nenhuma função ainda)
+    em_andamento --> concluida : finalizar_sessao() — fim do vídeo ou ESC
+    em_andamento --> interrompida : finalizar_sessao(status="interrompida") — erro ou Ctrl+C
+    em_andamento --> interrompida : interromper_sessoes_orfas() — no próximo início
     concluida --> [*]
+    interrompida --> [*]
 ```
 
-O status `interrompida` está previsto no schema, mas nenhuma função o grava ainda (seção 12).
+Uma sessão pode terminar de três jeitos:
+
+| Como terminou | Quem fecha | Status |
+|---|---|---|
+| O vídeo acabou, ou o operador apertou ESC | `finalizar_sessao()`, no `finally` do `sessao_de_monitoramento` | `concluida` |
+| Uma exceção: a fonte não abriu, erro no motor, Ctrl+C | `finalizar_sessao(status="interrompida")`, no mesmo `finally` | `interrompida` |
+| O processo morreu de fora: queda de energia, terminal fechado no X | Ninguém na hora. `interromper_sessoes_orfas()`, na **próxima** inicialização | `interrompida` |
+
+**Só sessões `concluida` entram no Histórico** (`vw_historico`). Uma contagem que falhou não aparece lá como resultado válido com zeros.
+
+O terceiro caso não tem como ser tratado na hora: se o processo é morto, nenhum código Python roda, nem o `finally`. A sessão fica `em_andamento` até o programa iniciar de novo. Aí, como só um processo roda o motor, qualquer sessão `em_andamento` é necessariamente resto de uma execução anterior, e é fechada antes de a API subir. Sem isso, uma sessão presa aparecia no dashboard como "contagem ativa" assim que a contagem real terminava.
 
 ---
 
@@ -393,41 +392,46 @@ Toda função recebe a conexão como primeiro argumento (não abre nem fecha con
 
 | Grupo | Função | Quem usa hoje |
 |---|---|---|
-| Paróquia | `obter_paroquia`, `definir_paroquia` | — |
 | Agenda | `criar_horario_padrao`, `listar_horarios_padrao`, `remover_horario_padrao` | — |
-| Celebração | `criar_celebracao`, `obter_ou_criar_celebracao` | Motor (via `main.py`) |
-| | `obter_celebracao` | API `/api/dashboard` |
-| | `listar_celebracoes_do_mes` | API `/api/celebrations` |
+| Celebração | `criar_celebracao`, `obter_ou_criar_celebracao` | `integracao/sessao.py` |
+| | `obter_celebracao` | `api/rotas/dashboard.py` |
+| | `listar_celebracoes_do_mes` | `api/rotas/celebracoes.py` |
 | | `listar_proximas_celebracoes`, `atualizar_status_celebracao` | — |
-| Sessão | `iniciar_sessao`, `atualizar_totais_sessao`, `registrar_instantaneo`, `finalizar_sessao` | Motor (via `main.py`) |
-| | `obter_sessao_ativa` | API `/api/status` e `/api/dashboard` |
-| | `obter_instantaneos` | API `/api/dashboard` |
+| Sessão | `iniciar_sessao`, `atualizar_totais_sessao`, `registrar_instantaneo`, `finalizar_sessao` | `integracao/sessao.py` |
+| | `interromper_sessoes_orfas` | `integracao/sessao.py` (`fechar_sessoes_presas`, no início do programa) |
+| | `obter_sessao_ativa` | `api/rotas/status.py` e `api/rotas/dashboard.py` |
+| | `obter_ultima_sessao_concluida` | `api/rotas/dashboard.py`, quando não há contagem ativa |
+| | `obter_instantaneos` | `api/rotas/dashboard.py` |
 | | `obter_sessao` | — |
-| Estimativa | `obter_configuracao_estimativa_vigente` | API `/api/dashboard` |
+| Estimativa | `obter_configuracao_estimativa_vigente` | `integracao/estimativa.py` |
 | | `definir_configuracao_estimativa` | Scripts de coeficiente e regressão |
-| | `registrar_estimativa`, `ajustar_estimativa` | — |
-| Histórico | `obter_historico` | API `/api/history` |
+| | `registrar_estimativa` | `integracao/estimativa.py` |
+| | `ajustar_estimativa` | — |
+| Histórico | `obter_historico` | `api/rotas/historico.py` |
 | Saúde | `registrar_evento_sistema`, `ultimo_evento_por_componente` | — |
 
 `obter_ou_criar_celebracao()` existe por causa do `UNIQUE (data, horario_missa)`: chamar `criar_celebracao()` duas vezes para a mesma missa (ex.: o programa reiniciado no meio dela) violaria a restrição. A função primeiro procura a celebração e só cria se não achar, então um reinício gera uma **sessão nova na mesma celebração**, exatamente o caso que a seção 2.1 descreve.
+
+`obter_ultima_sessao_concluida()` ordena por `finalizado_em DESC, id DESC` e só considera sessões da câmera (`origem_contagem = 'visao_computacional'`): as sessões manuais, importadas da planilha, não têm `finalizado_em`, gráfico, nem entradas e saídas.
 
 ---
 
 ## 7. Como uma missa é gravada
 
-Esta seção descreve o caminho dos números do motor de visão até o banco. O código que faz a ligação (`GravadorSessao`) está no `main.py` e é detalhado em [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md), seção 5. Aqui o foco é o que acontece **no banco**.
+Esta seção descreve o caminho dos números do motor de visão até o banco. O código que faz a ligação está em `integracao/sessao.py` (o `GravadorSessao` e o context manager `sessao_de_monitoramento`) e é detalhado em [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md), seção 6. Aqui o foco é o que acontece **no banco**.
 
 ### 7.1 A sequência completa
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant M as main.py
+    participant M as integracao/sessao.py
     participant G as GravadorSessao
     participant DB as SQLite
     participant API as FastAPI
     participant F as Dashboard
 
+    M->>DB: interromper_sessoes_orfas() — no início do programa
     M->>DB: obter_ou_criar_celebracao()
     M->>DB: iniciar_sessao() — status em_andamento
     Note over DB: celebracao passa a em_andamento
@@ -448,20 +452,22 @@ sequenceDiagram
         API-->>F: ocupação, entradas, saídas, gráfico
     end
 
-    M->>DB: finalizar_sessao() — status concluida (no finally)
+    M->>DB: finalizar_sessao() — concluida ou interrompida (no finally)
     Note over DB: celebracao passa a finalizada
+    Note over API: sem sessão ativa, o dashboard mostra<br/>a última concluída (obter_ultima_sessao_concluida)
 ```
 
-### 7.2 Quatro escritas, quatro ritmos
+### 7.2 As escritas e os seus ritmos
 
 | Função | Quando roda | Por quê nesse ritmo |
 |---|---|---|
+| `interromper_sessoes_orfas()` | Uma vez, no início do programa | Fecha sessões de execuções anteriores que morreram sem passar pelo `finally` (seção 5.2) |
 | `iniciar_sessao()` | Uma vez, antes do vídeo começar | Cria a linha que tudo o mais vai atualizar |
 | `atualizar_totais_sessao()` | **Só quando entradas ou saídas mudam** | Os cartões do dashboard precisam reagir a cada pessoa (seção 7.4) |
 | `registrar_instantaneo()` | **A cada 5 segundos de vídeo** | O gráfico precisa de uma curva, não de cada frame (seção 7.3) |
-| `finalizar_sessao()` | Uma vez, no fim, dentro de um `finally` | Fecha a sessão mesmo se o usuário apertar ESC, der erro ou Ctrl+C |
+| `finalizar_sessao()` | Uma vez, no fim, dentro de um `finally` | Fecha a sessão mesmo se o usuário apertar ESC, der erro ou Ctrl+C, com `concluida` ou `interrompida` conforme o caso |
 
-A última linha evita **sessões órfãs**. Se o programa saísse sem fechar a sessão, ela ficaria para sempre como `em_andamento`, e a API responderia a qualquer momento futuro que há uma contagem ativa.
+O `finalizar_sessao()` no `finally` e o `interromper_sessoes_orfas()` no início são duas camadas contra **sessões órfãs**. Uma sessão que ficasse para sempre `em_andamento` faria a API responder, a qualquer momento futuro, que há uma contagem ativa, e o dashboard mostraria os números dela.
 
 ### 7.3 Por que um instantâneo a cada 5 segundos
 
@@ -501,7 +507,7 @@ Gravar a cada passagem é barato porque **passagens são raras** comparadas aos 
 
 ### 7.5 Conexões, commits e threads
 
-O motor e a API rodam no mesmo processo, em threads diferentes (`DOCUMENTACAO_API.md`, seção 1), e usam conexões diferentes:
+O motor e a API rodam no mesmo processo, em threads diferentes (`DOCUMENTACAO_API.md`, seção 2), e usam conexões diferentes:
 
 | Quem | Conexões | Motivo |
 |---|---|---|
@@ -524,7 +530,7 @@ O `check_same_thread=False` em `obter_conexao()` desliga uma verificação do Py
 | Maior `dentro` já visto | `ocupacao_maxima` | Cada passagem / fim |
 | `Metricas.dentro` | `contagem_sistema` | Fim |
 
-No fim, `ocupacao_final` e `contagem_sistema` recebem o mesmo valor. A diferença entre elas só aparece se a equipe registrar depois a contagem manual daquela missa em `ocupacao_final` (seção 3.4).
+No fim, `ocupacao_final` e `contagem_sistema` recebem o mesmo valor. A diferença entre elas só aparece se a equipe registrar depois a contagem manual daquela missa em `ocupacao_final` (seção 3.3).
 
 ---
 
@@ -539,7 +545,14 @@ Há dois tipos de data e hora no banco, com regras diferentes:
 
 Os carimbos são gerados em dois lugares, e os dois precisam concordar: nos `DEFAULT` do `schema.sql` (`strftime(..., 'now')`, que no SQLite é UTC) e em `crud._agora()` (`datetime.now(timezone.utc)`). Um bug anterior usava `datetime.now()` sem fuso no Python, e o resultado era `finalizado_em` aparentando ser **anterior** a `iniciado_em`. Por isso a regra do projeto: **nunca usar `datetime.now()` puro para carimbos**.
 
-A consequência é que **quem exibe precisa converter** para a hora local. Isso ainda não acontece no eixo do gráfico (seção 12).
+A consequência é que **quem exibe precisa converter** para a hora local. Essa conversão acontece num lugar só, `api/formatacao.py` → `hora_de_timestamp()`:
+
+```python
+em_utc = datetime.fromisoformat(timestamp).replace(tzinfo=timezone.utc)
+return em_utc.astimezone().strftime("%H:%M")    # '2026-09-26T21:00:00' -> '18:00'
+```
+
+O `.replace(tzinfo=timezone.utc)` declara que o texto do banco está em UTC; sem ele, o Python não saberia de que fuso é o horário. O `.astimezone()` sem argumento converte para o fuso da máquina (Brasília, na paróquia).
 
 ---
 
@@ -572,6 +585,12 @@ Com os dados atuais (3 celebrações no `counting_people.csv`):
 | **Média** | | | **≈ 0,778** |
 
 A média é **das razões**, e não "total de comungantes ÷ total de pessoas". Assim, cada missa pesa igual, e uma missa muito cheia não domina o coeficiente.
+
+**No código**, a fórmula está em `integracao/estimativa.py` → `calcular_estimativa()`, a única implementação usada pelo sistema (detalhes em `DOCUMENTACAO_API.md`, seção 8):
+
+- **Coeficiente e margem:** lidos da configuração vigente (`crud.obter_configuracao_estimativa_vigente`). Enquanto `calcular_coeficiente_inicial.py` não tiver rodado e a tabela estiver vazia, valem os padrões do código: `COEFICIENTE_PADRAO = 0.78` (a média acima) e margem de 10%.
+- **Gravação:** `registrar_estimativa_da_sessao()` grava o resultado em `estimativa_comunhao` (`estimativa_calculada`, `hostias_calculadas`, `coeficiente_utilizado`, `configuracao_estimativa_id`). É dessa tabela que a `vw_historico` lê.
+- **Sessões pendentes:** `preencher_estimativas_pendentes()` grava a estimativa de todas as sessões concluídas que ainda não têm uma (seção 10).
 
 ### 9.2 Fase 2 — regressão (quando houver dados)
 
@@ -608,15 +627,16 @@ Cada linha vira uma celebração (reaproveitada se já existir a mesma data e ho
 | `db/preparar_dataset.py` | Mostra o dataset que a regressão usaria | `python preparar_dataset.py` |
 | `db/treinar_regressao.py` | Treina a regressão (se houver 15+ missas) | `python treinar_regressao.py` |
 | `gerar_dados.py` | Popula o banco com dados de demonstração | `cd backend && python gerar_dados.py` |
+| `integracao/estimativa.py` → `preencher_estimativas_pendentes()` | Grava a estimativa das sessões concluídas que ainda não têm uma. Só pega as pendentes, então é seguro repetir | `cd backend && python -c "from db.database import obter_conexao; from integracao.estimativa import preencher_estimativas_pendentes as p; k=obter_conexao(); print(p(k), 'sessoes atualizadas'); k.close()"` |
 
-Os scripts de `db/` usam imports diretos (`from database import ...`) e por isso precisam ser executados **de dentro da pasta `db/`**. O `main.py` e o `gerar_dados.py` rodam da pasta `backend/` e importam como pacote (`from db import crud`).
+Os scripts de `db/` usam imports diretos (`from database import ...`) e por isso precisam ser executados **de dentro da pasta `db/`**. O `main.py`, o `gerar_dados.py` e os módulos de `api/` e `integracao/` rodam da pasta `backend/` e importam como pacote (`from db import crud`).
 
 **`gerar_dados.py`** existe para demonstrar o dashboard sem câmera. Ele cria, com IDs fixos e `REPLACE INTO` (rodar de novo substitui, não duplica):
 
 - uma missa de **ontem**, finalizada (id 998), que aparece no Histórico;
 - uma missa de **hoje em andamento** (id 999), com 5 instantâneos nos últimos 40 minutos, que aparece no Dashboard como contagem ativa.
 
-> **Cuidado:** a sessão 999 fica `em_andamento` para sempre. Depois que uma contagem real terminar, o dashboard volta a mostrar a missa de demonstração como "ao vivo", e `/api/status` continua respondendo que há contagem ativa. Para voltar ao estado limpo, apague o `eucharist_count.db`; ele é recriado vazio na próxima execução do `main.py`.
+> **Cuidado:** a demonstração "ao vivo" não sobrevive ao `main.py`. Ao iniciar, o `main.py` fecha como `interrompida` toda sessão que encontrar `em_andamento` (seção 5.2), e isso inclui a sessão 999. Para ver a missa de demonstração como contagem ativa, é preciso servir a API sem passar pelo `main.py`. A missa 998 continua no Histórico. Para voltar ao estado limpo, apague o `eucharist_count.db`; ele é recriado vazio na próxima execução do `main.py`.
 
 O arquivo `.db` e a pasta `modelos_estimativa/` são **gerados**, não versionados: podem ser recriados a qualquer momento rodando os scripts acima.
 
@@ -636,11 +656,10 @@ Pontos identificados em revisão e ainda não corrigidos no código:
 
 | Onde | Limitação | Efeito |
 |---|---|---|
-| `crud.obter_configuracao_estimativa_vigente` | Ordena só por `vigente_desde`, que tem precisão de segundo | Se o coeficiente e a regressão forem gravados no mesmo segundo (rodando os dois scripts em sequência), a versão vigente pode sair errada. Correção: `ORDER BY vigente_desde DESC, id DESC`. O mesmo vale para `obter_sessao_ativa` e a ordem dos instantâneos |
-| `import_csv.py` | Reaproveita a celebração, mas sempre cria uma sessão nova | Importar o mesmo CSV duas vezes duplica sessões, linhas do histórico e o peso de cada missa no coeficiente |
+| `integracao/sessao.py` | O fechamento da sessão não chama `registrar_estimativa_da_sessao` | Toda contagem nova entra no Histórico com estimativa e hóstias 0, até alguém rodar `preencher_estimativas_pendentes` (seção 10) |
+| `crud.obter_historico` | Ordena só por `data DESC` | Missas do mesmo dia aparecem em ordem arbitrária no Histórico. Correção: `ORDER BY data DESC, horario_missa DESC` |
+| `crud.obter_instantaneos` | Ordena só por `registrado_em`, que tem precisão de segundo | Dois instantâneos no mesmo segundo podem sair fora de ordem no gráfico. Raro: o intervalo é de 5 s de vídeo. Correção: acrescentar `id` como desempate |
 | `vw_historico` | Junta **todas** as sessões concluídas da celebração | Uma missa com monitoramento reiniciado aparece duas vezes no Histórico |
 | `import_csv.py` | Grava `hosts_consecrated` (um valor humano) em `hostias_calculadas` (coluna do sistema) | Mistura as fontes "real" e "calculada". Hoje é latente: a coluna está vazia no CSV |
 | `crud.ajustar_estimativa` | `ajustado_por` não usa `COALESCE`, ao contrário das outras colunas | Um segundo ajuste sem informar o autor apaga o autor do primeiro |
-| `main.py` (`finally`) | Sempre fecha a sessão como `concluida` | Uma execução que falhou (ex.: vídeo não abriu) entra no histórico como contagem válida com zeros. O status `interrompida` existe para esse caso, mas falta uma função no `crud.py` |
-| Exibição | Carimbos em UTC são exibidos sem conversão | O eixo do gráfico aparece 3 horas adiantado no Brasil |
 | `.gitignore` | Não inclui `backend/db/modelos_estimativa/` | Os modelos `.joblib` treinados iriam para o Git |

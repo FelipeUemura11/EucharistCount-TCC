@@ -17,25 +17,22 @@ exigido pela LGPD no TCC.
 | `treinar_regressao.py` | Treina a regressão (modo `regressao`), valida com leave-one-out, salva o modelo em `modelos_estimativa/*.joblib` e registra a versão em `configuracao_estimativa`. **Só treina com 15+ celebrações no banco** — com menos que isso, ele avisa e não faz nada (ver seção "Estimativa de comunhão" abaixo). |
 | `requirements.txt` | Dependências só deste módulo (`pandas`, `scikit-learn`, `joblib`) — não é o `requirements.txt` do motor de visão, são libs separadas. |
 
-## Como começar (API)
+## Como a API usa este módulo
+
+O `main.py` chama `inicializar_banco()` uma vez, na inicialização. As rotas
+em `backend/api/rotas/` recebem uma conexão por requisição pela dependência
+`obter_db` (`backend/api/dependencias.py`) e só chamam funções do `crud`:
 
 ```python
-from db.database import inicializar_banco, obter_conexao
-from db import crud
-
-inicializar_banco()          # roda uma vez no startup do FastAPI
-
-def obter_db():
-    conexao = obter_conexao()
-    try:
-        yield conexao
-    finally:
-        conexao.close()
-
-@app.get("/historico")
-def historico(conexao = Depends(obter_db)):
-    return [dict(r) for r in crud.obter_historico(conexao)]
+# backend/api/rotas/historico.py (resumido)
+@router.get("/historico", response_model=list[RegistroHistorico])
+def get_historico(db: sqlite3.Connection = Depends(obter_db)):
+    return [RegistroHistorico(...) for r in crud.obter_historico(db)]
 ```
+
+Para uma rota nova, siga o mesmo padrão: se faltar uma operação, crie a
+função aqui no `crud.py`, e não SQL na rota. A organização completa da API
+está em [`../DOCUMENTACAO_API.md`](../DOCUMENTACAO_API.md).
 
 ## Modelo de dados (visão geral)
 
@@ -95,7 +92,11 @@ python3 calcular_coeficiente_inicial.py   # sempre atualiza o fallback
 python3 treinar_regressao.py              # só re-treina se ja tiver dado suficiente
 ```
 
-Pra API usar o modelo em produção, quando `metodo = 'regressao'`:
+Hoje, a estimativa usada pelo sistema é calculada em
+`backend/integracao/estimativa.py` (`calcular_estimativa`), sempre pelo
+coeficiente: se `configuracao_estimativa` estiver vazia, usa o padrão 0.78
+do próprio código. Para usar o modelo de regressão quando
+`metodo = 'regressao'`, a função precisará aplicar este contrato:
 
 ```python
 import joblib
@@ -116,23 +117,25 @@ else:
 hostias = math.ceil(estimativa * (1 + config["margem_hostias"]))
 ```
 
-Isso é trabalho de quem for montar a API — aqui só fica documentado o
-contrato (o que ler de `configuracao_estimativa` e como aplicar).
+Aqui fica documentado o contrato (o que ler de `configuracao_estimativa`
+e como aplicar); a implementação vai em `calcular_estimativa`, para o
+dashboard e o histórico continuarem usando uma única regra.
 
 ## Ligação com o motor de visão
 
-O motor já grava no banco durante a missa. O `main.py` abre uma sessão,
-passa um `GravadorSessao` como callback para `Monitor.executar()`, e fecha
-a sessão no fim:
+O motor já grava no banco durante a missa. Todo o ciclo da sessão fica em
+`backend/integracao/sessao.py`, e o `main.py` só o usa:
 
 ```python
-sessao_id = crud.iniciar_sessao(conexao, celebracao_id, origem_contagem="visao_computacional")
-gravador = GravadorSessao(conexao, sessao_id)   # totais a cada passagem, grafico a cada 5 s
-try:
+fechar_sessoes_presas()        # no inicio: sessoes de execucoes anteriores -> 'interrompida'
+
+with sessao_de_monitoramento(monitor, config) as gravador:
     metricas = monitor.executar(ao_atualizar=gravador)
-finally:
-    crud.finalizar_sessao(conexao, sessao_id, ...)
+# ao sair do "with": finalizar_sessao() com 'concluida' ou, se houve erro, 'interrompida'
 ```
+
+O `GravadorSessao` grava os totais a cada passagem pela linha e um ponto do
+gráfico a cada 5 segundos de vídeo.
 
 O detalhamento (sequência completa, por que 5 segundos, o que vai em cada
 coluna) está em [`../DOCUMENTACAO_BANCO.md`](../DOCUMENTACAO_BANCO.md),

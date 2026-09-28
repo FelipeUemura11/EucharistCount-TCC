@@ -26,20 +26,6 @@
 PRAGMA foreign_keys = ON;
 
 -- -----------------------------------------------------------------------------
--- 1. paroquia
--- -----------------------------------------------------------------------------
--- Configuracao de identidade da paroquia (nome/logo exibidos no menu lateral).
--- Tabela de linha unica: o app sempre le/atualiza o registro id = 1.
--- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS paroquia (
-    id              INTEGER PRIMARY KEY CHECK (id = 1),
-    nome            TEXT NOT NULL,
-    cidade          TEXT,
-    logotipo_path   TEXT,
-    atualizado_em   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now'))
-);
-
--- -----------------------------------------------------------------------------
 -- 2. horario_padrao
 -- -----------------------------------------------------------------------------
 -- Agenda semanal padrao (tela "Configuracoes"). Cada linha e uma missa fixa
@@ -134,7 +120,7 @@ CREATE INDEX IF NOT EXISTS idx_sessao_status ON sessao_monitoramento(status);
 -- 5. instantaneo_ocupacao
 -- -----------------------------------------------------------------------------
 -- Serie temporal de ocupacao dentro de uma sessao — e o que alimenta o
--- grafico do Dashboard (occupancyData). No motor automatizado, o
+-- grafico do Dashboard (graficoOcupacao). No motor automatizado, o
 -- APScheduler grava uma linha aqui a cada N segundos/minutos; no modo
 -- manual, cada leitura do "olhometro" tambem pode virar uma linha aqui.
 -- -----------------------------------------------------------------------------
@@ -231,7 +217,7 @@ CREATE INDEX IF NOT EXISTS idx_evento_sistema_tempo ON evento_sistema(registrado
 -- -----------------------------------------------------------------------------
 -- Junta celebracao + sessao (a mais recente concluida) + estimativa em uma
 -- unica consulta, ja no formato das colunas da tabela do frontend
--- (HistoryRecord): data, celebracao, horario, total de pessoas, estimativa,
+-- (RegistroHistorico): data, celebracao, horario, total de pessoas, estimativa,
 -- hostias sugeridas, entradas e saidas.
 -- -----------------------------------------------------------------------------
 CREATE VIEW IF NOT EXISTS vw_historico AS

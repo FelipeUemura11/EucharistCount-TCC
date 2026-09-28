@@ -1,26 +1,24 @@
-import type { LucideIcon } from 'lucide-react';
-
-export interface OccupancyDataPoint {
-  time: string;
-  value: number;
+export interface PontoOcupacao {
+  hora: string;
+  ocupacao: number;
 }
 
-export interface CelebrationSummaryItem {
-  icon: LucideIcon;
-  label: string;
-  value: string;
+export interface ResumoCelebracao {
+  titulo: string;
+  inicioMonitoramento: string;
+  fimMonitoramento: string;
 }
 
-export interface DashboardMetrics {
-  currentOccupancy: number;
-  estimatedCommunicants: number;
-  entries: number;
-  exits: number;
-  isCountingActive: boolean;
+export interface MetricasDashboard {
+  ocupacaoAtual: number;
+  estimativaComunhao: number;
+  entradas: number;
+  saidas: number;
+  contagemAtiva: boolean;
 }
 
-export interface DashboardOverview {
-  metrics: DashboardMetrics;
-  occupancyData: OccupancyDataPoint[];
-  celebrationSummary: CelebrationSummaryItem[];
+export interface DadosDashboard {
+  metricas: MetricasDashboard;
+  graficoOcupacao: PontoOcupacao[];
+  resumoCelebracao: ResumoCelebracao | null;
 }

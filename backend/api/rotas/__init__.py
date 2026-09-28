@@ -1,0 +1,1 @@
+"""Uma rota por tela do frontend"""
