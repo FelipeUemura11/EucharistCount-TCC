@@ -2,9 +2,7 @@ import { useMemo, useState } from "react";
 import FiltrosHistorico from "../components/historico/FiltrosHistorico";
 import TabelaHistorico from "../components/historico/TabelaHistorico";
 import { useHistorico } from "../hooks/useHistorico";
-import { useStatusContagem } from "../hooks/useStatusContagem";
 import type { RegistroHistorico } from "../types/history";
-import HeaderPage from "../components/layout/HeaderPage";
 
 interface HistoryFilterState {
     searchTerm: string;
@@ -38,8 +36,7 @@ function getLatestRecordDate(registros: RegistroHistorico[]) {
 }
 
 export default function Historico() {
-    const { registros, isLoading } = useHistorico();
-    const isActiveGlobal = useStatusContagem();
+    const { registros } = useHistorico();
     const [draftSearchTerm, setDraftSearchTerm] = useState("");
     const [draftPeriodInDays, setDraftPeriodInDays] = useState(30);
     const [appliedFilters, setAppliedFilters] = useState<HistoryFilterState>({
@@ -86,26 +83,19 @@ export default function Historico() {
     };
 
     return (
-        <div>
-            <HeaderPage
-                title={isLoading ? "Carregando histórico..." : "Histórico"}
-                isActive={isActiveGlobal}
+        <>
+            <FiltrosHistorico
+                searchTerm={draftSearchTerm}
+                periodInDays={draftPeriodInDays}
+                onSearchTermChange={setDraftSearchTerm}
+                onPeriodInDaysChange={setDraftPeriodInDays}
+                onApplyFilters={applyFilters}
             />
 
-            <main className="min-w-0 flex-1 overflow-x-hidden px-8 pt-7 pb-10 max-[640px]:px-4">
-                <FiltrosHistorico
-                    searchTerm={draftSearchTerm}
-                    periodInDays={draftPeriodInDays}
-                    onSearchTermChange={setDraftSearchTerm}
-                    onPeriodInDaysChange={setDraftPeriodInDays}
-                    onApplyFilters={applyFilters}
-                />
-
-                <TabelaHistorico
-                    registros={filteredRecords}
-                    onExport={handleExportRecords}
-                />
-            </main>
-        </div>
+            <TabelaHistorico
+                registros={filteredRecords}
+                onExport={handleExportRecords}
+            />
+        </>
     );
 }

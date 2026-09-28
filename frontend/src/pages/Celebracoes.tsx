@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import CalendarioCelebracoes from "../components/celebracoes/CalendarioCelebracoes";
 import ModalHorariosDia from "../components/celebracoes/ModalHorariosDia";
 import TabelaProximasCelebracoes from "../components/celebracoes/TabelaProximasCelebracoes";
-import HeaderPage from "../components/layout/HeaderPage";
 import {
     calendarDays,
     celebrationMonth,
@@ -13,10 +12,7 @@ import {
 } from "../data/celebrationsMock";
 import type { CelebrationMassScheduleChanges } from "../types/celebrations";
 
-import { useStatusContagem } from "../hooks/useStatusContagem";
-
 export default function Celebracoes() {
-    const isActiveGlobal = useStatusContagem();
     const [selectedDay, setSelectedDay] = useState<number | null>(null);
     const [daySchedules, setDaySchedules] = useState(createInitialDaySchedules);
 
@@ -82,31 +78,27 @@ export default function Celebracoes() {
     };
 
     return (
-        <div>
-            <HeaderPage title="Celebrações" isActive={isActiveGlobal} />
-
-            <main className="flex-1 px-8 pt-7 pb-10">
-                <div className="mb-6">
-                    <div>
-                        <p className="m-0 text-sm font-semibold uppercase text-text-muted">
-                            Agenda litúrgica
-                        </p>
-                        <h2 className="m-0 mt-1 text-2xl font-extrabold text-text-dark">
-                            {celebrationMonth.label}
-                        </h2>
-                    </div>
+        <>
+            <div className="mb-6">
+                <div>
+                    <p className="m-0 text-sm font-semibold uppercase text-text-muted">
+                        Agenda litúrgica
+                    </p>
+                    <h2 className="m-0 mt-1 text-2xl font-extrabold text-text-dark">
+                        {celebrationMonth.label}
+                    </h2>
                 </div>
+            </div>
 
-                <CalendarioCelebracoes
-                    calendarDays={calendarDays}
-                    monthLabel={celebrationMonth.label}
-                    selectedDay={selectedDay}
-                    weekDays={weekDays}
-                    onSelectDay={setSelectedDay}
-                />
+            <CalendarioCelebracoes
+                calendarDays={calendarDays}
+                monthLabel={celebrationMonth.label}
+                selectedDay={selectedDay}
+                weekDays={weekDays}
+                onSelectDay={setSelectedDay}
+            />
 
-                <TabelaProximasCelebracoes celebracoes={nextCelebrations} />
-            </main>
+            <TabelaProximasCelebracoes celebracoes={nextCelebrations} />
 
             {selectedDayInfo && (
                 <ModalHorariosDia
@@ -119,6 +111,6 @@ export default function Celebracoes() {
                     onUpdateSchedule={updateSchedule}
                 />
             )}
-        </div>
+        </>
     );
 }
