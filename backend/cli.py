@@ -18,12 +18,12 @@ def montar_argumentos() -> argparse.ArgumentParser:
     return p
 
 def aplicar_argumentos(config: Config, args: argparse.Namespace) -> Config:
+    if args.fonte is not None: config.camera.fonte = args.fonte
+    if args.modelo is not None: config.deteccao.modelo = args.modelo
     if args.fps is not None: config.camera.fps_processamento = args.fps
     if args.imgsz is not None: config.deteccao.imgsz = args.imgsz
     if args.conf is not None: config.deteccao.confianca = args.conf
     if args.threads is not None: config.deteccao.threads = args.threads
-    if args.conf: config.deteccao.confianca = args.conf
-    if args.threads: config.deteccao.threads = args.threads
     if args.sem_janela: config.visual.mostrar_janela = False
     if args.linha:
         valores = tuple(float(v) for v in args.linha.split(","))
