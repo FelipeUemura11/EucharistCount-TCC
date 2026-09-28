@@ -23,8 +23,8 @@ router = APIRouter()
 
 @router.get("/dashboard", response_model=DadosDashboard)
 def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
-    # Sem contagem ativa, mostra a ultima missa encerrada: e logo depois do
-    # video que a equipe quer ver o resultado final.
+    # Caso gravacao ao vivo Contagem ativa: obter_sessao_ativa(db)
+    # Caso gravacao finalizada Contagem inativa: obtter_ultima_sessao_concluida(db)
     sessao = crud.obter_sessao_ativa(db) or crud.obter_ultima_sessao_concluida(db)
 
     if not sessao:
@@ -45,7 +45,6 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
         for inst in crud.obter_instantaneos(db, sessao["id"])
     ]
 
-    # So os valores: icones e rotulos do resumo ficam fixos no frontend.
     celebracao = crud.obter_celebracao(db, sessao["celebracao_id"])
     if celebracao:
         resumo = ResumoCelebracao(
