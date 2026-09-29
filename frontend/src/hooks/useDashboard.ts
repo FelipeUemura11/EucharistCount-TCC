@@ -7,7 +7,6 @@ const INTERVALO_ATUALIZACAO_MS = 2000;
 
 export function useDashboard() {
   const [dados, setDados] = useState<DadosDashboard>(dashboardMock);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -18,8 +17,6 @@ export function useDashboard() {
         if (isMounted) setDados(novosDados);
       } catch {
         // API fora do ar: mantem os ultimos dados e tenta de novo no proximo ciclo.
-      } finally {
-        if (isMounted) setIsLoading(false);
       }
     }
 
@@ -32,8 +29,5 @@ export function useDashboard() {
     };
   }, []);
 
-  return {
-    dados,
-    isLoading,
-  };
+  return { dados };
 }

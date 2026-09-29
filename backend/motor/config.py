@@ -14,7 +14,7 @@ PASTA_MODELOS = RAIZ / "modelos"
 @dataclass
 class ConfigCamera:
     """Acesso da camera."""
-    fonte: str = "videos/20-09-teste.mp4"
+    fonte: str = "videos/27-09.mp4"
 
     # 5 a 8 fps é suficiente para rastreio confiável e reduz muito o uso de CPU.
     fps_processamento: float = 7.5

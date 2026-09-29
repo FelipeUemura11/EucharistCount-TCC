@@ -4,17 +4,13 @@ import type { RegistroHistorico } from '../types/history';
 
 export function useHistorico() {
   const [registros, setRegistros] = useState<RegistroHistorico[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
 
     async function carregarHistorico() {
       const registrosCarregados = await buscarHistorico();
-      if (isMounted) {
-        setRegistros(registrosCarregados);
-        setIsLoading(false);
-      }
+      if (isMounted) setRegistros(registrosCarregados);
     }
 
     void carregarHistorico();
@@ -24,5 +20,5 @@ export function useHistorico() {
     };
   }, []);
 
-  return { registros, isLoading };
+  return { registros };
 }

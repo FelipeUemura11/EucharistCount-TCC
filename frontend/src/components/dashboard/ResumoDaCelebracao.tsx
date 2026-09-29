@@ -5,8 +5,6 @@ interface ResumoDaCelebracaoProps {
     resumo: ResumoCelebracao | null;
     ocupacaoAtual: number;
     contagemAtiva: boolean;
-    onStartCount?: () => void;
-    onEndCount?: () => void;
 }
 
 export default function ResumoDaCelebracao({

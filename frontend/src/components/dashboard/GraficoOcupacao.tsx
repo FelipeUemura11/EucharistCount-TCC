@@ -13,24 +13,25 @@ import type { PontoOcupacao } from '../../types/dashboard';
 interface GraficoOcupacaoProps {
   pontos: PontoOcupacao[];
   maxCapacity?: number;
-  currentValue?: number;
+  currentValue: number;
+  inicioMonitoramento?: string;
+  fimMonitoramento?: string;
 }
 
-const pontosPadrao: PontoOcupacao[] = [
-  { hora: '18:00', ocupacao: 35 },
-  { hora: '18:10', ocupacao: 75 },
-  { hora: '18:20', ocupacao: 115 },
-  { hora: '18:30', ocupacao: 140 },
-  { hora: '18:40', ocupacao: 165 },
-  { hora: '18:50', ocupacao: 184 },
-];
-
 export default function GraficoOcupacao({
-  pontos = pontosPadrao,
+  pontos,
   maxCapacity = 300,
-  currentValue = 184
+  currentValue,
+  inicioMonitoramento,
+  fimMonitoramento
 }: GraficoOcupacaoProps) {
   const capacityTicks = Array.from({ length: 5 }, (_, index) => Math.round((maxCapacity / 4) * index));
+  const ultimoIndice = pontos.length - 1;
+  const formatarHora = (hora: string, index: number) => {
+    if (index === 0) return inicioMonitoramento || hora;
+    if (index === ultimoIndice) return fimMonitoramento || hora;
+    return '';
+  };
 
   return (
     <div className="bg-white rounded-lg p-6 shadow-sm border border-border">
@@ -70,6 +71,8 @@ export default function GraficoOcupacao({
               axisLine={false}
               tickLine={false}
               tick={{ fill: '#9ca3af', fontSize: 12 }}
+              interval={0}
+              tickFormatter={formatarHora}
               dy={10}
             />
             
@@ -112,7 +115,7 @@ export default function GraficoOcupacao({
               stroke="var(--color-secondary)"
               strokeWidth={3}
               fill="url(#colorOccupancy)"
-              dot={{ fill: 'var(--color-secondary)', strokeWidth: 2, stroke: '#ffffff', r: 4 }}
+              dot={false}
               activeDot={{ r: 6, stroke: 'var(--color-secondary)', strokeWidth: 2 }}
             />
           </AreaChart>

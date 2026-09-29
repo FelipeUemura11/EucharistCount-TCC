@@ -1,4 +1,4 @@
-import { HandHeart, LogIn, LogOut, Users } from 'lucide-react';
+import { LogIn, LogOut, Users } from 'lucide-react';
 import type { DadosDashboard } from '../types/dashboard';
 
 export const dashboardMock: DadosDashboard = {
@@ -17,10 +17,6 @@ export const dashboardMetricCards = {
   occupancy: {
     title: 'Pessoas presentes',
     icon: Users,
-  },
-  communicants: {
-    title: 'Estimativa para comunhão',
-    icon: HandHeart,
   },
   entries: {
     title: 'Entradas',
