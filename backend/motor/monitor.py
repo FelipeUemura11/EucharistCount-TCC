@@ -87,6 +87,7 @@ class Monitor:
             fonte_resolvida,
             fps_alvo=cfg.camera.fps_processamento,
             segundos_reconexao=cfg.camera.segundos_reconexao,
+            checar_interrupcao=lambda: self._parar,
         )
 
         if not fonte.abrir():
