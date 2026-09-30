@@ -3,7 +3,6 @@ import type {
   Celebracao,
   CelebrationDayInfo,
   CelebrationMassSchedule,
-  StatusCelebracao,
 } from '../types/celebrations';
 
 export const celebrationMonth = {
@@ -89,7 +88,7 @@ export const calendarDays: CalendarDay[] = [
   }),
 ];
 
-export const selectedDayCelebrations: Celebracao[] = [
+const selectedDayCelebrations: Celebracao[] = [
   {
     id: 1,
     titulo: 'Missa da manhã',
@@ -155,17 +154,3 @@ export const nextCelebrations: Celebracao[] = [
     status: 'agendada',
   },
 ];
-
-export const statusStyle: Record<StatusCelebracao, string> = {
-  agendada: 'bg-secondary/10 text-secondary',
-  em_andamento: 'bg-emerald-50 text-emerald-600',
-  finalizada: 'bg-slate-100 text-slate-600',
-  cancelada: 'bg-red-50 text-red-600',
-};
-
-export const statusLabel: Record<StatusCelebracao, string> = {
-  agendada: 'Agendada',
-  em_andamento: 'Em andamento',
-  finalizada: 'Finalizada',
-  cancelada: 'Cancelada',
-};

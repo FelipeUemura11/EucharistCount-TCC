@@ -15,23 +15,18 @@ export default function EstatisticasDashboard({ metricas }: EstatisticasDashboar
           value={metricas.ocupacaoAtual}
           icon={dashboardMetricCards.occupancy.icon}
           color="secondary"
-          type="simple"
         />
-       
-        
         <CartaoEstatistica
           title={dashboardMetricCards.entries.title}
           value={metricas.entradas}
           icon={dashboardMetricCards.entries.icon}
           color="green"
-          type="simple"
         />
         <CartaoEstatistica
           title={dashboardMetricCards.exits.title}
           value={metricas.saidas}
           icon={dashboardMetricCards.exits.icon}
           color="red"
-          type="simple"
         />
       </div>
     </section>

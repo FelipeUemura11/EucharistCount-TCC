@@ -9,14 +9,6 @@ export default function Dashboard() {
     const { dados } = useDashboard();
     const { metricas, graficoOcupacao, resumoCelebracao } = dados;
 
-    const handleStartCount = () => {
-        console.log("Iniciando contagem...");
-    };
-
-    const handleEndCount = () => {
-        console.log("Encerrando contagem...");
-    };
-
     return (
         <div className="flex flex-col gap-6">
             <EstatisticasDashboard metricas={metricas} />
@@ -26,6 +18,8 @@ export default function Dashboard() {
                         <GraficoOcupacao
                             pontos={graficoOcupacao}
                             currentValue={metricas.ocupacaoAtual}
+                            inicioMonitoramento={resumoCelebracao?.inicioMonitoramento}
+                            fimMonitoramento={resumoCelebracao?.fimMonitoramento}
                         />
                     </div>
                     <div className="min-w-0">
@@ -33,8 +27,6 @@ export default function Dashboard() {
                             resumo={resumoCelebracao}
                             ocupacaoAtual={metricas.ocupacaoAtual}
                             contagemAtiva={metricas.contagemAtiva}
-                            onStartCount={handleStartCount}
-                            onEndCount={handleEndCount}
                         />
                     </div>
                 </div>
