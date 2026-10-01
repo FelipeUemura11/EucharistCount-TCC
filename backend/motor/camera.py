@@ -13,7 +13,7 @@ Dois pontos importantes para o computador da igreja:
 
 import os
 import time
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Callable
 
 import cv2
 import numpy as np
@@ -29,6 +29,7 @@ class FonteVideo:
         self.fonte = fonte
         self.fps_alvo = fps_alvo
         self.segundos_reconexao = segundos_reconexao
+        self.checar_interrupcao = checar_interrupcao
 
         self._cap: Optional[cv2.VideoCapture] = None
         self._ao_vivo = False
@@ -73,6 +74,28 @@ class FonteVideo:
         if self._cap is not None:
             self._cap.release()
             self._cap = None
+
+    def _reconectar(self) -> bool:
+        """Tenta reabrir um stream que caiu. Retorna True se conseguiu."""
+        print(
+            f"[camera] Stream interrompido. "
+            f"Reconectando em {self.segundos_reconexao:.0f}s..."
+        )
+        self.fechar()
+
+        while True:
+
+            if self.checar_interrupcao and self.checar_interrupcao():
+                print("[camera] Monitoramento interrompido cancelando reconexao.")
+                return False
+
+            time.sleep(self.segundos_reconexao)
+
+            if self.abrir():
+                print("[camera] Reconectado.")
+                return True
+
+            print("[camera] Falha ao reconectar. Tentando novamente...")
 
     # ---------- Leitura ----------
 
