@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api import frontend
-from api.rotas import celebracoes, dashboard, historico, status
+from api.rotas import celebracoes, dashboard, historico, status, configuracoes
 
 def criar_app() -> FastAPI:
     app = FastAPI(title="Eucharist Count")
@@ -24,6 +24,8 @@ def criar_app() -> FastAPI:
 
     for rotas in (status, dashboard, celebracoes, historico):
         app.include_router(rotas.router, prefix="/api")
+
+    app.include_router(configuracoes.router, prefix="/api/configuracoes")
 
     # POR ULTIMO: o catch-all aceita qualquer caminho. O FastAPI testa as
     # rotas na ordem em que foram registradas.

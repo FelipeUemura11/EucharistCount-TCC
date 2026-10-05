@@ -8,6 +8,7 @@ const TITULOS: Record<string, string> = {
     "/celebracoes": "Celebrações",
     "/historico": "Histórico",
     "/configuracoes": "Configurações",
+    "/ajuda": "Ajuda e FAQ",
 };
 
 export default function AppLayout() {

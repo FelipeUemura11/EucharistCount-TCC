@@ -4,6 +4,7 @@ import Dashboard from "./pages/Dashboard";
 import Celebracoes from "./pages/Celebracoes";
 import Historico from "./pages/Historico";
 import Configuracoes from "./pages/Configuracoes";
+import Ajuda from "./pages/Ajuda";
 
 function App() {
     return (
@@ -13,6 +14,7 @@ function App() {
                 <Route path="/celebracoes" element={<Celebracoes />} />
                 <Route path="/historico" element={<Historico />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />
+                <Route path="/ajuda" element={<Ajuda />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
         </Routes>

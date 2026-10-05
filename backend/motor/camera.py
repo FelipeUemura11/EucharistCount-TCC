@@ -25,6 +25,7 @@ class FonteVideo:
         fonte: str,
         fps_alvo: float = 6.0,
         segundos_reconexao: float = 3.0,
+        checar_interrupcao: Optional[Callable[[], bool]] = None,
     ):
         self.fonte = fonte
         self.fps_alvo = fps_alvo
@@ -164,22 +165,6 @@ class FonteVideo:
         if self.fps_alvo <= 0 or self.fps_original <= 0:
             return 1
         return max(1, int(round(self.fps_original / self.fps_alvo)))
-
-    def _reconectar(self) -> bool:
-        """Tenta reabrir um stream que caiu. Retorna True se conseguiu."""
-        print(
-            f"[camera] Stream interrompido. "
-            f"Reconectando em {self.segundos_reconexao:.0f}s..."
-        )
-        self.fechar()
-        time.sleep(self.segundos_reconexao)
-
-        if self.abrir():
-            print("[camera] Reconectado.")
-            return True
-
-        print("[camera] Falha ao reconectar.")
-        return False
 
     # ---------- Informacao ----------
 

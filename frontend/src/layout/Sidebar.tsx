@@ -1,5 +1,5 @@
 import { NavLink } from "react-router";
-import { CalendarDays, History, LayoutDashboard, Settings } from "lucide-react";
+import { CalendarDays, History, LayoutDashboard, Settings, HelpCircle } from "lucide-react";
 import logo from "../assets/logo.png";
 import logoEucharistCount from "../assets/LogoEucaristCount.png";
 
@@ -56,6 +56,13 @@ export default function Sidebar() {
                         <Settings size={24} />
                     </span>
                     <span className="flex-1">Configurações</span>
+                </NavLink>
+
+                <NavLink to="/ajuda" className={linkClass}>
+                    <span className="text-lg w-6 text-center shrink-0">
+                        <HelpCircle size={24} />
+                    </span>
+                    <span className="flex-1">Ajuda</span>
                 </NavLink>
             </nav>
 

@@ -538,3 +538,12 @@ O modelo de regressão (`metodo = 'regressao'`, com o arquivo `.joblib`) ainda n
 | `useHistorico.ts` | Busca o histórico uma vez só, ao abrir a página | Uma missa que termina com a página aberta só aparece ao recarregar |
 | `api/servidor.py` | Escuta em `0.0.0.0` | O dashboard fica acessível para qualquer máquina da rede da paróquia, sem autenticação. Para uso só local, `host="127.0.0.1"` |
 | Frontend | Os *services* chamam `http://127.0.0.1:8000` com endereço fixo | Abrir o dashboard de outra máquina da rede não funciona. Endereços relativos (`/api/...`) resolveriam |
+
+### `GET /api/configuracoes`
+Retorna as configurações globais do sistema, como a agenda padrão semanal salva no banco, a saúde dos serviços em tempo real e os parâmetros lidos do `config.json`.
+
+### `POST /api/configuracoes/agenda`
+Permite o cadastro de novos horários fixos para a Agenda Semanal Padrão. Recebe um JSON com `diaSemana`, `horarioMissa`, `inicioGravacao` e `fimGravacao`.
+
+### `DELETE /api/configuracoes/agenda/{id}`
+Deleta um horário previamente cadastrado da agenda semanal padrão.

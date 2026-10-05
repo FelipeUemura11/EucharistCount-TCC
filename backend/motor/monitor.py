@@ -91,9 +91,13 @@ class Monitor:
         )
 
         if not fonte.abrir():
-            raise RuntimeError(
-                f"Nao foi possivel abrir a fonte de video: {fonte_resolvida}"
-            )
+            # Se for stream/webcam a gente tenta reconectar desde o inicio
+            if fonte.fonte.isdigit() or fonte.fonte.lower().startswith(("rtsp://", "http://", "https://")):
+                print(f"[aviso] Fonte {fonte_resolvida} indisponivel. Aguardando conexao...")
+                if not fonte._reconectar():
+                    raise RuntimeError("Monitoramento cancelado antes de conectar a camera.")
+            else:
+                raise RuntimeError(f"Nao foi possivel abrir o arquivo de video: {fonte_resolvida}")
 
         print(fonte.resumo())
         print(f"Modelo     : {self.detector.caminho_modelo.name}")

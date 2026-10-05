@@ -236,3 +236,14 @@ FROM celebracao c
 JOIN sessao_monitoramento s ON s.celebracao_id = c.id AND s.status = 'concluida'
 LEFT JOIN estimativa_comunhao e ON e.sessao_id = s.id
 WHERE c.status = 'finalizada';
+
+-- -----------------------------------------------------------------------------
+-- 10. agenda_padrao
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS agenda_padrao (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dia_semana INTEGER NOT NULL CHECK (dia_semana BETWEEN 0 AND 6),
+    horario_missa TEXT NOT NULL,
+    inicio_gravacao TEXT NOT NULL,
+    fim_gravacao TEXT NOT NULL
+);

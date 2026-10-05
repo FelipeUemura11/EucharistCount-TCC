@@ -41,31 +41,33 @@ def main() -> int:
         print("[✓] Documentação da API: http://127.0.0.1:8000/docs")
         print("[✓] Puxando motor visual e câmeras...\n")
 
-        # Monitor antes da sessao: se o modelo nao existir, falha antes de
-        # gravar qualquer coisa no banco.
-        monitor = Monitor(config, RAIZ)
+        try:
+            # Monitor antes da sessao: se o modelo nao existir, falha antes de
+            # gravar qualquer coisa no banco.
+            monitor = Monitor(config, RAIZ)
 
-        with sessao_de_monitoramento(monitor, config) as gravador:
-            metricas = monitor.executar(ao_atualizar=gravador)
+            with sessao_de_monitoramento(monitor, config) as gravador:
+                metricas = monitor.executar(ao_atualizar=gravador)
 
-        print("\n" + "=" * 52)
-        print(" >>> Sessão Concluída ")
-        print(f"Entradas           : {metricas.entradas}")
-        print(f"Saídas             : {metricas.saidas}")
-        print(f"Dentro da igreja   : {metricas.dentro}")
-        print(f"FPS médio          : {metricas.fps:.1f}")
-        print("=" * 52)
+            print("\n" + "=" * 52)
+            print(" >>> Sessão Concluída ")
+            print(f"Entradas           : {metricas.entradas}")
+            print(f"Saídas             : {metricas.saidas}")
+            print(f"Dentro da igreja   : {metricas.dentro}")
+            print(f"FPS médio          : {metricas.fps:.1f}")
+            print("=" * 52)
 
-        # O video acabou, mas o dashboard continua no ar: e agora que os
-        # numeros finais existem. A thread da API e daemon, entao o processo
-        # precisa ficar vivo aqui ate o usuario encerrar.
-        print("\nO dashboard continua em http://127.0.0.1:8000 — Ctrl+C para encerrar.")
+        except (FileNotFoundError, RuntimeError) as e:
+            # A captura do erro foi ajustada para nao derrubar a API web inteira
+            print(f"\n[AVISO] O motor de visão encontrou um problema:\n   {e}")
+            print("\n[AVISO] A interface do sistema (dashboard) permanecerá ativa para consultas.")
+
+        # O video acabou (ou a camera falhou), mas o dashboard continua no ar.
+        # A thread da API e daemon, entao o processo precisa ficar vivo aqui ate o usuario encerrar.
+        print("\nO dashboard continua no ar em http://127.0.0.1:8000 — Ctrl+C para encerrar.")
         while True:
             time.sleep(1)
 
-    except (FileNotFoundError, RuntimeError) as e:
-        print(f"\n[ERRO] {e}")
-        return 1
     except KeyboardInterrupt:
         print("\n\nEncerrado pelo utilizador.")
         return 0

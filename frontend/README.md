@@ -2,11 +2,9 @@
 
 Dashboard web do sistema de contagem. React + TypeScript + Vite.
 
-Ainda **não integrado à API** — as telas consomem os mocks de
-`src/data/` através dos hooks em `src/hooks/`. A troca por chamadas HTTP
-reais acontece dentro de `src/services/`, sem alterar as páginas.
+As telas já estão conectadas à API e se comunicam em tempo real com o motor de visão através dos arquivos em `src/services/`.
 
-## Rodar
+## Rodar (Modo Desenvolvimento)
 
 ```bash
 cd frontend
@@ -14,16 +12,19 @@ npm install
 npm run dev
 ```
 
+> **Nota:** Em produção/demonstração on-premise, rode `npm run build`. O arquivo principal do motor (`main.py` no backend) já serve essa pasta `dist` empacotada automaticamente na porta 8000.
+
 ## Estrutura
 
 ```
 src/
-├── pages/        # Dashboard, Celebrações, Histórico, Configurações
+├── pages/        # Dashboard, Celebrações, Histórico, Configurações e Ajuda (FAQ)
 ├── components/   # componentes por área (dashboard/, history/, layout/...)
-├── hooks/        # busca de dados das páginas
-├── services/     # ponto de troca mock -> API
-├── data/         # mocks enquanto a API não existe
-└── types/        # contratos de dados compartilhados
+├── hooks/        # busca de dados e estados (ex. status do motor)
+├── services/     # integração com a API FastAPI (chamadas HTTP)
+├── data/         # mocks e dados fixos utilizados na estrutura visual
+├── assets/       # imagens, logos e prints do sistema (faq)
+└── types/        # contratos de dados compartilhados com o backend
 ```
 
 O backend de visão computacional fica em [`../backend`](../backend).

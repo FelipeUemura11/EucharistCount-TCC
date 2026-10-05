@@ -57,3 +57,26 @@ class RegistroHistorico(BaseModel):
     hostiasSugeridas: int
     entradas: int
     saidas: int
+
+class AgendaDia(BaseModel):
+    id: int | None = None
+    diaSemana: int
+    horarioMissa: str
+    inicioGravacao: str
+    fimGravacao: str
+
+class InfoCamera(BaseModel):
+    fonte: str
+    resolucao: str
+    fpsProcessado: float
+
+class SaudeSistema(BaseModel):
+    apiLocal: str
+    bancoDados: str
+    camera: str
+    modeloYolo: str
+
+class ConfiguracoesGlobais(BaseModel):
+    agendaPadrao: list[AgendaDia]
+    infoCamera: InfoCamera
+    saudeSistema: SaudeSistema
