@@ -30,6 +30,9 @@ backend/videos/
 !frontend/**/*.png
 !frontend/**/*.jpg
 
+# Configuracao local com segredos (URL RTSP com senha)
+.env
+
 # Banco de dados local
 *.db
 *.sqlite

@@ -3,12 +3,21 @@ Configuracao central do Eucharist Count.
 """
 
 import json
+import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 RAIZ = Path(__file__).resolve().parent.parent
 ARQUIVO_CONFIG = RAIZ / "config.json"
 PASTA_MODELOS = RAIZ / "modelos"
+
+if getattr(sys, "frozen", False):
+    ARQUIVO_ENV = Path(sys.executable).parent / ".env"
+else:
+    ARQUIVO_ENV = RAIZ / ".env"
 
 
 @dataclass
@@ -137,22 +146,34 @@ class Config:
 
     @classmethod
     def carregar(cls, caminho: Path | None = None) -> "Config":
-        """Le config.json se existir; caso contrario usa os padroes."""
+        """
+        Le config.json se existir; caso contrario usa os padroes. Depois
+        aplica o .env: CAMERA_FONTE substitui camera.fonte.
+
+        Precedencia: linha de comando (cli.py) > .env > config.json > padrao.
+        """
         caminho = caminho or ARQUIVO_CONFIG
         if not caminho.exists():
-            return cls()
+            config = cls()
+        else:
+            with open(caminho, "r", encoding="utf-8") as f:
+                dados = json.load(f)
 
-        with open(caminho, "r", encoding="utf-8") as f:
-            dados = json.load(f)
+            config = cls(
+                camera=ConfigCamera(**dados.get("camera", {})),
+                deteccao=ConfigDeteccao(**dados.get("deteccao", {})),
+                rastreio=ConfigRastreio(**dados.get("rastreio", {})),
+                filtro=ConfigFiltro(**dados.get("filtro", {})),
+                contagem=ConfigContagem(**dados.get("contagem", {})),
+                visual=ConfigVisual(**dados.get("visual", {})),
+            )
 
-        return cls(
-            camera=ConfigCamera(**dados.get("camera", {})),
-            deteccao=ConfigDeteccao(**dados.get("deteccao", {})),
-            rastreio=ConfigRastreio(**dados.get("rastreio", {})),
-            filtro=ConfigFiltro(**dados.get("filtro", {})),
-            contagem=ConfigContagem(**dados.get("contagem", {})),
-            visual=ConfigVisual(**dados.get("visual", {})),
-        )
+        load_dotenv(ARQUIVO_ENV)
+        fonte_env = os.getenv("CAMERA_FONTE")
+        if fonte_env:
+            config.camera.fonte = fonte_env
+
+        return config
 
     def caminho_absoluto(self, caminho_relativo: str) -> str:
         """Resolve um caminho da config em relacao a raiz do backend."""

@@ -73,6 +73,24 @@ pip install -r requirements.txt --extra-index-url https://download.pytorch.org/w
 O `--extra-index-url` é importante: sem ele o pip baixa a versão CUDA do
 PyTorch (~2.5 GB) que não serve para nada numa máquina sem GPU.
 
+### Configuração local (`.env`)
+
+A fonte da câmera da igreja costuma ser uma URL RTSP com usuário e senha.
+Ela vai num `.env`, que **não é versionado**, e não no `config.json`:
+
+```bash
+copy .env.example .env          # Windows
+# cp .env.example .env          # Linux/Mac
+```
+
+| Variável | O que faz |
+|---|---|
+| `CAMERA_FONTE` | Substitui `camera.fonte` do `config.json`: arquivo de vídeo, índice de webcam (`0`) ou `rtsp://usuario:senha@ip:554/stream` |
+
+Precedência: `--fonte` na linha de comando > `.env` > `config.json` > padrão
+do código. Sem o `.env`, vale o `config.json`. Na tela de Configurações, a
+senha da URL aparece mascarada (`rtsp://usuario:***@...`).
+
 ---
 
 ## Primeira execução
@@ -122,7 +140,8 @@ tupla pronta para colar no `config.json`.
 # vídeo de teste
 python main.py --fonte videos/20-09-teste.mp4
 
-# câmera IP da igreja
+# câmera IP da igreja (no dia a dia, prefira CAMERA_FONTE no .env:
+# na linha de comando, a senha fica no histórico do terminal)
 python main.py --fonte "rtsp://usuario:senha@192.168.1.50:554/stream1"
 
 # ajustar a linha do portao (x1,y1,x2,y2 em fracoes do frame)

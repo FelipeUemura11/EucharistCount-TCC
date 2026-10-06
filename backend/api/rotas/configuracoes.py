@@ -7,6 +7,7 @@ config.json.
 
 import os
 import sqlite3
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -16,6 +17,15 @@ from db import crud
 from motor.config import Config
 
 router = APIRouter()
+
+
+def mascarar_senha(fonte: str) -> str:
+    """rtsp://admin:***@ip/stream"""
+    partes = urlsplit(fonte)
+    if not partes.password:
+        return fonte
+    netloc = partes.netloc.replace(f":{partes.password}@", ":***@", 1)
+    return partes._replace(netloc=netloc).geturl()
 
 
 @router.get("/configuracoes", response_model=ConfiguracoesGlobais)
@@ -44,7 +54,7 @@ def get_configuracoes(db: sqlite3.Connection = Depends(obter_db)):
     else:
         imgsz = config.deteccao.imgsz
         info_camera = InfoCamera(
-            fonte=config.camera.fonte,
+            fonte=mascarar_senha(config.camera.fonte),
             resolucao=f"{imgsz}x{imgsz} (processamento)",
             fpsProcessado=config.camera.fps_processamento,
         )

@@ -499,6 +499,8 @@ A mesma configuração `camera.fonte` aceita três tipos de fonte, e cada um pre
 | Webcam | `0`, `1` | Intacta: o `FonteVideo` a converte para o índice inteiro que o OpenCV espera |
 | Câmera IP | `rtsp://usuario:senha@192.168.1.50:554/stream1` | Intacta, aberta com o FFmpeg por TCP |
 
+Como a URL da câmera IP leva usuário e senha, ela não deve ficar no `config.json`, que é versionado. A variável `CAMERA_FONTE` do `backend/.env`, que fica fora do Git, substitui `camera.fonte` em `Config.carregar()`; o `--fonte` da linha de comando ainda ganha dela. O modelo é o `backend/.env.example`. No executável do PyInstaller, o `.env` é lido da pasta do `.exe`.
+
 Quem decide é `Config.resolver_fonte_camera()`: dígitos e URLs (`rtsp://`, `http://`, `https://`) passam sem mudança, e só o resto é tratado como arquivo. A regra existe por causa de um bug real: a versão anterior aplicava `caminho_absoluto()` a qualquer fonte, e no Windows isso transformava `"0"` em `...\backend\0` e `rtsp://...` em `...\backend\rtsp:\...`. **Webcam e câmera IP nunca abriam**, e só arquivos de vídeo funcionavam, justamente o contrário do que a instalação na paróquia precisa. Os scripts `calibrar.py` e `calibrar_linha.py` usam a mesma função.
 
 ---

@@ -266,7 +266,7 @@ A agenda semanal padrão fica na tabela `horario_padrao` (`DOCUMENTACAO_BANCO.md
 
 | Rota | Comportamento |
 |---|---|
-| `GET /api/configuracoes` | `agendaPadrao`: horários ativos, por dia e hora. `infoCamera`: fonte, `imgsz` e FPS do `config.json`, lido por `Config.carregar()`, que resolve o caminho pela raiz do backend. `saudeSistema`: ver abaixo |
+| `GET /api/configuracoes` | `agendaPadrao`: horários ativos, por dia e hora. `infoCamera`: fonte, `imgsz` e FPS lidos por `Config.carregar()` (`config.json` + `.env`, resolvidos pela raiz do backend). A senha de uma URL RTSP sai mascarada (`mascarar_senha`: `rtsp://usuario:***@...`). `saudeSistema`: ver abaixo |
 | `POST /api/configuracoes/agenda` | Recebe `diaSemana` (0 = domingo a 6), `horarioMissa`, `inicioGravacao` e `fimGravacao` (`HH:MM`). Fora do formato, ou com o fim antes do início, responde **422** |
 | `DELETE /api/configuracoes/agenda/{id}` | *Soft delete* (`ativo = 0`): celebrações geradas pelo horário mantêm a referência. **404** se não houver horário ativo com o `id` |
 
@@ -308,11 +308,12 @@ A mesma porta 8000 serve a API **e** o dashboard compilado. Não é preciso um s
 A rota `/{catchall:path}` segue esta regra, na ordem:
 
 1. Se o caminho começa com `api/`, devolve **404**. Nenhuma tela do React começa com `/api/`, então o que chegou até aqui é uma rota da API que não existe.
-2. Se o caminho é um arquivo que existe em `frontend/dist/` (um `.js`, `.css`, imagem), devolve o arquivo.
+2. Se o caminho é um arquivo que existe **dentro de** `frontend/dist/` (um `.js`, `.css`, imagem), devolve o arquivo. O caminho passa por `resolve()`, que desfaz os `..`, e só é servido se `is_relative_to(dist)`.
 3. Se `frontend/dist/index.html` não existe, devolve um aviso pedindo `npm run build`.
 4. Senão, devolve o `index.html`.
 
 - **O passo 1 existe por causa de um bug real.** Antes dele, uma rota da API inexistente devolvia o `index.html` com status 200. O frontend recebia HTML onde esperava JSON, o erro era engolido, e a tela ficava vazia sem nenhum aviso. Foi assim que a rota do histórico (na época `/api/history`), quebrada na reorganização por um `@` que faltava, passou despercebida.
+- **A checagem do passo 2 fecha um *path traversal*.** Antes, o caminho era só `dist / catchall`. O uvicorn decodifica `%2e%2e` para `..`, então `GET /%2e%2e/%2e%2e/backend/config.json` devolvia o `config.json`, e o mesmo valia para o banco e o `.env`. Como o servidor escuta em `0.0.0.0`, qualquer máquina da rede da paróquia conseguia baixar esses arquivos. Agora esse caminho cai no passo 4.
 - **O passo 4 faz as rotas do React funcionarem ao recarregar a página.** `/historico` não é um arquivo, e sim uma tela que o React desenha no navegador; sem essa regra, apertar F5 em `/historico` daria 404.
 
 **O frontend precisa estar compilado.** O servidor entrega a pasta `dist/`, e não o código-fonte React. Mudanças no frontend só aparecem em `:8000` depois de `npm run build` na pasta `frontend`. Durante o desenvolvimento, `npm run dev` serve o frontend com recarga automática na porta 5173, consumindo a API em `:8000`.
