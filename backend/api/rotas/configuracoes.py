@@ -1,105 +1,80 @@
-import json
+"""
+GET/POST/DELETE /api/configuracoes — pagina Configuracoes.
+
+A agenda padrao fica na tabela horario_padrao; camera e deteccao vem do
+config.json.
+"""
+
 import os
 import sqlite3
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
 
 from api.dependencias import obter_db
-from api.schemas import ConfiguracoesGlobais, AgendaDia, InfoCamera, SaudeSistema
+from api.schemas import AgendaDia, AgendaDiaCriar, ConfiguracoesGlobais, InfoCamera, SaudeSistema
+from db import crud
+from motor.config import Config
 
 router = APIRouter()
 
-class AgendaDiaCreate(BaseModel):
-    diaSemana: int
-    horarioMissa: str
-    inicioGravacao: str
-    fimGravacao: str
 
-@router.get("", response_model=ConfiguracoesGlobais)
+@router.get("/configuracoes", response_model=ConfiguracoesGlobais)
 def get_configuracoes(db: sqlite3.Connection = Depends(obter_db)):
-    # Ler agenda padrao do banco
-    db.row_factory = sqlite3.Row
-    cursor = db.cursor()
-    cursor.execute("SELECT id, dia_semana, horario_missa, inicio_gravacao, fim_gravacao FROM agenda_padrao ORDER BY dia_semana, horario_missa")
-    linhas = cursor.fetchall()
-    
-    agenda = []
-    for linha in linhas:
-        agenda.append(AgendaDia(
+    agenda = [
+        AgendaDia(
             id=linha["id"],
             diaSemana=linha["dia_semana"],
             horarioMissa=linha["horario_missa"],
-            inicioGravacao=linha["inicio_gravacao"],
-            fimGravacao=linha["fim_gravacao"]
-        ))
-        
-    # Ler configuracoes de camera e processamento do config.json
+            inicioGravacao=linha["horario_inicio_gravacao"],
+            fimGravacao=linha["horario_fim_gravacao"],
+        )
+        for linha in crud.listar_horarios_padrao(db)
+    ]
+
+    # Config.carregar() resolve o config.json pela raiz do backend, nao pela
+    # pasta de onde o processo foi iniciado.
     try:
-        with open("config.json", "r") as f:
-            config = json.load(f)
-            fonte = config.get("camera", {}).get("fonte", "Desconhecida")
-            fps = config.get("camera", {}).get("fps_processamento", 0.0)
-            imgsz = config.get("deteccao", {}).get("imgsz", 640)
-            resolucao = f"{imgsz}x{imgsz} (processamento)"
+        config = Config.carregar()
     except Exception:
-        fonte = "Erro ao ler config"
-        fps = 0.0
-        resolucao = "Desconhecida"
-        
-    info_camera = InfoCamera(
-        fonte=fonte,
-        resolucao=resolucao,
-        fpsProcessado=fps
-    )
-    
-    # Verificar saude do sistema
-    # API: Online (ja que respondeu)
-    # Banco: Online (ja que consultou a agenda)
-    saude_api = "Online"
-    saude_banco = "Online"
-    
-    # Mocking status for camera and YOLO model based on DB ou config
-    # In a real app we might check the camera stream or process status
-    saude_camera = "Online"
-    saude_yolo = "Online"
-    if not os.path.exists(config.get("deteccao", {}).get("modelo", "")):
-        saude_yolo = "Aviso: Modelo nao encontrado"
-    
-    saude_sistema = SaudeSistema(
-        apiLocal=saude_api,
-        bancoDados=saude_banco,
-        camera=saude_camera,
-        modeloYolo=saude_yolo
-    )
-    
-    return ConfiguracoesGlobais(
-        agendaPadrao=agenda,
-        infoCamera=info_camera,
-        saudeSistema=saude_sistema
+        config = None
+
+    if config is None:
+        info_camera = InfoCamera(fonte="Erro ao ler config.json", resolucao="Desconhecida", fpsProcessado=0.0)
+        saude_modelo = "Erro ao ler config.json"
+    else:
+        imgsz = config.deteccao.imgsz
+        info_camera = InfoCamera(
+            fonte=config.camera.fonte,
+            resolucao=f"{imgsz}x{imgsz} (processamento)",
+            fpsProcessado=config.camera.fps_processamento,
+        )
+        modelo_existe = os.path.exists(config.caminho_absoluto(config.deteccao.modelo))
+        saude_modelo = "Online" if modelo_existe else "Modelo nao encontrado"
+
+    # API e banco responderam a esta requisicao. A camera so e conhecida
+    # pelo motor: se ha sessao em andamento, ela esta entregando frames.
+    sessao = crud.obter_sessao_ativa(db)
+    saude = SaudeSistema(
+        apiLocal="Online",
+        bancoDados="Online",
+        camera="Online" if sessao is not None else "Sem monitoramento ativo",
+        modeloYolo=saude_modelo,
     )
 
-@router.post("/agenda", response_model=AgendaDia)
-def criar_agenda(agenda: AgendaDiaCreate, db: sqlite3.Connection = Depends(obter_db)):
-    cursor = db.cursor()
-    cursor.execute(
-        "INSERT INTO agenda_padrao (dia_semana, horario_missa, inicio_gravacao, fim_gravacao) VALUES (?, ?, ?, ?)",
-        (agenda.diaSemana, agenda.horarioMissa, agenda.inicioGravacao, agenda.fimGravacao)
-    )
-    db.commit()
-    novo_id = cursor.lastrowid
-    
-    return AgendaDia(
-        id=novo_id,
-        diaSemana=agenda.diaSemana,
-        horarioMissa=agenda.horarioMissa,
-        inicioGravacao=agenda.inicioGravacao,
-        fimGravacao=agenda.fimGravacao
-    )
+    return ConfiguracoesGlobais(agendaPadrao=agenda, infoCamera=info_camera, saudeSistema=saude)
 
-@router.delete("/agenda/{agenda_id}")
+
+@router.post("/configuracoes/agenda", response_model=AgendaDia)
+def criar_agenda(agenda: AgendaDiaCriar, db: sqlite3.Connection = Depends(obter_db)):
+    novo_id = crud.criar_horario_padrao(
+        db, agenda.diaSemana, agenda.horarioMissa, agenda.inicioGravacao, agenda.fimGravacao
+    )
+    return AgendaDia(id=novo_id, **agenda.model_dump())
+
+
+@router.delete("/configuracoes/agenda/{agenda_id}")
 def deletar_agenda(agenda_id: int, db: sqlite3.Connection = Depends(obter_db)):
-    cursor = db.cursor()
-    cursor.execute("DELETE FROM agenda_padrao WHERE id = ?", (agenda_id,))
-    db.commit()
+    # Soft delete: celebracoes geradas por este horario mantem a referencia.
+    if not crud.remover_horario_padrao(db, agenda_id):
+        raise HTTPException(status_code=404, detail="Horario nao encontrado")
     return {"sucesso": True}

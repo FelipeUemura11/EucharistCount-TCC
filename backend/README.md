@@ -281,7 +281,7 @@ versionados no Git — o `.gitignore` do projeto já bloqueia isso.
 
 - [x] API FastAPI servindo o dashboard — ver [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md)
 - [x] Motor gravando no banco durante a missa, com dashboard ao vivo
-- [x] Gestão de configurações globais e telas de Ajuda e Configuração
+- [x] Telas de Configurações (cadastro da agenda padrão) e Ajuda
 - [ ] Agendamento automático com APScheduler
 - [ ] Empacotamento com PyInstaller
 

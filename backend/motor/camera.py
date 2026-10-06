@@ -76,8 +76,16 @@ class FonteVideo:
             self._cap.release()
             self._cap = None
 
-    def _reconectar(self) -> bool:
-        """Tenta reabrir um stream que caiu. Retorna True se conseguiu."""
+    @property
+    def ao_vivo(self) -> bool:
+        """Webcam ou camera IP (definido em abrir(), mesmo se falhar)."""
+        return self._ao_vivo
+
+    def reconectar(self) -> bool:
+        """
+        Tenta reabrir um stream ate conseguir. Retorna False so se o
+        monitoramento for interrompido (checar_interrupcao) antes disso.
+        """
         print(
             f"[camera] Stream interrompido. "
             f"Reconectando em {self.segundos_reconexao:.0f}s..."
@@ -119,7 +127,7 @@ class FonteVideo:
             ok, frame = self._cap.read()
 
             if not ok:
-                if self._ao_vivo and self._reconectar():
+                if self._ao_vivo and self.reconectar():
                     continue
                 break
 

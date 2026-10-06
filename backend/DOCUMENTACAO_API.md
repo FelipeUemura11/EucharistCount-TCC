@@ -130,6 +130,9 @@ A configuração efetiva, já com os argumentos aplicados, fica gravada em `sess
 | `GET /api/dashboard` | `rotas/dashboard.py` | Métricas, gráfico e resumo da missa atual ou da última | Página Dashboard (a cada 2 s) |
 | `GET /api/celebracoes` | `rotas/celebracoes.py` | Celebrações do mês corrente | Ainda não usado (a página Celebrações usa dados fixos) |
 | `GET /api/historico` | `rotas/historico.py` | Missas encerradas, com os resultados | Página Histórico |
+| `GET /api/configuracoes` | `rotas/configuracoes.py` | Agenda padrão, dados da câmera e saúde dos serviços | Página Configurações |
+| `POST /api/configuracoes/agenda` | `rotas/configuracoes.py` | O horário criado, com `id` | Página Configurações (botão "Adicionar") |
+| `DELETE /api/configuracoes/agenda/{id}` | `rotas/configuracoes.py` | `{ "sucesso": true }`, ou **404** | Página Configurações (lixeira) |
 | `GET /api/<inexistente>` | `frontend.py` | **404** | — |
 | `GET /{qualquer outro caminho}` | `frontend.py` | O frontend compilado | O navegador |
 | `GET /docs` | automático | Documentação interativa (Swagger) | Desenvolvimento |
@@ -143,7 +146,7 @@ def criar_app() -> FastAPI:
     app = FastAPI(title="Eucharist Count")
     app.add_middleware(CORSMiddleware, ...)
 
-    for rotas in (status, dashboard, celebracoes, historico):
+    for rotas in (status, dashboard, celebracoes, historico, configuracoes):
         app.include_router(rotas.router, prefix="/api")
 
     # POR ULTIMO: o catch-all aceita qualquer caminho.
@@ -257,7 +260,27 @@ Lê a view `vw_historico` (`DOCUMENTACAO_BANCO.md`, seção 3.8): só sessões `
 | `estimativaComunhao`, `hostiasSugeridas` | Já priorizados pela view: ajustado → calculado → real. Para contagens da câmera, dependem de a estimativa ter sido gravada em `estimativa_comunhao` (seção 8); sem ela, saem `0` |
 | `entradas`, `saidas` | `total_entradas`, `total_saidas` |
 
-### 4.6 Uma conexão por requisição (`api/dependencias.py`)
+### 4.6 `/api/configuracoes`
+
+A agenda semanal padrão fica na tabela `horario_padrao` (`DOCUMENTACAO_BANCO.md`, seção 3.1), lida e escrita pelas funções de `crud.py`.
+
+| Rota | Comportamento |
+|---|---|
+| `GET /api/configuracoes` | `agendaPadrao`: horários ativos, por dia e hora. `infoCamera`: fonte, `imgsz` e FPS do `config.json`, lido por `Config.carregar()`, que resolve o caminho pela raiz do backend. `saudeSistema`: ver abaixo |
+| `POST /api/configuracoes/agenda` | Recebe `diaSemana` (0 = domingo a 6), `horarioMissa`, `inicioGravacao` e `fimGravacao` (`HH:MM`). Fora do formato, ou com o fim antes do início, responde **422** |
+| `DELETE /api/configuracoes/agenda/{id}` | *Soft delete* (`ativo = 0`): celebrações geradas pelo horário mantêm a referência. **404** se não houver horário ativo com o `id` |
+
+Como sai cada item de `saudeSistema`:
+
+| Campo | Valor |
+|---|---|
+| `apiLocal`, `bancoDados` | Sempre `Online`: se a rota respondeu e leu a agenda, os dois estão de pé |
+| `camera` | `Online` se houver sessão em andamento (o motor está recebendo frames); senão, `Sem monitoramento ativo` |
+| `modeloYolo` | `Online` se o arquivo de `deteccao.modelo` existir; senão, `Modelo nao encontrado` |
+
+A agenda ainda **não dispara o monitoramento**: isso depende do APScheduler (seção 9).
+
+### 4.7 Uma conexão por requisição (`api/dependencias.py`)
 
 ```python
 def obter_db():
@@ -538,12 +561,3 @@ O modelo de regressão (`metodo = 'regressao'`, com o arquivo `.joblib`) ainda n
 | `useHistorico.ts` | Busca o histórico uma vez só, ao abrir a página | Uma missa que termina com a página aberta só aparece ao recarregar |
 | `api/servidor.py` | Escuta em `0.0.0.0` | O dashboard fica acessível para qualquer máquina da rede da paróquia, sem autenticação. Para uso só local, `host="127.0.0.1"` |
 | Frontend | Os *services* chamam `http://127.0.0.1:8000` com endereço fixo | Abrir o dashboard de outra máquina da rede não funciona. Endereços relativos (`/api/...`) resolveriam |
-
-### `GET /api/configuracoes`
-Retorna as configurações globais do sistema, como a agenda padrão semanal salva no banco, a saúde dos serviços em tempo real e os parâmetros lidos do `config.json`.
-
-### `POST /api/configuracoes/agenda`
-Permite o cadastro de novos horários fixos para a Agenda Semanal Padrão. Recebe um JSON com `diaSemana`, `horarioMissa`, `inicioGravacao` e `fimGravacao`.
-
-### `DELETE /api/configuracoes/agenda/{id}`
-Deleta um horário previamente cadastrado da agenda semanal padrão.

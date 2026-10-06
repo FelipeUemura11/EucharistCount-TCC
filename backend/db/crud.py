@@ -64,9 +64,18 @@ def listar_horarios_padrao(conexao: sqlite3.Connection, apenas_ativos: bool = Tr
     return conexao.execute(query).fetchall()
 
 
-def remover_horario_padrao(conexao: sqlite3.Connection, horario_id: int) -> None:
-    conexao.execute("UPDATE horario_padrao SET ativo = 0 WHERE id = ?", (horario_id,))
+def remover_horario_padrao(conexao: sqlite3.Connection, horario_id: int) -> bool:
+    """Soft delete. Retorna False se nao havia horario ativo com esse id."""
+    cursor = conexao.execute(
+        """
+        UPDATE horario_padrao
+        SET ativo = 0, atualizado_em = strftime('%Y-%m-%dT%H:%M:%S', 'now')
+        WHERE id = ? AND ativo = 1
+        """,
+        (horario_id,),
+    )
     conexao.commit()
+    return cursor.rowcount > 0
 
 
 # ============================================================================

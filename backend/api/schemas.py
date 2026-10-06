@@ -5,7 +5,7 @@ Cada modelo espelha, campo a campo e com os mesmos nomes, uma interface
 TypeScript de frontend/src/types/. Mudou um lado, mude o outro.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 
 class PontoOcupacao(BaseModel):
@@ -58,12 +58,26 @@ class RegistroHistorico(BaseModel):
     entradas: int
     saidas: int
 
-class AgendaDia(BaseModel):
-    id: int | None = None
-    diaSemana: int
-    horarioMissa: str
-    inicioGravacao: str
-    fimGravacao: str
+HORARIO = r"^([01]\d|2[0-3]):[0-5]\d$"  # HH:MM, 24h
+
+
+class AgendaDiaCriar(BaseModel):
+    """Corpo do POST: o id quem gera e o banco."""
+    diaSemana: int = Field(ge=0, le=6)  # 0 = domingo
+    horarioMissa: str = Field(pattern=HORARIO)
+    inicioGravacao: str = Field(pattern=HORARIO)
+    fimGravacao: str = Field(pattern=HORARIO)
+
+    @model_validator(mode="after")
+    def gravacao_em_ordem(self) -> "AgendaDiaCriar":
+        # "HH:MM" com zero a esquerda compara certo como texto.
+        if self.fimGravacao <= self.inicioGravacao:
+            raise ValueError("fimGravacao deve ser depois de inicioGravacao")
+        return self
+
+
+class AgendaDia(AgendaDiaCriar):
+    id: int
 
 class InfoCamera(BaseModel):
     fonte: str

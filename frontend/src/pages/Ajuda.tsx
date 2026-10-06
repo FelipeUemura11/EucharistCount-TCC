@@ -15,22 +15,16 @@ interface FaqItem {
     colorClass: string;
 }
 
-export default function Ajuda() {
-    const [openId, setOpenId] = useState<string | null>("nova-missa");
-    const [zoomedImage, setZoomedImage] = useState<string | null>(null);
-
-    const toggleAccordion = (id: string) => {
-        setOpenId(openId === id ? null : id);
-    };
-
-    // Componente para exibir a imagem e permitir zoom
-    const ExpandableImage = ({ src, alt }: { src: string, alt: string }) => (
-        <div 
+// Fora do componente da pagina: definido dentro, seria um componente novo a
+// cada render e o React remontaria as imagens.
+function ExpandableImage({ src, alt, onZoom }: { src: string; alt: string; onZoom: (src: string) => void }) {
+    return (
+        <div
             className="relative overflow-hidden rounded-lg border border-border shadow-sm cursor-zoom-in group"
-            onClick={() => setZoomedImage(src)}
+            onClick={() => onZoom(src)}
         >
             <img src={src} alt={alt} className="w-full h-auto object-cover group-hover:opacity-90 transition-opacity" />
-            
+
             {/* Overlay com texto "Clique para ampliar" */}
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity bg-black/5">
                 <span className="bg-black/75 text-white px-4 py-2 rounded-full text-sm font-medium backdrop-blur-md">
@@ -39,6 +33,15 @@ export default function Ajuda() {
             </div>
         </div>
     );
+}
+
+export default function Ajuda() {
+    const [openId, setOpenId] = useState<string | null>("nova-missa");
+    const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+
+    const toggleAccordion = (id: string) => {
+        setOpenId(openId === id ? null : id);
+    };
 
     const faqs: FaqItem[] = [
         {
@@ -55,7 +58,7 @@ export default function Ajuda() {
                         O dashboard principal exibe as contagens em tempo real.
                     </p>
                     <div className="mt-4">
-                        <ExpandableImage src={printDashboard} alt="Dashboard do Sistema" />
+                        <ExpandableImage src={printDashboard} alt="Dashboard do Sistema" onZoom={setZoomedImage} />
                     </div>
                 </>
             )
@@ -73,16 +76,18 @@ export default function Ajuda() {
                         <li>No calendário, clique no dia desejado.</li>
                         <li>No modal que se abrirá, clique em <strong className="text-text-dark">"Adicionar Horário"</strong>.</li>
                         <li>Preencha o horário de início da missa e ajuste os horários de gravação (início e fim) para a câmera.</li>
-                        <li>Clique em <strong className="text-text-dark">"Salvar Alterações"</strong>. O sistema agendará a gravação automaticamente para aquele horário.</li>
+                        <li>Clique em <strong className="text-text-dark">"Salvar Alterações"</strong> para registrar o horário da celebração.</li>
                     </ol>
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                         <ExpandableImage 
                             src={printCelebracoes} 
-                            alt="Tela de Celebrações" 
+                            alt="Tela de Celebrações"
+                            onZoom={setZoomedImage}
                         />
                         <ExpandableImage 
                             src={printCelebracaoModal} 
-                            alt="Modal de Adicionar Horário" 
+                            alt="Modal de Adicionar Horário"
+                            onZoom={setZoomedImage}
                         />
                     </div>
                 </>
@@ -97,10 +102,10 @@ export default function Ajuda() {
                 <>
                     <p className="mb-4">
                         Todo o registro de contagens passadas fica armazenado na aba <strong className="text-text-dark">Histórico</strong>. 
-                        Lá você pode buscar por datas específicas e ver relatórios detalhados da quantidade de pessoas em cada horário e porta da igreja.
+                        Lá você pode filtrar por período e ver, para cada missa, a presença estimada, as entradas e saídas e a sugestão de hóstias.
                     </p>
                     <div className="mt-4">
-                        <ExpandableImage src={printHistorico} alt="Tela de Histórico" />
+                        <ExpandableImage src={printHistorico} alt="Tela de Histórico" onZoom={setZoomedImage} />
                     </div>
                 </>
             )
@@ -114,11 +119,11 @@ export default function Ajuda() {
                 <>
                     <p className="mb-4">
                         A aba <strong className="text-text-dark">Configurações</strong> concentra a gestão global da igreja.
-                        Nela, você pode definir a agenda padrão semanal — cadastrando o dia, o horário da missa e o período de gravação — para que o sistema funcione automaticamente no cotidiano.
-                        Também é possível visualizar a saúde das integrações (API, banco de dados, câmera e modelo) e propriedades de vídeo em tempo real.
+                        Nela, você pode definir a agenda padrão semanal, cadastrando o dia, o horário da missa e o período de gravação.
+                        Também é possível consultar a situação dos serviços (API, banco de dados, câmera e modelo) e as configurações de vídeo usadas no processamento.
                     </p>
                     <div className="mt-4">
-                        <ExpandableImage src={printConfiguracoes} alt="Tela de Configurações" />
+                        <ExpandableImage src={printConfiguracoes} alt="Tela de Configurações" onZoom={setZoomedImage} />
                     </div>
                 </>
             )
@@ -181,7 +186,7 @@ export default function Ajuda() {
             {/* Lightbox / Modal para visualizar imagem em tela cheia */}
             {zoomedImage && (
                 <div 
-                    className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 md:p-10"
+                    className="fixed inset-0 z-9999 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 md:p-10"
                     onClick={() => setZoomedImage(null)}
                 >
                     <button 

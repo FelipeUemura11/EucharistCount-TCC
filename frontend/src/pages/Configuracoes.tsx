@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { PlusCircle, Trash2, Camera, Server, Database, Activity, CheckCircle2, AlertCircle } from "lucide-react";
-import type { ConfiguracoesGlobais, AgendaDia } from "../types/configuracoes";
+import type { ConfiguracoesGlobais, AgendaDiaCriar } from "../types/configuracoes";
 import { getConfiguracoesGlobais, criarAgendaPadrao, removerAgendaPadrao } from "../services/configuracoes";
 
 const DIAS_SEMANA = [
@@ -13,59 +13,76 @@ const DIAS_SEMANA = [
     "Sábado"
 ];
 
+function StatusIcon({ status }: { status: string }) {
+    const isOnline = status.toLowerCase().includes("online");
+    return isOnline ?
+        <CheckCircle2 size={18} className="text-green-500" /> :
+        <AlertCircle size={18} className="text-yellow-500" />;
+}
+
 export default function Configuracoes() {
     const [configuracoes, setConfiguracoes] = useState<ConfiguracoesGlobais | null>(null);
     const [loading, setLoading] = useState(true);
+    const [erroAgenda, setErroAgenda] = useState<string | null>(null);
 
     // Estado para o formulário de nova agenda
-    const [novaAgenda, setNovaAgenda] = useState<Partial<AgendaDia>>({
+    const [novaAgenda, setNovaAgenda] = useState<AgendaDiaCriar>({
         diaSemana: 0,
         horarioMissa: "08:00",
         inicioGravacao: "08:00",
         fimGravacao: "09:00"
     });
 
+    // Recarga apos adicionar/remover: nao volta para "Carregando...".
     const carregarConfigs = async () => {
-        setLoading(true);
-        try {
-            const data = await getConfiguracoesGlobais();
-            setConfiguracoes(data);
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
+        setConfiguracoes(await getConfiguracoesGlobais());
     };
 
     useEffect(() => {
-        carregarConfigs();
+        let isMounted = true;
+
+        async function carregarInicial() {
+            try {
+                const data = await getConfiguracoesGlobais();
+                if (isMounted) setConfiguracoes(data);
+            } catch (error) {
+                console.error(error);
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        }
+
+        void carregarInicial();
+
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     const handleAdicionarAgenda = async () => {
         if (!novaAgenda.horarioMissa || !novaAgenda.inicioGravacao || !novaAgenda.fimGravacao) return;
-        
+        if (novaAgenda.fimGravacao <= novaAgenda.inicioGravacao) {
+            setErroAgenda("O fim da gravação deve ser depois do início.");
+            return;
+        }
+
         try {
-            await criarAgendaPadrao(novaAgenda as AgendaDia);
+            await criarAgendaPadrao(novaAgenda);
+            setErroAgenda(null);
             await carregarConfigs();
         } catch (error) {
-            console.error("Erro ao salvar", error);
+            setErroAgenda(error instanceof Error ? error.message : "Erro ao salvar horário.");
         }
     };
 
     const handleRemoverAgenda = async (id: number) => {
         try {
             await removerAgendaPadrao(id);
+            setErroAgenda(null);
             await carregarConfigs();
         } catch (error) {
-            console.error("Erro ao deletar", error);
+            setErroAgenda(error instanceof Error ? error.message : "Erro ao remover horário.");
         }
-    };
-
-    const StatusIcon = ({ status }: { status: string }) => {
-        const isOnline = status.toLowerCase().includes("online");
-        return isOnline ? 
-            <CheckCircle2 size={18} className="text-green-500" /> : 
-            <AlertCircle size={18} className="text-yellow-500" />;
     };
 
     if (loading) return <div className="p-8 text-center text-text-muted">Carregando configurações...</div>;
@@ -93,12 +110,12 @@ export default function Configuracoes() {
                             Agenda Semanal Padrão
                         </h3>
                         <p className="text-sm text-text-muted mb-6">
-                            Adicione os horários fixos das missas. Eles serão utilizados automaticamente pelo sistema para o monitoramento. Celebrações especiais podem ser ajustadas na aba "Celebrações".
+                            Cadastre os horários fixos das missas e o período de gravação de cada uma. O agendamento automático do monitoramento a partir desta agenda ainda está em desenvolvimento. Celebrações especiais podem ser ajustadas na aba "Celebrações".
                         </p>
 
                         {/* Formulário de Adição */}
                         <div className="bg-gray-50 p-4 rounded-lg border border-border mb-6 flex flex-wrap gap-4 items-end">
-                            <div className="flex-1 min-w-[150px]">
+                            <div className="flex-1 min-w-37.5">
                                 <label className="block text-sm font-medium text-text-dark mb-1">Dia da Semana</label>
                                 <select 
                                     className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
@@ -110,7 +127,7 @@ export default function Configuracoes() {
                                     ))}
                                 </select>
                             </div>
-                            <div className="flex-1 min-w-[120px]">
+                            <div className="flex-1 min-w-30">
                                 <label className="block text-sm font-medium text-text-dark mb-1">Início (Missa)</label>
                                 <input 
                                     type="time" 
@@ -119,7 +136,7 @@ export default function Configuracoes() {
                                     onChange={(e) => setNovaAgenda({...novaAgenda, horarioMissa: e.target.value})}
                                 />
                             </div>
-                            <div className="flex-1 min-w-[120px]">
+                            <div className="flex-1 min-w-30">
                                 <label className="block text-sm font-medium text-text-dark mb-1">Início Gravação</label>
                                 <input 
                                     type="time" 
@@ -128,7 +145,7 @@ export default function Configuracoes() {
                                     onChange={(e) => setNovaAgenda({...novaAgenda, inicioGravacao: e.target.value})}
                                 />
                             </div>
-                            <div className="flex-1 min-w-[120px]">
+                            <div className="flex-1 min-w-30">
                                 <label className="block text-sm font-medium text-text-dark mb-1">Fim Gravação</label>
                                 <input 
                                     type="time" 
@@ -147,6 +164,10 @@ export default function Configuracoes() {
                                 </button>
                             </div>
                         </div>
+
+                        {erroAgenda && (
+                            <p className="-mt-3 mb-6 text-sm text-red-600">{erroAgenda}</p>
+                        )}
 
                         {/* Lista Agrupada */}
                         <div className="space-y-4">
@@ -173,7 +194,7 @@ export default function Configuracoes() {
                                                         </div>
                                                     </div>
                                                     <button 
-                                                        onClick={() => handleRemoverAgenda(agenda.id!)}
+                                                        onClick={() => handleRemoverAgenda(agenda.id)}
                                                         className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                                                         title="Remover horário"
                                                     >
