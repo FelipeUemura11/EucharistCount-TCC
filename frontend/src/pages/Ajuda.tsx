@@ -120,7 +120,7 @@ export default function Ajuda() {
                     <p className="mb-4">
                         A aba <strong className="text-text-dark">Configurações</strong> concentra a gestão global da igreja.
                         Nela, você pode definir a agenda padrão semanal, cadastrando o dia, o horário da missa e o período de gravação.
-                        Também é possível consultar a situação dos serviços (API, banco de dados, câmera e modelo) e as configurações de vídeo usadas no processamento.
+                        Também é possível consultar as configurações de vídeo usadas no processamento.
                     </p>
                     <div className="mt-4">
                         <ExpandableImage src={printConfiguracoes} alt="Tela de Configurações" onZoom={setZoomedImage} />

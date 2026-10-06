@@ -84,13 +84,6 @@ class InfoCamera(BaseModel):
     resolucao: str
     fpsProcessado: float
 
-class SaudeSistema(BaseModel):
-    apiLocal: str
-    bancoDados: str
-    camera: str
-    modeloYolo: str
-
 class ConfiguracoesGlobais(BaseModel):
     agendaPadrao: list[AgendaDia]
     infoCamera: InfoCamera
-    saudeSistema: SaudeSistema

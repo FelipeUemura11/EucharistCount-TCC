@@ -15,15 +15,7 @@ export interface InfoCamera {
     fpsProcessado: number;
 }
 
-export interface SaudeSistema {
-    apiLocal: string;
-    bancoDados: string;
-    camera: string;
-    modeloYolo: string;
-}
-
 export interface ConfiguracoesGlobais {
     agendaPadrao: AgendaDia[];
     infoCamera: InfoCamera;
-    saudeSistema: SaudeSistema;
 }

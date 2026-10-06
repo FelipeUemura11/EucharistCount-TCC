@@ -5,14 +5,13 @@ A agenda padrao fica na tabela horario_padrao; camera e deteccao vem do
 config.json.
 """
 
-import os
 import sqlite3
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.dependencias import obter_db
-from api.schemas import AgendaDia, AgendaDiaCriar, ConfiguracoesGlobais, InfoCamera, SaudeSistema
+from api.schemas import AgendaDia, AgendaDiaCriar, ConfiguracoesGlobais, InfoCamera
 from db import crud
 from motor.config import Config
 
@@ -50,7 +49,6 @@ def get_configuracoes(db: sqlite3.Connection = Depends(obter_db)):
 
     if config is None:
         info_camera = InfoCamera(fonte="Erro ao ler config.json", resolucao="Desconhecida", fpsProcessado=0.0)
-        saude_modelo = "Erro ao ler config.json"
     else:
         imgsz = config.deteccao.imgsz
         info_camera = InfoCamera(
@@ -58,20 +56,8 @@ def get_configuracoes(db: sqlite3.Connection = Depends(obter_db)):
             resolucao=f"{imgsz}x{imgsz} (processamento)",
             fpsProcessado=config.camera.fps_processamento,
         )
-        modelo_existe = os.path.exists(config.caminho_absoluto(config.deteccao.modelo))
-        saude_modelo = "Online" if modelo_existe else "Modelo nao encontrado"
 
-    # API e banco responderam a esta requisicao. A camera so e conhecida
-    # pelo motor: se ha sessao em andamento, ela esta entregando frames.
-    sessao = crud.obter_sessao_ativa(db)
-    saude = SaudeSistema(
-        apiLocal="Online",
-        bancoDados="Online",
-        camera="Online" if sessao is not None else "Sem monitoramento ativo",
-        modeloYolo=saude_modelo,
-    )
-
-    return ConfiguracoesGlobais(agendaPadrao=agenda, infoCamera=info_camera, saudeSistema=saude)
+    return ConfiguracoesGlobais(agendaPadrao=agenda, infoCamera=info_camera)
 
 
 @router.post("/configuracoes/agenda", response_model=AgendaDia)

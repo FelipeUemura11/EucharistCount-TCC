@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PlusCircle, Trash2, Camera, Server, Database, Activity, CheckCircle2, AlertCircle } from "lucide-react";
+import { PlusCircle, Trash2, Camera } from "lucide-react";
 import type { ConfiguracoesGlobais, AgendaDiaCriar } from "../types/configuracoes";
 import { getConfiguracoesGlobais, criarAgendaPadrao, removerAgendaPadrao } from "../services/configuracoes";
 
@@ -12,13 +12,6 @@ const DIAS_SEMANA = [
     "Sexta-feira",
     "Sábado"
 ];
-
-function StatusIcon({ status }: { status: string }) {
-    const isOnline = status.toLowerCase().includes("online");
-    return isOnline ?
-        <CheckCircle2 size={18} className="text-green-500" /> :
-        <AlertCircle size={18} className="text-yellow-500" />;
-}
 
 export default function Configuracoes() {
     const [configuracoes, setConfiguracoes] = useState<ConfiguracoesGlobais | null>(null);
@@ -98,7 +91,7 @@ export default function Configuracoes() {
                     Configurações Globais
                 </h2>
                 <p className="mt-2 text-text-muted">
-                    Gerencie a agenda padrão de missas semanais e consulte o status dos serviços locais.
+                    Gerencie a agenda padrão de missas semanais e consulte as configurações da câmera.
                 </p>
             </div>
 
@@ -216,7 +209,7 @@ export default function Configuracoes() {
                     </div>
                 </div>
 
-                {/* Coluna Lateral: Status e Informações */}
+                {/* Coluna Lateral: Informações da Câmera */}
                 <div className="space-y-6">
                     {/* Informações da Câmera */}
                     <div className="rounded-xl bg-white p-6 shadow-sm border border-border">
@@ -236,56 +229,6 @@ export default function Configuracoes() {
                             <li className="flex flex-col">
                                 <span className="text-text-muted text-xs uppercase font-semibold">FPS Processado</span>
                                 <span className="text-text-dark mt-0.5">{configuracoes.infoCamera.fpsProcessado} fps</span>
-                            </li>
-                        </ul>
-                    </div>
-
-                    {/* Saúde do Sistema */}
-                    <div className="rounded-xl bg-white p-6 shadow-sm border border-border">
-                        <div className="flex items-center gap-2 mb-4 border-b border-border pb-3">
-                            <Activity className="text-text-muted" size={20} />
-                            <h3 className="m-0 text-lg font-bold text-text-dark">Saúde do Sistema</h3>
-                        </div>
-                        <ul className="space-y-4 text-sm">
-                            <li className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Server size={16} className="text-text-muted" />
-                                    <span className="text-text-dark">API Local</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-medium">{configuracoes.saudeSistema.apiLocal}</span>
-                                    <StatusIcon status={configuracoes.saudeSistema.apiLocal} />
-                                </div>
-                            </li>
-                            <li className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Database size={16} className="text-text-muted" />
-                                    <span className="text-text-dark">Banco de Dados</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-medium">{configuracoes.saudeSistema.bancoDados}</span>
-                                    <StatusIcon status={configuracoes.saudeSistema.bancoDados} />
-                                </div>
-                            </li>
-                            <li className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Camera size={16} className="text-text-muted" />
-                                    <span className="text-text-dark">Câmera Principal</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-medium">{configuracoes.saudeSistema.camera}</span>
-                                    <StatusIcon status={configuracoes.saudeSistema.camera} />
-                                </div>
-                            </li>
-                            <li className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Activity size={16} className="text-text-muted" />
-                                    <span className="text-text-dark">Modelo YOLO</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-medium">{configuracoes.saudeSistema.modeloYolo}</span>
-                                    <StatusIcon status={configuracoes.saudeSistema.modeloYolo} />
-                                </div>
                             </li>
                         </ul>
                     </div>
