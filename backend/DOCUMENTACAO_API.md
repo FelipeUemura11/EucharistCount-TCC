@@ -537,7 +537,7 @@ O modelo de regressão (`metodo = 'regressao'`, com o arquivo `.joblib`) ainda n
 
 - **Agendamento automático (APScheduler).** Iniciar o monitoramento sozinho no horário de cada missa, sem janela (`--sem-janela`), usando o mesmo `with sessao_de_monitoramento(...)` + `monitor.executar(...)`. Com ele, a celebração deixaria de ser criada na hora (seção 6.5) e passaria a vir da agenda (`horario_padrao`). O `Monitor.parar()` já existe para encerrar a contagem no fim da janela.
 - **Empacotamento (PyInstaller).** O código já prevê o executável: `freeze_support()` e a resolução de caminhos por `sys._MEIPASS`.
-- **Botões de iniciar e encerrar contagem.** Existem no dashboard, mas hoje só escrevem no console do navegador. Não há rotas na API para controlar o motor.
+- **Controle manual da contagem.** Hoje não há botões no dashboard nem rotas na API para iniciar ou encerrar o motor: ele começa com o `main.py` e termina no fim do vídeo, por ESC/Q na janela ou por Ctrl+C.
 
 ---
 
@@ -546,7 +546,6 @@ O modelo de regressão (`metodo = 'regressao'`, com o arquivo `.joblib`) ainda n
 | Onde | Limitação | Efeito |
 |---|---|---|
 | `integracao/sessao.py` | O fechamento da sessão não chama `registrar_estimativa_da_sessao` | **Toda contagem nova entra no Histórico com estimativa e hóstias 0**, até alguém rodar `preencher_estimativas_pendentes` (seção 8). Correção: no `finally` de `sessao_de_monitoramento`, depois do `finalizar_sessao`, chamar `registrar_estimativa_da_sessao(conexao, sessao_id, m.dentro)` quando `status == "concluida"` |
-| `cli.py` | `aplicar_argumentos` não trata `--fonte` nem `--modelo`, e repete `--conf`/`--threads` com o teste antigo (`if valor:`) | **`--fonte` e `--modelo` são ignorados**: o programa usa o que está no `config.json`. Correção: `if args.fonte: config.camera.fonte = args.fonte` e `if args.modelo: config.deteccao.modelo = args.modelo`, e apagar as duas linhas repetidas |
 | `crud.obter_historico` | Ordena só por `data DESC` | Missas do mesmo dia aparecem em ordem arbitrária no Histórico. Correção: `ORDER BY data DESC, horario_missa DESC` |
 | `vw_historico` | Junta **todas** as sessões concluídas da celebração | Uma missa com monitoramento reiniciado aparece duas vezes no Histórico |
 | `integracao/estimativa.py` | Sempre usa o coeficiente, mesmo com `metodo = 'regressao'` | O modelo treinado por `treinar_regressao.py` ainda não é usado |

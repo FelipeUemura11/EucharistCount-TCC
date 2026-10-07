@@ -177,7 +177,7 @@ A agenda semanal fixa (tela Configurações): cada linha é uma missa recorrente
 - `dia_semana` segue a convenção **0 = domingo … 6 = sábado**, travada por `CHECK (dia_semana BETWEEN 0 AND 6)`. Atenção: o Python usa segunda = 0; a conversão está em `preparar_dataset._dia_semana()`.
 - Remover um horário não apaga a linha: `crud.remover_horario_padrao()` faz `ativo = 0` (*soft delete*), para que celebrações antigas geradas a partir dele não percam a referência.
 
-Ainda não é usada pela API nem pelo motor. A tela de Configurações está em construção.
+A tela de Configurações lê, cria e remove horários por `api/rotas/configuracoes.py` (`GET /api/configuracoes`, `POST /api/configuracoes/agenda` e `DELETE /api/configuracoes/agenda/{id}`). O motor ainda não a usa: isso fica para o agendamento automático (APScheduler).
 
 ### 3.2 `celebracao`
 
@@ -252,7 +252,7 @@ Guardar as três separadas, em vez de sobrescrever uma com a outra, é o que sus
 
 ### 3.7 `evento_sistema`
 
-Um log leve de saúde e operação (câmera, modelo, reconexões, erros), pensado para alimentar a seção "Saúde do sistema" com dados reais em vez de valores fixos na tela. A tabela e as funções (`registrar_evento_sistema`, `ultimo_evento_por_componente`) existem, mas **ainda não são usadas** pelo motor nem pela API.
+Um log leve de saúde e operação (câmera, modelo, reconexões, erros), pensado para alimentar uma seção "Saúde do sistema" no dashboard. Essa seção foi removida do frontend, e a tabela e as funções (`registrar_evento_sistema`, `ultimo_evento_por_componente`) **não são usadas** pelo motor nem pela API: ficam reservadas para um log de operação futuro.
 
 ### 3.8 `vw_historico` (view)
 
