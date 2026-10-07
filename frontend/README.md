@@ -12,6 +12,8 @@ npm install
 npm run dev
 ```
 
+O `npm run dev` precisa do backend rodando (`python main.py`): as telas chamam a API por endereço relativo (`/api/...`), e o *proxy* do `vite.config.ts` repassa essas chamadas para `http://127.0.0.1:8000`.
+
 > **Nota:** Em produção/demonstração on-premise, rode `npm run build`. O arquivo principal do motor (`main.py` no backend) já serve essa pasta `dist` empacotada automaticamente na porta 8000.
 
 ## Estrutura
