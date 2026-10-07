@@ -144,7 +144,6 @@ Cada arquivo em `api/rotas/` cria um `APIRouter()`: um "mini-app" com as rotas d
 ```python
 def criar_app() -> FastAPI:
     app = FastAPI(title="Eucharist Count")
-    app.add_middleware(CORSMiddleware, ...)
 
     for rotas in (status, dashboard, celebracoes, historico, configuracoes):
         app.include_router(rotas.router, prefix="/api")
@@ -266,7 +265,7 @@ A agenda semanal padrão fica na tabela `horario_padrao` (`DOCUMENTACAO_BANCO.md
 
 | Rota | Comportamento |
 |---|---|
-| `GET /api/configuracoes` | `agendaPadrao`: horários ativos, por dia e hora. `infoCamera`: fonte, `imgsz` e FPS lidos por `Config.carregar()` (`config.json` + `.env`, resolvidos pela raiz do backend). A senha de uma URL RTSP sai mascarada (`mascarar_senha`: `rtsp://usuario:***@...`) |
+| `GET /api/configuracoes` | `agendaPadrao`: horários ativos, por dia e hora. `infoCamera`: fonte (do `.env`), `imgsz` e FPS (do `config.json`) lidos por `Config.carregar()`, resolvidos pela raiz do backend. Sem `CAMERA_FONTE`, a fonte aparece como "Não definida". A senha de uma URL RTSP sai mascarada (`mascarar_senha`: `rtsp://usuario:***@...`) |
 | `POST /api/configuracoes/agenda` | Recebe `diaSemana` (0 = domingo a 6), `horarioMissa`, `inicioGravacao` e `fimGravacao` (`HH:MM`). Fora do formato, ou com o fim antes do início, responde **422** |
 | `DELETE /api/configuracoes/agenda/{id}` | *Soft delete* (`ativo = 0`): celebrações geradas pelo horário mantêm a referência. **404** se não houver horário ativo com o `id` |
 
@@ -305,16 +304,22 @@ A rota `/{catchall:path}` segue esta regra, na ordem:
 4. Senão, devolve o `index.html`.
 
 - **O passo 1 existe por causa de um bug real.** Antes dele, uma rota da API inexistente devolvia o `index.html` com status 200. O frontend recebia HTML onde esperava JSON, o erro era engolido, e a tela ficava vazia sem nenhum aviso. Foi assim que a rota do histórico (na época `/api/history`), quebrada na reorganização por um `@` que faltava, passou despercebida.
-- **A checagem do passo 2 fecha um *path traversal*.** Antes, o caminho era só `dist / catchall`. O uvicorn decodifica `%2e%2e` para `..`, então `GET /%2e%2e/%2e%2e/backend/config.json` devolvia o `config.json`, e o mesmo valia para o banco e o `.env`. Como o servidor escuta em `0.0.0.0`, qualquer máquina da rede da paróquia conseguia baixar esses arquivos. Agora esse caminho cai no passo 4.
+- **A checagem do passo 2 fecha um *path traversal*.** Antes, o caminho era só `dist / catchall`. O uvicorn decodifica `%2e%2e` para `..`, então `GET /%2e%2e/%2e%2e/backend/config.json` devolvia o `config.json`, e o mesmo valia para o banco e o `.env`. Na época o servidor escutava em `0.0.0.0`, então qualquer máquina da rede da paróquia conseguia baixar esses arquivos. Agora esse caminho cai no passo 4, e o servidor só escuta em `127.0.0.1` (ver *Acesso só local* abaixo).
 - **O passo 4 faz as rotas do React funcionarem ao recarregar a página.** `/historico` não é um arquivo, e sim uma tela que o React desenha no navegador; sem essa regra, apertar F5 em `/historico` daria 404.
 
-**O frontend precisa estar compilado.** O servidor entrega a pasta `dist/`, e não o código-fonte React. Mudanças no frontend só aparecem em `:8000` depois de `npm run build` na pasta `frontend`. Durante o desenvolvimento, `npm run dev` serve o frontend com recarga automática na porta 5173, consumindo a API em `:8000`.
+**O frontend precisa estar compilado.** O servidor entrega a pasta `dist/`, e não o código-fonte React. Mudanças no frontend só aparecem em `:8000` depois de `npm run build` na pasta `frontend`. Durante o desenvolvimento, `npm run dev` serve o frontend com recarga automática na porta 5173, e o *proxy* do Vite (`frontend/vite.config.ts`) repassa as chamadas `/api` para `:8000`. O `main.py` precisa estar rodando.
 
 **Onde fica `dist/`:**
 - **em desenvolvimento:** em `frontend/dist`, calculado como `RAIZ.parent / "frontend" / "dist"`. O `RAIZ` vem de `motor/config.py` e aponta para `backend/`. O caminho não depende de onde o `frontend.py` está: um `Path(__file__).parent.parent` mudaria de significado se o arquivo trocasse de pasta, que foi exatamente o que aconteceu na reorganização;
 - **no executável do PyInstaller:** os arquivos são extraídos numa pasta temporária indicada por `sys._MEIPASS`, e o `getattr(sys, "frozen", False)` escolhe entre os dois casos.
 
-**CORS:** em desenvolvimento, o frontend (`:5173`) e a API (`:8000`) estão em portas diferentes, o que o navegador trata como origens diferentes e bloqueia por padrão. O `CORSMiddleware` com `allow_origins=["*"]` libera. Quando o dashboard é servido pela própria porta 8000, tudo vem da mesma origem e o CORS nem entra em jogo.
+**Acesso só local.** O sistema é usado só no PC onde está instalado, e o dashboard não tem login. Por isso:
+
+- **O servidor escuta em `127.0.0.1`** (`api/servidor.py`), não em `0.0.0.0`. Outra máquina da rede não alcança o dashboard nem a API.
+- **O frontend usa endereços relativos** (`/api/dashboard`, `/api/status`...). Servido pelo `main.py`, a página e a API estão na mesma origem (`:8000`). Em desenvolvimento, o *proxy* do Vite faz o mesmo papel.
+- **Não há CORS.** Como tudo vem da mesma origem, o `CORSMiddleware` saiu. Antes ele liberava `allow_origins=["*"]`, e qualquer site aberto no navegador do PC podia chamar a API, inclusive para apagar horários da agenda.
+
+Para voltar a abrir o dashboard de outra máquina, seria preciso trocar o `host` para `0.0.0.0`, e antes disso colocar autenticação.
 
 ---
 
@@ -537,7 +542,7 @@ O modelo de regressão (`metodo = 'regressao'`, com o arquivo `.joblib`) ainda n
 
 - **Agendamento automático (APScheduler).** Iniciar o monitoramento sozinho no horário de cada missa, sem janela (`--sem-janela`), usando o mesmo `with sessao_de_monitoramento(...)` + `monitor.executar(...)`. Com ele, a celebração deixaria de ser criada na hora (seção 6.5) e passaria a vir da agenda (`horario_padrao`). O `Monitor.parar()` já existe para encerrar a contagem no fim da janela.
 - **Empacotamento (PyInstaller).** O código já prevê o executável: `freeze_support()` e a resolução de caminhos por `sys._MEIPASS`.
-- **Botões de iniciar e encerrar contagem.** Existem no dashboard, mas hoje só escrevem no console do navegador. Não há rotas na API para controlar o motor.
+- **Controle manual da contagem.** Hoje não há botões no dashboard nem rotas na API para iniciar ou encerrar o motor: ele começa com o `main.py` e termina no fim do vídeo, por ESC/Q na janela ou por Ctrl+C.
 
 ---
 
@@ -546,11 +551,8 @@ O modelo de regressão (`metodo = 'regressao'`, com o arquivo `.joblib`) ainda n
 | Onde | Limitação | Efeito |
 |---|---|---|
 | `integracao/sessao.py` | O fechamento da sessão não chama `registrar_estimativa_da_sessao` | **Toda contagem nova entra no Histórico com estimativa e hóstias 0**, até alguém rodar `preencher_estimativas_pendentes` (seção 8). Correção: no `finally` de `sessao_de_monitoramento`, depois do `finalizar_sessao`, chamar `registrar_estimativa_da_sessao(conexao, sessao_id, m.dentro)` quando `status == "concluida"` |
-| `cli.py` | `aplicar_argumentos` não trata `--fonte` nem `--modelo`, e repete `--conf`/`--threads` com o teste antigo (`if valor:`) | **`--fonte` e `--modelo` são ignorados**: o programa usa o que está no `config.json`. Correção: `if args.fonte: config.camera.fonte = args.fonte` e `if args.modelo: config.deteccao.modelo = args.modelo`, e apagar as duas linhas repetidas |
 | `crud.obter_historico` | Ordena só por `data DESC` | Missas do mesmo dia aparecem em ordem arbitrária no Histórico. Correção: `ORDER BY data DESC, horario_missa DESC` |
 | `vw_historico` | Junta **todas** as sessões concluídas da celebração | Uma missa com monitoramento reiniciado aparece duas vezes no Histórico |
 | `integracao/estimativa.py` | Sempre usa o coeficiente, mesmo com `metodo = 'regressao'` | O modelo treinado por `treinar_regressao.py` ainda não é usado |
 | `EstimativaComunhao.tsx` | O frontend calcula as hóstias do dashboard com `× 1,1` fixo | Se a `margem_hostias` do banco mudar, o dashboard e o Histórico sugerem números diferentes. A rota do dashboard poderia enviar as hóstias já calculadas |
 | `useHistorico.ts` | Busca o histórico uma vez só, ao abrir a página | Uma missa que termina com a página aberta só aparece ao recarregar |
-| `api/servidor.py` | Escuta em `0.0.0.0` | O dashboard fica acessível para qualquer máquina da rede da paróquia, sem autenticação. Para uso só local, `host="127.0.0.1"` |
-| Frontend | Os *services* chamam `http://127.0.0.1:8000` com endereço fixo | Abrir o dashboard de outra máquina da rede não funciona. Endereços relativos (`/api/...`) resolveriam |

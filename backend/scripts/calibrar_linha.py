@@ -76,7 +76,7 @@ def main() -> int:
         description="Marca a linha de contagem clicando sobre o portao"
     )
     ap.add_argument("--fonte",
-                    help="caminho do video. Padrao: a fonte do config.json")
+                    help="caminho do video. Padrao: CAMERA_FONTE do .env")
     args = ap.parse_args()
 
     from motor.config import Config

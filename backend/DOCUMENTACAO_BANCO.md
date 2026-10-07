@@ -177,7 +177,7 @@ A agenda semanal fixa (tela Configurações): cada linha é uma missa recorrente
 - `dia_semana` segue a convenção **0 = domingo … 6 = sábado**, travada por `CHECK (dia_semana BETWEEN 0 AND 6)`. Atenção: o Python usa segunda = 0; a conversão está em `preparar_dataset._dia_semana()`.
 - Remover um horário não apaga a linha: `crud.remover_horario_padrao()` faz `ativo = 0` (*soft delete*), para que celebrações antigas geradas a partir dele não percam a referência.
 
-Ainda não é usada pela API nem pelo motor. A tela de Configurações está em construção.
+A tela de Configurações lê, cria e remove horários por `api/rotas/configuracoes.py` (`GET /api/configuracoes`, `POST /api/configuracoes/agenda` e `DELETE /api/configuracoes/agenda/{id}`). O motor ainda não a usa: isso fica para o agendamento automático (APScheduler).
 
 ### 3.2 `celebracao`
 
@@ -212,7 +212,7 @@ Uma data concreta com missa.
 | `parametros_contagem` | JSON | Cópia completa da configuração usada (modelo, `imgsz`, linha, margem…) |
 | `observacoes` | texto livre | Ex.: "chuva forte", "câmera reiniciada" |
 
-**Por que guardar `parametros_contagem`:** a contagem depende de parâmetros ajustáveis, como posição da linha, margem e confiança (ver `DOCUMENTACAO_MOTOR.md`, seção 7.2). Guardar a configuração exata junto de cada sessão torna cada número **auditável e reproduzível**: é possível saber, meses depois, com que ajuste uma contagem antiga foi feita, e rodar o mesmo vídeo com os mesmos parâmetros para conferir. O motor grava ali `json.dumps(asdict(config))`, um retrato de todo o `config.json` efetivo, já com os argumentos de linha de comando aplicados.
+**Por que guardar `parametros_contagem`:** a contagem depende de parâmetros ajustáveis, como posição da linha, margem e confiança (ver `DOCUMENTACAO_MOTOR.md`, seção 7.2). Guardar a configuração exata junto de cada sessão torna cada número **auditável e reproduzível**: é possível saber, meses depois, com que ajuste uma contagem antiga foi feita, e rodar o mesmo vídeo com os mesmos parâmetros para conferir. O motor grava ali `json.dumps(asdict(config))`, um retrato de todo o `config.json` efetivo, já com o `.env` e os argumentos de linha de comando aplicados. A fonte da câmera entra com a senha mascarada (`rtsp://usuario:***@...`).
 
 ### 3.4 `instantaneo_ocupacao`
 
@@ -252,7 +252,7 @@ Guardar as três separadas, em vez de sobrescrever uma com a outra, é o que sus
 
 ### 3.7 `evento_sistema`
 
-Um log leve de saúde e operação (câmera, modelo, reconexões, erros), pensado para alimentar a seção "Saúde do sistema" com dados reais em vez de valores fixos na tela. A tabela e as funções (`registrar_evento_sistema`, `ultimo_evento_por_componente`) existem, mas **ainda não são usadas** pelo motor nem pela API.
+Um log leve de saúde e operação (câmera, modelo, reconexões, erros), pensado para alimentar uma seção "Saúde do sistema" no dashboard. Essa seção foi removida do frontend, e a tabela e as funções (`registrar_evento_sistema`, `ultimo_evento_por_componente`) **não são usadas** pelo motor nem pela API: ficam reservadas para um log de operação futuro.
 
 ### 3.8 `vw_historico` (view)
 
@@ -662,4 +662,3 @@ Pontos identificados em revisão e ainda não corrigidos no código:
 | `vw_historico` | Junta **todas** as sessões concluídas da celebração | Uma missa com monitoramento reiniciado aparece duas vezes no Histórico |
 | `import_csv.py` | Grava `hosts_consecrated` (um valor humano) em `hostias_calculadas` (coluna do sistema) | Mistura as fontes "real" e "calculada". Hoje é latente: a coluna está vazia no CSV |
 | `crud.ajustar_estimativa` | `ajustado_por` não usa `COALESCE`, ao contrário das outras colunas | Um segundo ajuste sem informar o autor apaga o autor do primeiro |
-| `.gitignore` | Não inclui `backend/db/modelos_estimativa/` | Os modelos `.joblib` treinados iriam para o Git |

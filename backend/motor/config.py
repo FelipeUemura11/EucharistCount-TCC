@@ -5,8 +5,9 @@ Configuracao central do Eucharist Count.
 import json
 import os
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 
@@ -23,7 +24,11 @@ else:
 @dataclass
 class ConfigCamera:
     """Acesso da camera."""
-    fonte: str = "videos/27-09.mp4"
+
+    # Vem so do CAMERA_FONTE no .env (ou do --fonte na linha de comando):
+    # a URL RTSP leva usuario e senha e nao pode ir para o config.json,
+    # que e versionado. Vazio = nao configurada.
+    fonte: str = ""
 
     # 5 a 8 fps é suficiente para rastreio confiável e reduz muito o uso de CPU.
     fps_processamento: float = 7.5
@@ -133,6 +138,28 @@ class ConfigVisual:
     mostrar_linhas: bool = True
 
 
+def mascarar_senha(fonte: str) -> str:
+    """rtsp://admin:***@ip/stream"""
+    partes = urlsplit(fonte)
+    if not partes.password:
+        return fonte
+    netloc = partes.netloc.replace(f":{partes.password}@", ":***@", 1)
+    return partes._replace(netloc=netloc).geturl()
+
+
+def _construir(tipo, dados: dict, secao: str):
+    """
+    Monta o dataclass de uma secao do config.json so com as chaves que ele
+    conhece. Uma chave desconhecida (erro de digitacao, opcao removida) e
+    ignorada com aviso, em vez de impedir o programa de iniciar com TypeError.
+    """
+    valores = dados.get(secao, {})
+    conhecidas = {f.name for f in fields(tipo)}
+    for chave in valores.keys() - conhecidas:
+        print(f"[config] chave desconhecida ignorada: {secao}.{chave}")
+    return tipo(**{k: v for k, v in valores.items() if k in conhecidas})
+
+
 @dataclass
 class Config:
     camera: ConfigCamera = field(default_factory=ConfigCamera)
@@ -148,9 +175,10 @@ class Config:
     def carregar(cls, caminho: Path | None = None) -> "Config":
         """
         Le config.json se existir; caso contrario usa os padroes. Depois
-        aplica o .env: CAMERA_FONTE substitui camera.fonte.
+        aplica o .env: CAMERA_FONTE define camera.fonte.
 
-        Precedencia: linha de comando (cli.py) > .env > config.json > padrao.
+        Precedencia dos parametros: linha de comando (cli.py) > config.json
+        > padrao. A fonte da camera: linha de comando > .env.
         """
         caminho = caminho or ARQUIVO_CONFIG
         if not caminho.exists():
@@ -159,14 +187,20 @@ class Config:
             with open(caminho, "r", encoding="utf-8") as f:
                 dados = json.load(f)
 
+            # A fonte vem so do .env: uma que sobre no JSON e descartada.
+            if dados.get("camera", {}).pop("fonte", None) is not None:
+                print("camera.fonte no .env: use CAMERA_FONTE")
+
             config = cls(
-                camera=ConfigCamera(**dados.get("camera", {})),
-                deteccao=ConfigDeteccao(**dados.get("deteccao", {})),
-                rastreio=ConfigRastreio(**dados.get("rastreio", {})),
-                filtro=ConfigFiltro(**dados.get("filtro", {})),
-                contagem=ConfigContagem(**dados.get("contagem", {})),
-                visual=ConfigVisual(**dados.get("visual", {})),
+                camera=_construir(ConfigCamera, dados, "camera"),
+                deteccao=_construir(ConfigDeteccao, dados, "deteccao"),
+                rastreio=_construir(ConfigRastreio, dados, "rastreio"),
+                filtro=_construir(ConfigFiltro, dados, "filtro"),
+                contagem=_construir(ConfigContagem, dados, "contagem"),
+                visual=_construir(ConfigVisual, dados, "visual"),
             )
+            # O JSON nao tem tupla: a linha chega como lista.
+            config.contagem.linha = tuple(config.contagem.linha)
 
         load_dotenv(ARQUIVO_ENV)
         fonte_env = os.getenv("CAMERA_FONTE")
@@ -194,6 +228,11 @@ class Config:
         de video funcionava. So arquivo local precisa virar caminho
         absoluto; webcam e URL de rede devem passar intactos.
         """
+        if not fonte.strip():
+            raise RuntimeError(
+                "Fonte da camera nao definida: defina CAMERA_FONTE no "
+                f"{ARQUIVO_ENV} (modelo: .env.example) ou use --fonte."
+            )
         if fonte.isdigit():
             return fonte
         if fonte.lower().startswith(("rtsp://", "http://", "https://")):

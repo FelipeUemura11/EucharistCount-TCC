@@ -61,6 +61,9 @@ class Monitor:
         self.raiz = raiz
         self.metricas = Metricas()
 
+        # Fonte nao definida falha aqui, antes de abrir sessao no banco.
+        config.resolver_fonte_camera(config.camera.fonte)
+
         self.detector = DetectorPessoas(
             config.deteccao,
             config.rastreio,
@@ -80,6 +83,18 @@ class Monitor:
     # ---------- Loop principal ----------
 
     def executar(self, ao_atualizar: Callable[[Metricas, float], None] | None = None) -> Metricas:
+        # Cada execucao comeca do zero, mesmo reusando a instancia: sem
+        # isto, um parar() anterior encerraria esta no primeiro frame e os
+        # IDs, o FPS e o rastreador viriam da execucao passada.
+        # Cuidado: um parar() chamado ANTES de executar() comecar e apagado
+        # aqui. Quem agendar (APScheduler) deve chamar parar() so depois.
+        self._parar = False
+        self._pausado = False
+        self.metricas = Metricas()
+        self._janela_fps.clear()
+        self.contador = None
+        self.detector.reiniciar_rastreio()
+
         cfg = self.config
         fonte_resolvida = cfg.resolver_fonte_camera(cfg.camera.fonte)
 

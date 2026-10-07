@@ -8,7 +8,7 @@ export function useStatusContagem() {
 
     async function verificarStatus() {
       try {
-        const response = await fetch('http://127.0.0.1:8000/api/status');
+        const response = await fetch('/api/status');
         if (response.ok) {
           const dados = await response.json();
           if (mounted) setContagemAtiva(dados.contagemAtiva);

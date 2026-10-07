@@ -482,16 +482,14 @@ if agora - ultimo_envio < intervalo_minimo:
 
 ### 9.2 Reconexão automática
 
-Se um stream ao vivo (RTSP ou webcam) parar de entregar frames no meio de uma celebração, o sistema não encerra na hora: ele espera `segundos_reconexao` (3.0s) e tenta reabrir a conexão automaticamente. Isso cobre o caso mais comum, uma queda momentânea da rede Wi-Fi, sem exigir que alguém da equipe litúrgica intervenha no meio da missa.
+Se um stream ao vivo (RTSP ou webcam) parar de entregar frames no meio de uma celebração, o sistema não encerra: `FonteVideo.reconectar()` espera `segundos_reconexao` (3.0s) e tenta reabrir a conexão, repetindo até conseguir. Só desiste se o monitoramento for interrompido (`Monitor.parar()`), que ele confere antes de cada tentativa. A mesma espera vale quando a câmera ainda não está disponível no início da missa. Isso cobre o caso mais comum, uma queda momentânea da rede Wi-Fi, sem exigir que alguém da equipe litúrgica intervenha no meio da missa.
 
 Para arquivos de vídeo não há reconexão: o fim da leitura é o fim do vídeo.
-
-> **Limitação conhecida.** A reconexão é tentada **uma única vez**. Se a câmera ainda estiver fora do ar depois dos 3 segundos, `_reconectar()` devolve `False`, o loop termina e a sessão é fechada. Uma queda de rede mais longa encerra a contagem daquela missa. Para tornar a reconexão persistente, `_reconectar()` precisaria repetir a tentativa até conseguir ou até `Monitor.parar()` ser chamado.
 
 
 ### 9.3 De onde vem o frame: arquivo, webcam ou câmera IP
 
-A mesma configuração `camera.fonte` aceita três tipos de fonte, e cada um precisa chegar ao OpenCV de um jeito:
+A mesma fonte (`camera.fonte`) aceita três tipos, e cada um precisa chegar ao OpenCV de um jeito:
 
 | Fonte | Exemplo | Como chega ao `FonteVideo` |
 |---|---|---|
@@ -499,7 +497,7 @@ A mesma configuração `camera.fonte` aceita três tipos de fonte, e cada um pre
 | Webcam | `0`, `1` | Intacta: o `FonteVideo` a converte para o índice inteiro que o OpenCV espera |
 | Câmera IP | `rtsp://usuario:senha@192.168.1.50:554/stream1` | Intacta, aberta com o FFmpeg por TCP |
 
-Como a URL da câmera IP leva usuário e senha, ela não deve ficar no `config.json`, que é versionado. A variável `CAMERA_FONTE` do `backend/.env`, que fica fora do Git, substitui `camera.fonte` em `Config.carregar()`; o `--fonte` da linha de comando ainda ganha dela. O modelo é o `backend/.env.example`. No executável do PyInstaller, o `.env` é lido da pasta do `.exe`.
+Como a URL da câmera IP leva usuário e senha, ela não fica no `config.json`, que é versionado. A fonte vem **só** da variável `CAMERA_FONTE` do `backend/.env`, que fica fora do Git, aplicada em `Config.carregar()`; o `--fonte` da linha de comando ainda ganha dela. O padrão do dataclass é vazio: sem `.env` nem `--fonte`, `resolver_fonte_camera()` levanta `RuntimeError`, já no construtor do `Monitor`, antes de abrir sessão no banco, e o `main.py` mantém o dashboard no ar. Uma `fonte` que sobre no `config.json` é ignorada com aviso. Antes de ir para o `parametros_contagem` do banco, a fonte passa por `mascarar_senha()` (`rtsp://usuario:***@...`). O modelo é o `backend/.env.example`. No executável do PyInstaller, o `.env` é lido da pasta do `.exe`.
 
 Quem decide é `Config.resolver_fonte_camera()`: dígitos e URLs (`rtsp://`, `http://`, `https://`) passam sem mudança, e só o resto é tratado como arquivo. A regra existe por causa de um bug real: a versão anterior aplicava `caminho_absoluto()` a qualquer fonte, e no Windows isso transformava `"0"` em `...\backend\0` e `rtsp://...` em `...\backend\rtsp:\...`. **Webcam e câmera IP nunca abriam**, e só arquivos de vídeo funcionavam, justamente o contrário do que a instalação na paróquia precisa. Os scripts `calibrar.py` e `calibrar_linha.py` usam a mesma função.
 
@@ -572,9 +570,10 @@ Pontos identificados em revisão e ainda não corrigidos no código:
 | Onde | Limitação | Efeito |
 |---|---|---|
 | `contador.py` — cooldown | Atualiza o lado antes de testar o cooldown | Quem hesita na porta pode ser contado duas vezes (seção 8.7) |
-| `camera.py` — `_reconectar()` | Uma única tentativa | Queda de rede longa encerra a contagem (seção 9.2) |
-| `monitor.py` — `executar()` | Não reinicia `_parar` nem as `Metricas` | Reusar a mesma instância de `Monitor` para duas missas acumula as contagens. Criar um `Monitor` novo por missa evita o problema |
-| `config.py` — `Config.carregar()` | Repassa as chaves do JSON direto para os dataclasses | Uma chave desconhecida no `config.json` (um erro de digitação, por exemplo) impede o programa de iniciar, com `TypeError` |
+
+Corrigido: `Config.carregar()` repassava as chaves do JSON direto para os dataclasses, e uma chave desconhecida no `config.json` (um erro de digitação, por exemplo) impedia o programa de iniciar com `TypeError`. Agora cada seção passa por `_construir()`, que só usa as chaves conhecidas e avisa no terminal (`[config] chave desconhecida ignorada: ...`) as que descartou. A `contagem.linha`, que chega do JSON como lista, é convertida para tupla, como declara o dataclass.
+
+Corrigido: `Monitor.executar()` não reiniciava o estado da execução anterior. Reusar a mesma instância depois de um `parar()` fazia a nova execução terminar no primeiro frame, devolvendo as métricas antigas, e os IDs únicos, o FPS e o rastreador (o `persist=True` do ByteTrack) vinham da execução passada. Agora `executar()` zera `_parar`, as `Metricas`, a janela de FPS e o contador, e chama `DetectorPessoas.reiniciar_rastreio()`, que limpa as trilhas e recomeça os IDs. Consequência para o agendador: um `parar()` chamado **antes** de `executar()` começar é apagado por esse reset, então ele só deve ser chamado com a execução já em andamento.
 
 ---
 
