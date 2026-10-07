@@ -127,6 +127,16 @@ class DetectorPessoas:
 
         return self._converter(resultado, frame.shape[1], frame.shape[0])
 
+    def reiniciar_rastreio(self) -> None:
+        """
+        Esquece as trilhas e recomeca os IDs. O persist=True mantem o
+        rastreador entre chamadas de detectar(); sem isto, uma segunda
+        execucao herdaria as pessoas e os IDs da anterior.
+        """
+        predictor = self.modelo.predictor
+        for rastreador in getattr(predictor, "trackers", None) or []:
+            rastreador.reset()
+
     def _converter(self, resultado, largura: int, altura: int) -> list[Pessoa]:
         """Traduz a saida da Ultralytics para objetos Pessoa, aplicando o filtro."""
         caixas = resultado.boxes

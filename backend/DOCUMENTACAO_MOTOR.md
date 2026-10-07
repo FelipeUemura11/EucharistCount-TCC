@@ -573,9 +573,10 @@ Pontos identificados em revisão e ainda não corrigidos no código:
 |---|---|---|
 | `contador.py` — cooldown | Atualiza o lado antes de testar o cooldown | Quem hesita na porta pode ser contado duas vezes (seção 8.7) |
 | `camera.py` — `_reconectar()` | Uma única tentativa | Queda de rede longa encerra a contagem (seção 9.2) |
-| `monitor.py` — `executar()` | Não reinicia `_parar` nem as `Metricas` | Reusar a mesma instância de `Monitor` para duas missas acumula as contagens. Criar um `Monitor` novo por missa evita o problema |
 
 Corrigido: `Config.carregar()` repassava as chaves do JSON direto para os dataclasses, e uma chave desconhecida no `config.json` (um erro de digitação, por exemplo) impedia o programa de iniciar com `TypeError`. Agora cada seção passa por `_construir()`, que só usa as chaves conhecidas e avisa no terminal (`[config] chave desconhecida ignorada: ...`) as que descartou. A `contagem.linha`, que chega do JSON como lista, é convertida para tupla, como declara o dataclass.
+
+Corrigido: `Monitor.executar()` não reiniciava o estado da execução anterior. Reusar a mesma instância depois de um `parar()` fazia a nova execução terminar no primeiro frame, devolvendo as métricas antigas, e os IDs únicos, o FPS e o rastreador (o `persist=True` do ByteTrack) vinham da execução passada. Agora `executar()` zera `_parar`, as `Metricas`, a janela de FPS e o contador, e chama `DetectorPessoas.reiniciar_rastreio()`, que limpa as trilhas e recomeça os IDs. Consequência para o agendador: um `parar()` chamado **antes** de `executar()` começar é apagado por esse reset, então ele só deve ser chamado com a execução já em andamento.
 
 ---
 
