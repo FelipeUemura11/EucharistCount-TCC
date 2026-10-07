@@ -7,6 +7,9 @@ venv/
 __pycache__/
 *.pyc
 
+# Modelos de estimativa treinados (regenerar com db/treinar_regressao.py)
+backend/db/modelos_estimativa/
+
 # Modelos (pesados, regenerar com scripts/preparar_modelo.py)
 *.pt
 *.onnx
