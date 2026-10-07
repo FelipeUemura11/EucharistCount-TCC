@@ -6,25 +6,15 @@ config.json.
 """
 
 import sqlite3
-from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.dependencias import obter_db
 from api.schemas import AgendaDia, AgendaDiaCriar, ConfiguracoesGlobais, InfoCamera
 from db import crud
-from motor.config import Config
+from motor.config import Config, mascarar_senha
 
 router = APIRouter()
-
-
-def mascarar_senha(fonte: str) -> str:
-    """rtsp://admin:***@ip/stream"""
-    partes = urlsplit(fonte)
-    if not partes.password:
-        return fonte
-    netloc = partes.netloc.replace(f":{partes.password}@", ":***@", 1)
-    return partes._replace(netloc=netloc).geturl()
 
 
 @router.get("/configuracoes", response_model=ConfiguracoesGlobais)
@@ -52,7 +42,7 @@ def get_configuracoes(db: sqlite3.Connection = Depends(obter_db)):
     else:
         imgsz = config.deteccao.imgsz
         info_camera = InfoCamera(
-            fonte=mascarar_senha(config.camera.fonte),
+            fonte=mascarar_senha(config.camera.fonte) or "Não definida (CAMERA_FONTE no .env)",
             resolucao=f"{imgsz}x{imgsz} (processamento)",
             fpsProcessado=config.camera.fps_processamento,
         )

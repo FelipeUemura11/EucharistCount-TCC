@@ -85,11 +85,13 @@ copy .env.example .env          # Windows
 
 | Variável | O que faz |
 |---|---|
-| `CAMERA_FONTE` | Substitui `camera.fonte` do `config.json`: arquivo de vídeo, índice de webcam (`0`) ou `rtsp://usuario:senha@ip:554/stream` |
+| `CAMERA_FONTE` | **Obrigatória.** Fonte da câmera: arquivo de vídeo, índice de webcam (`0`) ou `rtsp://usuario:senha@ip:554/stream` |
 
-Precedência: `--fonte` na linha de comando > `.env` > `config.json` > padrão
-do código. Sem o `.env`, vale o `config.json`. Na tela de Configurações, a
-senha da URL aparece mascarada (`rtsp://usuario:***@...`).
+A fonte da câmera **não fica no `config.json`**: vem só do `.env` (ou do
+`--fonte` na linha de comando, que ganha dele). Sem nenhum dos dois, o motor
+avisa e não inicia, mas o dashboard continua no ar. Na tela de Configurações
+e no `parametros_contagem` gravado no banco, a senha da URL aparece
+mascarada (`rtsp://usuario:***@...`).
 
 ---
 
@@ -240,7 +242,7 @@ Se as pessoas do fundo não forem detectadas, o problema quase sempre é o
 ## Parâmetros do `config.json`
 
 **camera**
-- `fonte` — arquivo, `"0"` para webcam, ou URL `rtsp://`
+- `fonte` — **não vai aqui**: use `CAMERA_FONTE` no `.env` (ver *Configuração local*). Se aparecer no `config.json`, é ignorada com aviso
 - `fps_processamento` — quadros por segundo a analisar
 - `segundos_reconexao` — espera antes de retentar um stream caído
 

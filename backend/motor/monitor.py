@@ -61,6 +61,9 @@ class Monitor:
         self.raiz = raiz
         self.metricas = Metricas()
 
+        # Fonte nao definida falha aqui, antes de abrir sessao no banco.
+        config.resolver_fonte_camera(config.camera.fonte)
+
         self.detector = DetectorPessoas(
             config.deteccao,
             config.rastreio,

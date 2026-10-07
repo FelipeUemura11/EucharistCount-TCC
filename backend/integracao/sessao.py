@@ -15,7 +15,7 @@ from typing import Iterator
 
 from db import crud
 from db.database import obter_conexao
-from motor.config import Config
+from motor.config import Config, mascarar_senha
 from motor.monitor import Metricas, Monitor
 
 class GravadorSessao:
@@ -72,10 +72,14 @@ def sessao_de_monitoramento(monitor: Monitor, config: Config) -> Iterator[Gravad
         data=agora.strftime("%Y-%m-%d"),
         horario_missa=agora.strftime("%H:%M"),
     )
+    # A fonte pode ser uma URL RTSP com senha: o banco guarda so a mascarada.
+    parametros = asdict(config)
+    parametros["camera"]["fonte"] = mascarar_senha(config.camera.fonte)
+
     sessao_id = crud.iniciar_sessao(
         conexao, celebracao_id,
         origem_contagem="visao_computacional",
-        parametros_contagem=json.dumps(asdict(config)),
+        parametros_contagem=json.dumps(parametros),
     )
 
     gravador = GravadorSessao(conexao, sessao_id)
