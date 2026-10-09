@@ -657,8 +657,4 @@ Pontos identificados em revisão e ainda não corrigidos no código:
 | Onde | Limitação | Efeito |
 |---|---|---|
 | `integracao/sessao.py` | O fechamento da sessão não chama `registrar_estimativa_da_sessao` | Toda contagem nova entra no Histórico com estimativa e hóstias 0, até alguém rodar `preencher_estimativas_pendentes` (seção 10) |
-| `crud.obter_historico` | Ordena só por `data DESC` | Missas do mesmo dia aparecem em ordem arbitrária no Histórico. Correção: `ORDER BY data DESC, horario_missa DESC` |
-| `crud.obter_instantaneos` | Ordena só por `registrado_em`, que tem precisão de segundo | Dois instantâneos no mesmo segundo podem sair fora de ordem no gráfico. Raro: o intervalo é de 5 s de vídeo. Correção: acrescentar `id` como desempate |
 | `vw_historico` | Junta **todas** as sessões concluídas da celebração | Uma missa com monitoramento reiniciado aparece duas vezes no Histórico |
-| `import_csv.py` | Grava `hosts_consecrated` (um valor humano) em `hostias_calculadas` (coluna do sistema) | Mistura as fontes "real" e "calculada". Hoje é latente: a coluna está vazia no CSV |
-| `crud.ajustar_estimativa` | `ajustado_por` não usa `COALESCE`, ao contrário das outras colunas | Um segundo ajuste sem informar o autor apaga o autor do primeiro |

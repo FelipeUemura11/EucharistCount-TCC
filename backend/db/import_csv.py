@@ -12,7 +12,7 @@ Mapeamento de colunas:
     system_count          -> sessao_monitoramento.contagem_sistema (preenchido quando a camera existir)
     notes                 -> sessao_monitoramento.observacoes
     communed               -> estimativa_comunhao.comungantes_reais
-    hosts_consecrated      -> estimativa_comunhao.hostias_calculadas (sugestao da IA; vazio hoje)
+    hosts_consecrated      -> estimativa_comunhao.hostias_reais (valor observado)
 
 O 'id' do CSV nao e reaproveitado como chave primaria (o banco gera as
 proprias); ele fica guardado em celebracao.titulo/observacoes se quiser
@@ -63,7 +63,7 @@ def importar(caminho_csv: Path, caminho_banco: Path = CAMINHO_BANCO) -> None:
                 tipo = _vazio_para_none(linha.get("celebration_type")) or "comum"
                 comungantes = _int_ou_none(linha.get("communed"))
                 contagem_sistema = _int_ou_none(linha.get("system_count"))
-                hostias_ia = _int_ou_none(linha.get("hosts_consecrated"))
+                hostias_reais = _int_ou_none(linha.get("hosts_consecrated"))
                 notas = _vazio_para_none(linha.get("notes"))
 
                 # Uma celebracao por combinacao (data, horario) — se ja existir
@@ -126,7 +126,7 @@ def importar(caminho_csv: Path, caminho_banco: Path = CAMINHO_BANCO) -> None:
                     )
                     sessao_id = cursor.lastrowid
 
-                if comungantes is not None or hostias_ia is not None:
+                if comungantes is not None or hostias_reais is not None:
                     cursor = conexao.execute(
                         "SELECT id FROM estimativa_comunhao WHERE sessao_id = ?",
                         (sessao_id,),
@@ -137,19 +137,19 @@ def importar(caminho_csv: Path, caminho_banco: Path = CAMINHO_BANCO) -> None:
                         conexao.execute(
                             """
                             UPDATE estimativa_comunhao
-                            SET comungantes_reais = ?, hostias_calculadas = ?
+                            SET comungantes_reais = ?, hostias_reais = ?
                             WHERE sessao_id = ?
                             """,
-                            (comungantes, hostias_ia, sessao_id),
+                            (comungantes, hostias_reais, sessao_id),
                         )
                     else:
                         conexao.execute(
                             """
                             INSERT INTO estimativa_comunhao
-                                (sessao_id, comungantes_reais, hostias_calculadas)
+                                (sessao_id, comungantes_reais, hostias_reais)
                             VALUES (?, ?, ?)
                             """,
-                            (sessao_id, comungantes, hostias_ia),
+                            (sessao_id, comungantes, hostias_reais),
                         )
 
                 importadas += 1
