@@ -261,13 +261,14 @@ Uma consulta salva que entrega a tela **Histórico** já pronta, sem nenhum `JOI
 ```mermaid
 flowchart LR
     C["celebracao<br/>status = 'finalizada'"] -->|JOIN| V[["vw_historico"]]
-    S["sessao_monitoramento<br/>status = 'concluida'"] -->|JOIN| V
+    S["sessao_monitoramento<br/>a concluída mais recente"] -->|JOIN| V
     E["estimativa_comunhao"] -->|LEFT JOIN| V
     V -->|"SELECT * (crud.obter_historico)"| A["GET /api/historico"]
 ```
 
-Duas decisões merecem destaque:
+Três decisões merecem destaque:
 
+- **Uma linha por celebração:** uma missa com monitoramento reiniciado tem várias sessões `concluida`. A view junta só a mais recente (`ORDER BY finalizado_em DESC, id DESC LIMIT 1`, o mesmo critério de `crud.obter_ultima_sessao_concluida`), então a missa aparece uma única vez no Histórico. Sessões `interrompida` nunca entram.
 - **`LEFT JOIN` na estimativa:** uma missa contada, mas ainda sem estimativa registrada, aparece no histórico com a estimativa vazia, em vez de sumir.
 - **Prioridade por `COALESCE`:**
 
@@ -320,7 +321,7 @@ Qualquer `UPDATE` em `celebracao` renova `atualizado_em` automaticamente. O `UPD
 |---|---|
 | `idx_celebracao_data` | Calendário do mês (`WHERE data LIKE '2026-09%'`) |
 | `idx_celebracao_status` | Próximas celebrações (`WHERE status IN ('agendada', 'em_andamento')`) |
-| `idx_sessao_celebracao` | Sessões de uma missa; `JOIN` da `vw_historico` |
+| `idx_sessao_celebracao` | Sessões de uma missa; subconsulta da `vw_historico` que escolhe a sessão mais recente |
 | `idx_sessao_status` | Sessão ativa (`WHERE status = 'em_andamento'`), consultada a cada 2 s pelo dashboard |
 | `idx_instantaneo_sessao_tempo` | Série do gráfico (`WHERE sessao_id = ? ORDER BY registrado_em`) |
 | `idx_horario_padrao_dia` | Agenda de um dia da semana |
@@ -659,6 +660,5 @@ Pontos identificados em revisão e ainda não corrigidos no código:
 | `integracao/sessao.py` | O fechamento da sessão não chama `registrar_estimativa_da_sessao` | Toda contagem nova entra no Histórico com estimativa e hóstias 0, até alguém rodar `preencher_estimativas_pendentes` (seção 10) |
 | `crud.obter_historico` | Ordena só por `data DESC` | Missas do mesmo dia aparecem em ordem arbitrária no Histórico. Correção: `ORDER BY data DESC, horario_missa DESC` |
 | `crud.obter_instantaneos` | Ordena só por `registrado_em`, que tem precisão de segundo | Dois instantâneos no mesmo segundo podem sair fora de ordem no gráfico. Raro: o intervalo é de 5 s de vídeo. Correção: acrescentar `id` como desempate |
-| `vw_historico` | Junta **todas** as sessões concluídas da celebração | Uma missa com monitoramento reiniciado aparece duas vezes no Histórico |
 | `import_csv.py` | Grava `hosts_consecrated` (um valor humano) em `hostias_calculadas` (coluna do sistema) | Mistura as fontes "real" e "calculada". Hoje é latente: a coluna está vazia no CSV |
 | `crud.ajustar_estimativa` | `ajustado_por` não usa `COALESCE`, ao contrário das outras colunas | Um segundo ajuste sem informar o autor apaga o autor do primeiro |

@@ -1,13 +1,11 @@
 import { useMemo, useState } from "react";
 import CalendarioCelebracoes from "../components/celebracoes/CalendarioCelebracoes";
 import ModalHorariosDia from "../components/celebracoes/ModalHorariosDia";
-import TabelaProximasCelebracoes from "../components/celebracoes/TabelaProximasCelebracoes";
 import {
     calendarDays,
     celebrationMonth,
     createInitialDaySchedules,
     getDayInfo,
-    nextCelebrations,
     weekDays,
 } from "../data/celebrationsMock";
 import type { CelebrationMassScheduleChanges } from "../types/celebrations";
@@ -97,8 +95,6 @@ export default function Celebracoes() {
                 weekDays={weekDays}
                 onSelectDay={setSelectedDay}
             />
-
-            <TabelaProximasCelebracoes celebracoes={nextCelebrations} />
 
             {selectedDayInfo && (
                 <ModalHorariosDia
