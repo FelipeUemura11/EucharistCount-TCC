@@ -554,4 +554,3 @@ O modelo de regressão (`metodo = 'regressao'`, com o arquivo `.joblib`) ainda n
 | `crud.obter_historico` | Ordena só por `data DESC` | Missas do mesmo dia aparecem em ordem arbitrária no Histórico. Correção: `ORDER BY data DESC, horario_missa DESC` |
 | `integracao/estimativa.py` | Sempre usa o coeficiente, mesmo com `metodo = 'regressao'` | O modelo treinado por `treinar_regressao.py` ainda não é usado |
 | `EstimativaComunhao.tsx` | O frontend calcula as hóstias do dashboard com `× 1,1` fixo | Se a `margem_hostias` do banco mudar, o dashboard e o Histórico sugerem números diferentes. A rota do dashboard poderia enviar as hóstias já calculadas |
-| `useHistorico.ts` | Busca o histórico uma vez só, ao abrir a página | Uma missa que termina com a página aberta só aparece ao recarregar |
