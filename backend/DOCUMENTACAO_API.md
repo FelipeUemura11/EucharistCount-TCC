@@ -247,7 +247,7 @@ Lista as celebrações do **mês atual** (`crud.listar_celebracoes_do_mes`, que 
 
 ### 4.5 `GET /api/historico`
 
-Lê a view `vw_historico` (`DOCUMENTACAO_BANCO.md`, seção 3.8): só sessões `concluida`, de celebrações `finalizada`, da data mais recente para a mais antiga.
+Lê a view `vw_historico` (`DOCUMENTACAO_BANCO.md`, seção 3.8): uma linha por celebração `finalizada`, com a sessão `concluida` mais recente (se o monitoramento foi reiniciado, as tentativas anteriores não aparecem), da data mais recente para a mais antiga.
 
 | Campo | Origem |
 |---|---|
@@ -552,7 +552,5 @@ O modelo de regressão (`metodo = 'regressao'`, com o arquivo `.joblib`) ainda n
 |---|---|---|
 | `integracao/sessao.py` | O fechamento da sessão não chama `registrar_estimativa_da_sessao` | **Toda contagem nova entra no Histórico com estimativa e hóstias 0**, até alguém rodar `preencher_estimativas_pendentes` (seção 8). Correção: no `finally` de `sessao_de_monitoramento`, depois do `finalizar_sessao`, chamar `registrar_estimativa_da_sessao(conexao, sessao_id, m.dentro)` quando `status == "concluida"` |
 | `crud.obter_historico` | Ordena só por `data DESC` | Missas do mesmo dia aparecem em ordem arbitrária no Histórico. Correção: `ORDER BY data DESC, horario_missa DESC` |
-| `vw_historico` | Junta **todas** as sessões concluídas da celebração | Uma missa com monitoramento reiniciado aparece duas vezes no Histórico |
 | `integracao/estimativa.py` | Sempre usa o coeficiente, mesmo com `metodo = 'regressao'` | O modelo treinado por `treinar_regressao.py` ainda não é usado |
 | `EstimativaComunhao.tsx` | O frontend calcula as hóstias do dashboard com `× 1,1` fixo | Se a `margem_hostias` do banco mudar, o dashboard e o Histórico sugerem números diferentes. A rota do dashboard poderia enviar as hóstias já calculadas |
-| `useHistorico.ts` | Busca o histórico uma vez só, ao abrir a página | Uma missa que termina com a página aberta só aparece ao recarregar |

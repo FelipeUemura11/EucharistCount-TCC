@@ -219,8 +219,16 @@ CREATE INDEX IF NOT EXISTS idx_evento_sistema_tempo ON evento_sistema(registrado
 -- unica consulta, ja no formato das colunas da tabela do frontend
 -- (RegistroHistorico): data, celebracao, horario, total de pessoas, estimativa,
 -- hostias sugeridas, entradas e saidas.
+--
+-- Uma celebracao com monitoramento reiniciado tem varias sessoes concluidas;
+-- so a mais recente entra, para a missa aparecer uma unica vez. Mesmo criterio
+-- de crud.obter_ultima_sessao_concluida: finalizado_em, com id como desempate.
+--
+-- DROP antes do CREATE: view nao guarda dados, e sem isso um banco ja criado
+-- manteria a definicao antiga (CREATE VIEW IF NOT EXISTS nao substitui).
 -- -----------------------------------------------------------------------------
-CREATE VIEW IF NOT EXISTS vw_historico AS
+DROP VIEW IF EXISTS vw_historico;
+CREATE VIEW vw_historico AS
 SELECT
     c.id                                    AS celebracao_id,
     c.data                                  AS data,
@@ -233,6 +241,11 @@ SELECT
     s.total_entradas                        AS entradas,
     s.total_saidas                          AS saidas
 FROM celebracao c
-JOIN sessao_monitoramento s ON s.celebracao_id = c.id AND s.status = 'concluida'
+JOIN sessao_monitoramento s ON s.id = (
+    SELECT s2.id FROM sessao_monitoramento s2
+    WHERE s2.celebracao_id = c.id AND s2.status = 'concluida'
+    ORDER BY s2.finalizado_em DESC, s2.id DESC
+    LIMIT 1
+)
 LEFT JOIN estimativa_comunhao e ON e.sessao_id = s.id
 WHERE c.status = 'finalizada';
