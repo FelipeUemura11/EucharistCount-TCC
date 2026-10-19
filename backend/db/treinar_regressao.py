@@ -22,13 +22,17 @@ from sklearn.model_selection import LeaveOneOut, cross_val_predict
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
-from database import obter_conexao
+from database import CAMINHO_BANCO, obter_conexao
 from preparar_dataset import montar_dataset
 import crud
 
 MINIMO_AMOSTRAS = 15  # abaixo disso, regressao linear nao e confiavel
-RAIZ = Path(__file__).resolve().parent
-CAMINHO_MODELOS = RAIZ / "modelos_estimativa"
+
+# Salva os modelos na mesma pasta base do banco (CAMINHO_BANCO.parent).
+# Quando empacotado com PyInstaller/Inno Setup, o banco fica em %APPDATA%\EucharistCount,
+# garantindo que os arquivos .joblib persistam fora da pasta temporaria (_MEI...).
+PASTA_BASE_MODELOS = CAMINHO_BANCO.parent
+CAMINHO_MODELOS = PASTA_BASE_MODELOS / "modelos_estimativa"
 
 FEATURES_NUMERICAS = ["ocupacao_final", "minutos_missa"]
 FEATURES_CATEGORICAS = ["dia_semana", "tipo"]
@@ -80,7 +84,7 @@ def treinar() -> None:
     # a capacidade de generalizar; agora e so aproveitar tudo que se tem).
     pipeline.fit(X, y)
 
-    CAMINHO_MODELOS.mkdir(exist_ok=True)
+    CAMINHO_MODELOS.mkdir(parents=True, exist_ok=True)
     versao = pd.Timestamp.now("UTC").strftime("%Y%m%d_%H%M%S")
     caminho_modelo = CAMINHO_MODELOS / f"regressao_comunhao_{versao}.joblib"
     joblib.dump(pipeline, caminho_modelo)
@@ -92,7 +96,7 @@ def treinar() -> None:
         conexao,
         coeficiente_comunhao=round(coeficiente_fallback, 4),
         metodo="regressao",
-        modelo_path=str(caminho_modelo.relative_to(RAIZ)),
+        modelo_path=str(caminho_modelo.relative_to(PASTA_BASE_MODELOS)),
         observacoes=f"Regressao linear treinada com {n} celebracoes. MAE={mae:.1f}, R2={r2:.3f}.",
     )
     conexao.close()

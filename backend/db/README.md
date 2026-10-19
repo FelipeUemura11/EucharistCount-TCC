@@ -14,7 +14,7 @@ exigido pela LGPD no TCC.
 | `import_csv.py` | Importa o `counting_people.csv` (contagem manual) para o schema normalizado. |
 | `calcular_coeficiente_inicial.py` | Calcula a média `comungantes_reais / ocupacao_final` dos dados já importados e grava em `configuracao_estimativa` (modo `coeficiente_fixo`). Rodar de novo sempre que importar dado novo. |
 | `preparar_dataset.py` | Monta o dataset de treino (ocupação, dia da semana, horário, tipo → comungantes reais) a partir do banco. Usado pelo script de treino, mas também roda sozinho pra inspecionar o dataset (`python3 preparar_dataset.py`). |
-| `treinar_regressao.py` | Treina a regressão (modo `regressao`), valida com leave-one-out, salva o modelo em `modelos_estimativa/*.joblib` e registra a versão em `configuracao_estimativa`. **Só treina com 15+ celebrações no banco** — com menos que isso, ele avisa e não faz nada (ver seção "Estimativa de comunhão" abaixo). |
+| `treinar_regressao.py` | Treina a regressão (modo `regressao`), valida com leave-one-out, salva o modelo em `modelos_estimativa/*.joblib` (na mesma pasta onde vive o banco, `CAMINHO_BANCO.parent`) e registra a versão em `configuracao_estimativa`. **Só treina com 15+ celebrações no banco** — com menos que isso, ele avisa e não faz nada (ver seção "Estimativa de comunhão" abaixo). |
 | `requirements.txt` | Dependências só deste módulo (`pandas`, `scikit-learn`, `joblib`) — não é o `requirements.txt` do motor de visão, são libs separadas. |
 
 ## Como a API usa este módulo
@@ -75,14 +75,17 @@ instantaneo_ocupacao            estimativa_comunhao
 O sistema opera em duas fases, sem precisar trocar de schema entre elas
 (`configuracao_estimativa.metodo`):
 
-1. **`coeficiente_fixo`** (fase atual) — `calcular_coeficiente_inicial.py`
-   calcula a média real observada e grava. É esse valor que a API deve ler
+1. **`coeficiente_fixo`** (fase inicial) — `calcular_coeficiente_inicial.py`
+   calcula a média real observada e grava. É esse valor que a API lê
    (`crud.obter_configuracao_estimativa_vigente`) pra sugerir comungantes/
-   hóstias enquanto não há modelo.
+   hóstias enquanto não há modelo de regressão treinado.
 2. **`regressao`** — assim que houver **15+ celebrações** com
    `comungantes_reais` preenchido no banco, `treinar_regressao.py` treina
    um modelo (ocupação + dia da semana + horário + tipo → comungantes) e
-   grava o caminho do artefato em `configuracao_estimativa.modelo_path`.
+   grava o caminho do artefato em `configuracao_estimativa.modelo_path`
+   (salvo em `CAMINHO_BANCO.parent / "modelos_estimativa"`, garantindo que
+   no executável PyInstaller o modelo fique persistido em `%APPDATA%` junto ao
+   banco e fora da pasta temporária).
 
 Rotina recomendada: sempre que importar um lote novo de dados
 (`import_csv.py`), rodar os dois scripts de novo, nessa ordem:
@@ -92,34 +95,18 @@ python3 calcular_coeficiente_inicial.py   # sempre atualiza o fallback
 python3 treinar_regressao.py              # só re-treina se ja tiver dado suficiente
 ```
 
-Hoje, a estimativa usada pelo sistema é calculada em
-`backend/integracao/estimativa.py` (`calcular_estimativa`), sempre pelo
-coeficiente: se `configuracao_estimativa` estiver vazia, usa o padrão 0.78
-do próprio código. Para usar o modelo de regressão quando
-`metodo = 'regressao'`, a função precisará aplicar este contrato:
+A estimativa usada pelo sistema é centralizada em
+`backend/integracao/estimativa.py` (`calcular_estimativa`):
+- Se `metodo == 'regressao'` e o arquivo `.joblib` existir, carrega o modelo
+  (com cache em memória) e prevê os comungantes usando `ocupacao_final`,
+  `minutos_missa`, `dia_semana` e `tipo` da celebração.
+- Caso contrário (modo `coeficiente_fixo`, tabela vazia ou falha ao carregar o
+  modelo), multiplica a ocupação pelo `coeficiente_comunhao` (ou pelo padrão
+  `0.78` se o banco estiver vazio).
 
-```python
-import joblib
-config = crud.obter_configuracao_estimativa_vigente(conexao)
-
-if config["metodo"] == "regressao" and config["modelo_path"]:
-    modelo = joblib.load(RAIZ_DB / config["modelo_path"])
-    entrada = pd.DataFrame([{
-        "ocupacao_final": ocupacao_atual,
-        "minutos_missa": minutos_desde_meia_noite,
-        "dia_semana": dia_semana,
-        "tipo": tipo_celebracao,
-    }])
-    estimativa = int(modelo.predict(entrada)[0])
-else:
-    estimativa = round(ocupacao_atual * config["coeficiente_comunhao"])
-
-hostias = math.ceil(estimativa * (1 + config["margem_hostias"]))
-```
-
-Aqui fica documentado o contrato (o que ler de `configuracao_estimativa`
-e como aplicar); a implementação vai em `calcular_estimativa`, para o
-dashboard e o histórico continuarem usando uma única regra.
+Assim, tanto o dashboard ao vivo quanto o histórico usam exatamente a mesma
+regra e transicionam automaticamente do coeficiente fixo para a regressão
+assim que o modelo é treinado.
 
 ## Ligação com o motor de visão
 
