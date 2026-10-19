@@ -211,7 +211,7 @@ def obter_ou_criar_celebracao(conexao: sqlite3.Connection, titulo: str,
 
 def obter_instantaneos(conexao: sqlite3.Connection, sessao_id: int) -> list[sqlite3.Row]:
     return conexao.execute(
-        "SELECT * FROM instantaneo_ocupacao WHERE sessao_id = ? ORDER BY registrado_em",
+        "SELECT * FROM instantaneo_ocupacao WHERE sessao_id = ? ORDER BY registrado_em, id",
         (sessao_id,),
     ).fetchall()
 
@@ -398,7 +398,7 @@ def ajustar_estimativa(conexao: sqlite3.Connection, sessao_id: int,
         UPDATE estimativa_comunhao
         SET estimativa_ajustada = COALESCE(?, estimativa_ajustada),
             hostias_ajustadas = COALESCE(?, hostias_ajustadas),
-            ajustado_por = ?,
+            ajustado_por = COALESCE(?, ajustado_por),
             ajustado_em = ?
         WHERE sessao_id = ?
         """,
@@ -424,7 +424,7 @@ def obter_historico(conexao: sqlite3.Connection, data_inicio: str | None = None,
         query += " AND data <= ?"
         parametros.append(data_fim)
 
-    query += " ORDER BY data DESC"
+    query += " ORDER BY data DESC, horario_missa DESC"
     return conexao.execute(query, parametros).fetchall()
 
 
