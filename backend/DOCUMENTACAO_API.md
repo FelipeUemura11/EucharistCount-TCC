@@ -220,7 +220,7 @@ De onde vem cada campo:
 |---|---|---|
 | `ocupacaoAtual` | `sessao_monitoramento.ocupacao_final` | A cada passagem pela linha |
 | `entradas` / `saidas` | `sessao_monitoramento.total_entradas` / `total_saidas` | A cada passagem pela linha |
-| `estimativaComunhao` | `calcular_estimativa(db, ocupação).comungantes` (seção 8) | Junto com a ocupação |
+| `estimativaComunhao` | `calcular_estimativa(db, ocupação, celebracao=celebracao).comungantes` (seção 8) | Junto com a ocupação |
 | `contagemAtiva` | `sessao["status"] == "em_andamento"` | `false` quando mostra a última missa encerrada |
 | `graficoOcupacao[]` | `instantaneo_ocupacao`: `hora` = `hora_de_timestamp(registrado_em)`, `ocupacao` = `ocupacao_atual` | A cada 5 s de vídeo |
 | `resumoCelebracao` | Título e janela de monitoramento da celebração | — |
@@ -498,23 +498,22 @@ Se a API não responder, o hook **mantém na tela os últimos dados recebidos** 
 
 ## 8. A estimativa de comunhão (`integracao/estimativa.py`)
 
-A estimativa é calculada **num lugar só**. O arquivo tem três funções:
+A estimativa é calculada **num lugar só**. O arquivo tem três funções públicas:
 
 | Função | O que faz | Quem chama hoje |
 |---|---|---|
-| `calcular_estimativa(conexao, ocupacao)` | Calcula comungantes e hóstias | `api/rotas/dashboard.py`, a cada consulta |
+| `calcular_estimativa(conexao, ocupacao, celebracao=None)` | Calcula comungantes e hóstias (via regressão ou coeficiente fixo) | `api/rotas/dashboard.py`, a cada consulta |
 | `registrar_estimativa_da_sessao(conexao, sessao_id, ocupacao)` | Calcula e **grava** em `estimativa_comunhao`, de onde o Histórico lê | `preencher_estimativas_pendentes` |
 | `preencher_estimativas_pendentes(conexao)` | Grava a estimativa de toda sessão concluída que ainda não tem uma | Rodada manualmente (comando abaixo) |
 
 Se o dashboard e o histórico tivessem cada um a sua cópia da conta, bastaria alguém mudar uma delas para os dois mostrarem números diferentes. Com uma função só, os dois sempre concordam.
 
-A regra (fórmula de `DOCUMENTACAO_BANCO.md`, seção 9.1):
+A regra opera em duas fases conforme a linha vigente de `configuracao_estimativa` (`DOCUMENTACAO_BANCO.md`, seções 9.1 e 9.2):
+
+1. **Modo `regressao`:** quando `metodo == 'regressao'` e `modelo_path` aponta para um artefato `.joblib` válido (salvo na pasta do banco, `CAMINHO_BANCO.parent / "modelos_estimativa"`), o pipeline scikit-learn é carregado com cache em memória (`_CACHE_MODELO`) e prevê a quantidade de comungantes a partir de `ocupacao_final`, `minutos_missa`, `dia_semana` e `tipo` da celebração.
+2. **Modo `coeficiente_fixo` (ou fallback):** enquanto não há modelo de regressão (ou caso o arquivo `.joblib` não possa ser carregado), aplica a proporção direta:
 
 ```python
-config = crud.obter_configuracao_estimativa_vigente(conexao)
-coeficiente = config["coeficiente_comunhao"] if config else COEFICIENTE_PADRAO    # 0.78
-margem      = config["margem_hostias"]       if config else MARGEM_HOSTIAS_PADRAO  # 0.10
-
 comungantes = int(max(ocupacao, 0) * coeficiente)
 hostias     = math.ceil(comungantes * (1 + margem))
 ```
@@ -534,14 +533,12 @@ python -c "from db.database import obter_conexao; from integracao.estimativa imp
 
 **Por que em `integracao/`:** é regra de negócio usada pelos dois lados, API e gravação. O arquivo não importa o `motor`, então a API continua rodando sem a `ultralytics`.
 
-O modelo de regressão (`metodo = 'regressao'`, com o arquivo `.joblib`) ainda não é carregado aqui: a função sempre usa o coeficiente. Ver seção 10.
-
 ---
 
 ## 9. Próximos passos previstos
 
 - **Agendamento automático (APScheduler).** Iniciar o monitoramento sozinho no horário de cada missa, sem janela (`--sem-janela`), usando o mesmo `with sessao_de_monitoramento(...)` + `monitor.executar(...)`. Com ele, a celebração deixaria de ser criada na hora (seção 6.5) e passaria a vir da agenda (`horario_padrao`). O `Monitor.parar()` já existe para encerrar a contagem no fim da janela.
-- **Empacotamento (PyInstaller).** O código já prevê o executável: `freeze_support()` e a resolução de caminhos por `sys._MEIPASS`.
+- **Empacotamento (PyInstaller).** O código já prevê o executável: `freeze_support()`, a resolução de caminhos estáticos por `sys._MEIPASS` e os arquivos mutáveis (`.db` e modelos `.joblib` de regressão) direcionados para a mesma pasta de dados (`CAMINHO_BANCO.parent`).
 - **Controle manual da contagem.** Hoje não há botões no dashboard nem rotas na API para iniciar ou encerrar o motor: ele começa com o `main.py` e termina no fim do vídeo, por ESC/Q na janela ou por Ctrl+C.
 
 ---
@@ -551,6 +548,4 @@ O modelo de regressão (`metodo = 'regressao'`, com o arquivo `.joblib`) ainda n
 | Onde | Limitação | Efeito |
 |---|---|---|
 | `integracao/sessao.py` | O fechamento da sessão não chama `registrar_estimativa_da_sessao` | **Toda contagem nova entra no Histórico com estimativa e hóstias 0**, até alguém rodar `preencher_estimativas_pendentes` (seção 8). Correção: no `finally` de `sessao_de_monitoramento`, depois do `finalizar_sessao`, chamar `registrar_estimativa_da_sessao(conexao, sessao_id, m.dentro)` quando `status == "concluida"` |
-| `crud.obter_historico` | Ordena só por `data DESC` | Missas do mesmo dia aparecem em ordem arbitrária no Histórico. Correção: `ORDER BY data DESC, horario_missa DESC` |
-| `integracao/estimativa.py` | Sempre usa o coeficiente, mesmo com `metodo = 'regressao'` | O modelo treinado por `treinar_regressao.py` ainda não é usado |
 | `EstimativaComunhao.tsx` | O frontend calcula as hóstias do dashboard com `× 1,1` fixo | Se a `margem_hostias` do banco mudar, o dashboard e o Histórico sugerem números diferentes. A rota do dashboard poderia enviar as hóstias já calculadas |

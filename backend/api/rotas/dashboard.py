@@ -59,7 +59,7 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
     return DadosDashboard(
         metricas=MetricasDashboard(
             ocupacaoAtual=ocupacao,
-            estimativaComunhao=calcular_estimativa(db, ocupacao).comungantes,
+            estimativaComunhao=calcular_estimativa(db, ocupacao, celebracao=celebracao).comungantes,
             entradas=sessao["total_entradas"],
             saidas=sessao["total_saidas"],
             contagemAtiva=ativa,

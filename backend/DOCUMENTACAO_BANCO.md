@@ -158,7 +158,7 @@ PLANEJADO                                   EXECUTADO
 horario_padrao ──gera──▶ celebracao ──1:N──▶ sessao_monitoramento ──1:N──▶ instantaneo_ocupacao
 (agenda semanal)         (uma missa          (uma execução            │     (série do gráfico)
                           numa data)          real da contagem)       │
-                                                                      └─1:1─▶ estimativa_comunhao
+                                                                      └─1:1──▶ estimativa_comunhao
                                                                               (comungantes e hóstias)
 ```
 
@@ -228,10 +228,10 @@ Os parâmetros que convertem ocupação em estimativa de comungantes e de hósti
 
 | Coluna | Para que serve |
 |---|---|
-| `metodo` | `'coeficiente_fixo'` (fase atual) ou `'regressao'` (quando houver dados suficientes, seção 9) |
+| `metodo` | `'coeficiente_fixo'` (fase inicial) ou `'regressao'` (quando houver dados suficientes, seção 9) |
 | `coeficiente_comunhao` | Fração dos presentes que costuma comungar. **Obrigatório mesmo no modo regressão**, onde serve de reserva se o modelo não puder prever |
 | `margem_hostias` | Folga sobre a estimativa. `0.10` = consagrar 10% a mais |
-| `modelo_path` | Caminho do modelo treinado (`.joblib`), relativo a `db/` |
+| `modelo_path` | Caminho do modelo treinado (`.joblib`), relativo à pasta onde vive o banco (`CAMINHO_BANCO.parent`) |
 | `vigente_desde` | Quando essa versão passou a valer |
 
 **É uma tabela *append-only*:** para mudar o coeficiente, insere-se uma linha nova em vez de fazer `UPDATE`. A versão vigente é sempre a mais recente. Isso preserva o histórico: dá para saber qual coeficiente valia quando cada sessão antiga foi estimada, e a coluna `estimativa_comunhao.configuracao_estimativa_id` aponta exatamente para ele.
@@ -393,9 +393,9 @@ Toda função recebe a conexão como primeiro argumento (não abre nem fecha con
 
 | Grupo | Função | Quem usa hoje |
 |---|---|---|
-| Agenda | `criar_horario_padrao`, `listar_horarios_padrao`, `remover_horario_padrao` | — |
+| Agenda | `criar_horario_padrao`, `listar_horarios_padrao`, `remover_horario_padrao` | `api/rotas/configuracoes.py` |
 | Celebração | `criar_celebracao`, `obter_ou_criar_celebracao` | `integracao/sessao.py` |
-| | `obter_celebracao` | `api/rotas/dashboard.py` |
+| | `obter_celebracao` | `api/rotas/dashboard.py`, `integracao/estimativa.py` |
 | | `listar_celebracoes_do_mes` | `api/rotas/celebracoes.py` |
 | | `listar_proximas_celebracoes`, `atualizar_status_celebracao` | — |
 | Sessão | `iniciar_sessao`, `atualizar_totais_sessao`, `registrar_instantaneo`, `finalizar_sessao` | `integracao/sessao.py` |
@@ -403,7 +403,7 @@ Toda função recebe a conexão como primeiro argumento (não abre nem fecha con
 | | `obter_sessao_ativa` | `api/rotas/status.py` e `api/rotas/dashboard.py` |
 | | `obter_ultima_sessao_concluida` | `api/rotas/dashboard.py`, quando não há contagem ativa |
 | | `obter_instantaneos` | `api/rotas/dashboard.py` |
-| | `obter_sessao` | — |
+| | `obter_sessao` | `integracao/estimativa.py` |
 | Estimativa | `obter_configuracao_estimativa_vigente` | `integracao/estimativa.py` |
 | | `definir_configuracao_estimativa` | Scripts de coeficiente e regressão |
 | | `registrar_estimativa` | `integracao/estimativa.py` |
@@ -576,7 +576,7 @@ estimativa  = ocupação × coeficiente
 hóstias     = ⌈ estimativa × (1 + margem_hostias) ⌉
 ```
 
-Com os dados atuais (3 celebrações no `counting_people.csv`):
+Com os dados iniciais (3 celebrações no `counting_people.csv`):
 
 | Data | Pessoas | Comungaram | Razão |
 |---|---|---|---|
@@ -597,10 +597,11 @@ A média é **das razões**, e não "total de comungantes ÷ total de pessoas". 
 
 `treinar_regressao.py` treina uma regressão linear que usa, além da ocupação, o dia da semana, o horário (em minutos desde meia-noite) e o tipo de celebração. A hipótese é que a fração que comunga varia com o tipo de missa: domingo de manhã é diferente de uma quarta à noite.
 
-- **Mínimo de 15 celebrações.** Com menos que isso, uma regressão com várias variáveis só "decora" os pontos que viu. O script avisa e não treina nada. Hoje há 3.
+- **Mínimo de 15 celebrações.** Com menos que isso, uma regressão com várias variáveis só "decora" os pontos que viu. O script avisa e não treina nada.
 - **Validação *leave-one-out*.** Com poucos dados, separar treino e teste fixos desperdiçaria amostras. O script treina com todas as missas menos uma, testa nessa, repete para cada missa, e reporta o erro médio (MAE) e o R².
 - **Variáveis categóricas** (dia da semana, tipo) passam por *one-hot encoding*, com `handle_unknown="ignore"`: um tipo de missa novo, nunca visto no treino, não derruba a previsão.
-- O modelo final é salvo em `db/modelos_estimativa/regressao_comunhao_<data>.joblib`, e uma nova linha de `configuracao_estimativa` passa a apontar para ele.
+- **Armazenamento compatível com PyInstaller:** o modelo final é salvo em `CAMINHO_BANCO.parent / "modelos_estimativa" / "regressao_comunhao_<data>.joblib"`, garantindo que no executável empacotado (onde o banco vive em `%APPDATA%\EucharistCount`) o `.joblib` também fique salvo em disco persistente e nunca na pasta temporária `_MEI...`.
+- **Inferência em `integracao/estimativa.py`:** quando a configuração vigente tem `metodo = 'regressao'`, `calcular_estimativa()` carrega o modelo com cache em memória e prevê os comungantes usando o contexto da celebração. Caso o arquivo não seja encontrado ou falhe, cai automaticamente para o `coeficiente_comunhao` de reserva.
 
 ### 9.3 Importação do CSV manual
 
@@ -612,7 +613,7 @@ A média é **das razões**, e não "total de comungantes ÷ total de pessoas". 
 | `system_count` | `sessao_monitoramento.contagem_sistema` |
 | `notes` | `sessao_monitoramento.observacoes` |
 | `communed` | `estimativa_comunhao.comungantes_reais` |
-| `hosts_consecrated` | `estimativa_comunhao.hostias_calculadas` (ver seção 12) |
+| `hosts_consecrated` | `estimativa_comunhao.hostias_reais` |
 
 Cada linha vira uma celebração (reaproveitada se já existir a mesma data e horário), uma sessão `manual` já `concluida` e, se houver dado de comunhão, uma estimativa.
 
@@ -658,4 +659,3 @@ Pontos identificados em revisão e ainda não corrigidos no código:
 | Onde | Limitação | Efeito |
 |---|---|---|
 | `integracao/sessao.py` | O fechamento da sessão não chama `registrar_estimativa_da_sessao` | Toda contagem nova entra no Histórico com estimativa e hóstias 0, até alguém rodar `preencher_estimativas_pendentes` (seção 10) |
-| `vw_historico` | Junta **todas** as sessões concluídas da celebração | Uma missa com monitoramento reiniciado aparece duas vezes no Histórico |

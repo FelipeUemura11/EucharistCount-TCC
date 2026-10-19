@@ -19,6 +19,8 @@ backend/db/modelos_estimativa/
 backend/modelos/
 *_openvino_model/
 .aiassistant
+.agents
+.gemini
 
 # Videos — NUNCA versionar filmagens de fieis (LGPD)
 backend/videos/

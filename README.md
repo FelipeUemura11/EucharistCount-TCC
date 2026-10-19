@@ -85,9 +85,9 @@ Este é um TCC em duas etapas. **O que está implementado até aqui:** a visão 
 | Contagem por cruzamento de linha virtual (entrada/saída) | ✅ Implementado |
 | Painel de monitoramento em tempo real (janela local) | ✅ Implementado |
 | Persistência (SQLite) — o motor grava cada missa durante a contagem | ✅ Implementado |
-| API (FastAPI) — status, dashboard, celebrações e histórico, em [`backend/api/`](./backend/api/) | ✅ Implementado |
-| Dashboard web (React) — Dashboard ao vivo e Histórico ligados à API | 🚧 Celebrações e Configurações ainda com dados fictícios |
-| Estimativa de comunhão e hóstias sugeridas | 🚧 Coeficiente fixo calculado e exibido; gravação automática no histórico e uso da regressão pendentes |
+| API (FastAPI) — status, dashboard, celebrações, histórico e configurações, em [`backend/api/`](./backend/api/) | ✅ Implementado |
+| Dashboard web (React) — Dashboard ao vivo, Histórico e Configurações ligados à API | 🚧 Celebrações ainda com dados fictícios |
+| Estimativa de comunhão e hóstias sugeridas | 🚧 Coeficiente fixo e inferência por regressão (`.joblib`) implementados; gravação automática no fechamento da sessão pendente |
 | Agendamento automático (APScheduler) | Em Desenvolvimento |
 | Empacotamento (PyInstaller) | Em Desenvolvimento |
 
@@ -161,7 +161,7 @@ O dashboard fica em `http://127.0.0.1:8000`. Quando o vídeo termina, ele contin
 
 Instruções completas — calibração de modelo, ajuste da linha de contagem e parâmetros de `config.json` — estão em [`backend/README.md`](./backend/README.md).
 
-O frontend (`frontend/`) é servido já compilado pelo próprio backend, na mesma porta da API: depois de qualquer mudança nele, é preciso rodar `npm run build` de novo. As telas Dashboard e Histórico consomem a API; Celebrações e Configurações ainda usam dados fictícios. Instruções em [`frontend/README.md`](./frontend/README.md).
+O frontend (`frontend/`) é servido já compilado pelo próprio backend, na mesma porta da API: depois de qualquer mudança nele, é preciso rodar `npm run build` de novo. As telas Dashboard, Histórico e Configurações consomem a API; Celebrações ainda usa dados fictícios. Instruções em [`frontend/README.md`](./frontend/README.md).
 
 ---
 
