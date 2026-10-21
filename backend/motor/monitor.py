@@ -76,6 +76,7 @@ class Monitor:
 
         self._parar = False
         self._pausado = False
+        # FPS exibido = media dos ultimos 30 frames.
         self._janela_fps: deque[float] = deque(maxlen=30)
         self.contador: ContadorLinha | None = None
 
@@ -157,6 +158,7 @@ class Monitor:
 
         ultimo_instante = time.perf_counter()
 
+        # Ciclo por frame: detectar, contar (se nao for replay), metricas, callback, janela.
         try:
             for frame in fonte:
                 if self._parar:
@@ -164,6 +166,7 @@ class Monitor:
 
                 pessoas = self.detector.detectar(frame)
 
+                # Frame ja contado antes (depois de voltar com A): so exibe, nao conta.
                 self._replay = fonte.indice_atual <= self._frame_max_contado
 
                 if self.contador is not None and not self._replay:
@@ -184,6 +187,7 @@ class Monitor:
 
                 self._atualizar_metricas(pessoas, ultimo_instante)
 
+                # Callback opcional: recebe metricas e tempo do video a cada frame.
                 if ao_atualizar is not None:
                     ao_atualizar(self.metricas, fonte.tempo_atual)
 
@@ -213,6 +217,7 @@ class Monitor:
             if p.id is not None:
                 m.ids_unicos.add(p.id)
 
+        # FPS instantaneo = 1 / tempo desde o frame anterior; a media da janela suaviza.
         decorrido = time.perf_counter() - instante_anterior
         self._janela_fps.append(1.0 / max(decorrido, 1e-6))
         m.fps = sum(self._janela_fps) / len(self._janela_fps)
@@ -224,6 +229,7 @@ class Monitor:
     def _anotar(self, frame, pessoas: list[Pessoa]) -> None:
         cfg = self.config
 
+        # Ordem de desenho: linha e zona morta, caixas, painel por cima.
         if self.contador is not None and cfg.visual.mostrar_linhas:
             desenhar_linha(frame, self.contador.linha, self.contador.margem)
 

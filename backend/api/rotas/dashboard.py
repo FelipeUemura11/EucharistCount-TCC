@@ -27,6 +27,7 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
     # Caso gravacao finalizada Contagem inativa: obtter_ultima_sessao_concluida(db)
     sessao = crud.obter_sessao_ativa(db) or crud.obter_ultima_sessao_concluida(db)
 
+    # Sem nenhuma sessao: zera tudo em vez de dar erro, para o frontend receber sempre o mesmo formato.
     if not sessao:
         return DadosDashboard(
             metricas=MetricasDashboard(
@@ -36,6 +37,7 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
             graficoOcupacao=[], resumoCelebracao=None,
         )
 
+    # em_andamento = contagem ao vivo; senao e a ultima sessao concluida.
     ativa = sessao["status"] == "em_andamento"
     ocupacao = sessao["ocupacao_final"]
 

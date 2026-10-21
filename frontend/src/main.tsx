@@ -7,6 +7,7 @@ import { BrowserRouter } from "react-router";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
+        {/* ErrorBoundary por fora do router: pega erro de render de qualquer pagina. */}
         <ErrorBoundary>
             <BrowserRouter>
                 <App />

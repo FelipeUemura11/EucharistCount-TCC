@@ -37,8 +37,8 @@ Máquina Local da Igreja
 │  Frontend (React + TypeScript)          │
 │              ↕ HTTP localhost           │
 │  API (FastAPI)                          │
-│              ↕ registra jobs            │
-│  Automação (APScheduler)                │
+│              ↕ registra jobs (planej.)  │
+│  Automação (APScheduler — em desenv.)   │
 │              ↕ aciona/finaliza          │
 │  Motor IA (OpenCV + YOLO + ByteTrack)   │
 │              ↕ grava contagem           │
@@ -48,7 +48,7 @@ Máquina Local da Igreja
    Câmera IP / NVR — stream RTSP
 ```
 
-Tudo roda num único executável local (empacotado com PyInstaller), sem conectividade externa. A câmera fornece o stream via RTSP; o motor de IA processa os frames em memória, sem gravar nada em disco; a API expõe os dados agregados ao dashboard via `localhost`.
+A câmera fornece o stream via RTSP; o motor de IA processa os frames em memória, sem gravar nada em disco; a API expõe os dados agregados ao dashboard via `localhost` (`127.0.0.1:8000`). O agendamento automático via APScheduler e o empacotamento em executável único (PyInstaller) estão em desenvolvimento.
 
 ---
 
@@ -62,14 +62,15 @@ Conforme especificado no documento do TCC:
 | Visão computacional | **OpenCV** | Captura, redimensionamento e desenho sobre os frames |
 | Detecção | **Ultralytics YOLO** | Detecção de pessoas (classe `person`) no quadro da câmera de acesso |
 | Rastreamento | **ByteTrack** | Identificadores únicos e persistentes por indivíduo |
-| API | **FastAPI + Uvicorn** | Rotas HTTP assíncronas, comunicação local |
+| Estimativa / Regressão | **Pandas + scikit-learn + joblib** | Cálculo de comungantes e hóstias (coeficiente fixo e regressão linear) |
+| API | **FastAPI + Uvicorn** | Rotas HTTP e entrega do frontend na mesma origem (`127.0.0.1:8000`) |
 | Validação de dados | **Pydantic** | Tipagem e validação dos schemas trafegados |
 | Persistência | **SQLite** | Celebrações, contagens, snapshots — em arquivo único, local |
-| Agendamento | **APScheduler** | Início/fim automático do monitoramento por celebração |
-| Frontend | **React + TypeScript + Vite** | Dashboard, Celebrações, Histórico, Configurações |
+| Agendamento | **APScheduler** *(em desenvolvimento)* | Início/fim automático do monitoramento por celebração |
+| Frontend | **React + TypeScript + Vite + Tailwind** | Dashboard, Celebrações, Histórico, Configurações e Ajuda (FAQ) |
 | Gráficos | **Recharts** | Evolução da ocupação ao longo da celebração |
-| HTTP client | **Axios** | Comunicação do frontend com a API local |
-| Empacotamento | **PyInstaller** | Executável autônomo para a máquina da paróquia |
+| HTTP client | **Fetch API** | Comunicação do frontend com a API local (`/api/...`) |
+| Empacotamento | **PyInstaller** *(em desenvolvimento)* | Executável autônomo para a máquina da paróquia |
 
 ---
 
@@ -79,17 +80,17 @@ Este é um TCC em duas etapas. **O que está implementado até aqui:** a visão 
 
 | Componente | Status |
 |---|---|
-| Captura de vídeo (arquivo / webcam / RTSP, com reconexão) | ✅ Implementado |
+| Captura de vídeo (arquivo / webcam / RTSP, com reconexão e salto A/D em arquivo) | ✅ Implementado |
 | Detecção de pessoas (YOLO, otimizado para CPU via ONNX) | ✅ Implementado |
-| Rastreamento com ID persistente (ByteTrack) | ✅ Implementado |
-| Contagem por cruzamento de linha virtual (entrada/saída) | ✅ Implementado |
-| Painel de monitoramento em tempo real (janela local) | ✅ Implementado |
+| Rastreamento com ID persistente (ByteTrack ajustado) | ✅ Implementado |
+| Contagem por cruzamento de linha virtual (entrada/saída, zona morta e cooldown) | ✅ Implementado |
+| Painel de monitoramento em tempo real (janela local com modo replay) | ✅ Implementado |
 | Persistência (SQLite) — o motor grava cada missa durante a contagem | ✅ Implementado |
 | API (FastAPI) — status, dashboard, celebrações, histórico e configurações, em [`backend/api/`](./backend/api/) | ✅ Implementado |
-| Dashboard web (React) — Dashboard ao vivo, Histórico e Configurações ligados à API | 🚧 Celebrações ainda com dados fictícios |
-| Estimativa de comunhão e hóstias sugeridas | 🚧 Coeficiente fixo e inferência por regressão (`.joblib`) implementados; gravação automática no fechamento da sessão pendente |
-| Agendamento automático (APScheduler) | Em Desenvolvimento |
-| Empacotamento (PyInstaller) | Em Desenvolvimento |
+| Dashboard web (React) — Dashboard ao vivo, Histórico, Configurações e Ajuda (FAQ) ligados à API | 🚧 Celebrações ainda com dados fictícios |
+| Estimativa de comunhão e hóstias sugeridas (`integracao/estimativa.py`) | 🚧 Coeficiente fixo e inferência por regressão (`.joblib`) no Dashboard prontos; gravação automática no fechamento da sessão pendente |
+| Agendamento automático (APScheduler) | ⏳ Em desenvolvimento |
+| Empacotamento (PyInstaller) | ⏳ Em desenvolvimento |
 
 Detalhes de uso, configuração e arquitetura interna do módulo de visão computacional estão em [`backend/README.md`](./backend/README.md).
 
@@ -104,7 +105,9 @@ EucharistCount-TCC/
 ├── backend/
 │   ├── main.py                  # ponto de entrada: sobe banco, API e motor
 │   ├── cli.py                   # argumentos de linha de comando
+│   ├── gerar_dados.py           # popula o banco com dados de demonstração
 │   ├── config.json              # parâmetros ajustáveis (câmera, modelo, contagem)
+│   ├── .env.example             # modelo de variáveis locais (CAMERA_FONTE)
 │   ├── bytetrack_ajustado.yaml  # tracker ajustado para esta cena
 │   ├── counting_people.csv      # contagem manual de referência (validação)
 │   ├── requirements.txt
@@ -113,8 +116,8 @@ EucharistCount-TCC/
 │   ├── DOCUMENTACAO_BANCO.md    # modelo de dados, diagramas e estimativa de comunhão
 │   ├── DOCUMENTACAO_API.md      # API FastAPI, ligação motor → banco e dashboard ao vivo
 │   │
-│   ├── motor/                    # Motor de Visao Computacional (nome alinhado ao TCC)
-│   │   ├── config.py            # carrega o config.json
+│   ├── motor/                   # Motor de Visão Computacional (nome alinhado ao TCC)
+│   │   ├── config.py            # carrega o config.json e o .env
 │   │   ├── camera.py            # captura: arquivo, webcam ou RTSP
 │   │   ├── detector.py          # YOLO + ByteTrack → lista de Pessoa
 │   │   ├── contador.py          # contagem por cruzamento de linha virtual
@@ -127,14 +130,14 @@ EucharistCount-TCC/
 │   ├── db/                      # camada de persistência SQLite (TCC II)
 │   │   ├── schema.sql           # tabelas, índices e a view do histórico
 │   │   ├── crud.py              # uma função por operação, para a API usar
-│   │   └── ...                  # importação do CSV e estimativa de comunhão
+│   │   └── ...                  # importação do CSV e treino da regressão de comunhão
 │   │
 │   ├── scripts/
 │   │   ├── preparar_modelo.py   # exporta o modelo YOLO para ONNX
 │   │   ├── calibrar.py          # testa combinações de modelo/resolução/confiança
 │   │   └── calibrar_linha.py    # marca a linha de contagem por clique
 │   │
-│   ├── modelos/                 # modelos .onnx (fora do Git)
+│   ├── modelos/                 # modelos .onnx
 │   └── videos/                  # vídeos de teste (fora do Git)
 │
 └── frontend/                    # React + TypeScript + Vite (servido pelo backend em :8000)
@@ -147,9 +150,10 @@ EucharistCount-TCC/
 ```bash
 cd backend
 python -m venv .venv
-.venv\Scripts\activate          # Windows
+.venv\Scripts\activate          # Windows (no Linux/Mac: source .venv/bin/activate)
 
 pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+cp .env.example .env            # defina CAMERA_FONTE no .env (ou passe --fonte)
 
 python -m scripts.preparar_modelo --modelo yolo11n --imgsz 640
 
@@ -157,7 +161,7 @@ cd ../frontend && npm install && npm run build && cd ../backend
 python main.py
 ```
 
-O dashboard fica em `http://127.0.0.1:8000`. Quando o vídeo termina, ele continua no ar mostrando o resultado da missa; `Ctrl+C` no terminal encerra o programa.
+O dashboard fica em `http://127.0.0.1:8000`. Quando o vídeo termina (ou caso a câmera não esteja conectada), ele continua no ar mostrando o resultado da última missa e permitindo consultar Histórico e Configurações; `Ctrl+C` no terminal encerra o programa.
 
 Instruções completas — calibração de modelo, ajuste da linha de contagem e parâmetros de `config.json` — estão em [`backend/README.md`](./backend/README.md).
 

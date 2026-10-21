@@ -141,7 +141,7 @@ No código (`detector.py`), a chamada relevante é:
 
 ```python
 resultado = self.modelo.track(
-    entrada,
+    frame,
     imgsz=self.config.imgsz,
     conf=self.config.confianca,
     iou=self.config.iou,
@@ -329,8 +329,6 @@ intacta a proteção contra tremor descrita na seção 8.4. Empurrar a linha
 para `0.40` começa a contar gente demais: naquela altura do quadro ela
 cruza o caminho de quem apenas circula pelo pátio sem entrar.
 
-
-
 ---
 
 ## 8. A contagem por linha virtual
@@ -426,7 +424,17 @@ Dois parâmetros temporais governam o ciclo de vida de cada rastro:
 
 **`segundos_cooldown` (3.0s)** — depois de confirmar uma contagem para uma pessoa, o sistema ignora novos eventos dela por esse período. Isso evita contar a mesma pessoa duas vezes caso ela volte a atravessar a faixa logo após ser contada — alguém que para na porta, hesita e volta, por exemplo.
 
-> **Limitação conhecida.** O cooldown suprime o evento de volta, mas o lado registrado da pessoa é atualizado mesmo assim (`contador.py`, a atribuição `rastro.lado = lado` vem antes do teste de cooldown). Se ela entra, recua para fora dentro dos 3 s e entra de novo depois deles, a segunda entrada é contada e a saída não: **2 entradas e 0 saídas para uma pessoa só**, o que infla a ocupação. Reproduzido com uma trajetória sintética. A correção é só atualizar o lado depois de passar pelo cooldown.
+Durante o cooldown, `rastro.lado` **não é atualizado** (permanece o lado da última contagem confirmada):
+
+```python
+if agora - rastro.contado_em < self.config.segundos_cooldown:
+    return None
+
+rastro.lado = lado
+rastro.contado_em = agora
+```
+
+Se `rastro.lado` fosse atualizado antes do teste de cooldown, uma pessoa que entrasse, recuasse dentro dos 3 s e entrasse de novo depois deles geraria 2 entradas e 0 saídas. Mantendo o lado da última contagem durante o cooldown, a hesitação é absorvida como 1 única entrada — e se a pessoa realmente voltou e ficou do lado de fora, a saída é registrada normalmente assim que o cooldown termina.
 
 **`segundos_esquecer` (10.0s)** — pessoas que somem do enquadramento (ou que o rastreador simplesmente perde) têm seu rastro apagado após esse tempo:
 
@@ -456,6 +464,13 @@ def tempo_atual(self) -> float:
 Para um arquivo de vídeo, o tempo é `número do frame ÷ fps original do arquivo` — um valor que depende só do conteúdo do vídeo, nunca de quão rápido a máquina processa. Isso é essencial para a reprodutibilidade dos testes de validação do TCC: rodar o mesmo arquivo numa máquina mais lenta ou mais rápida produz **exatamente a mesma contagem**, porque os limiares de tempo (cooldown, esquecer) sempre se referem ao tempo que se passou *dentro do vídeo*, não ao tempo que o computador levou para processá-lo. Sem esse cuidado, o mesmo vídeo poderia gerar contagens diferentes dependendo do hardware — o que inviabilizaria comparar resultados de forma confiável.
 
 Um cuidado que decorre disso: o campo `contado_em` de cada rastro nasce em `-infinito`, e não em zero. Como o tempo do vídeo começa em zero, um valor inicial zero colocaria todo mundo em cooldown durante os primeiros 3 segundos de gravação — ninguém que cruzasse a linha nesse intervalo seria contado.
+
+### 8.9 Navegação no vídeo (teclas A/D) e modo Replay
+
+Em arquivos de vídeo, a janela de monitoramento permite voltar (`A`) ou avançar (`D`) 10 segundos (`Monitor.SEGUNDOS_SALTO = 10.0`) por meio de `FonteVideo.pular()`. Como o salto reposiciona o vídeo abruptamente, duas proteções entram em ação:
+
+1. **Limpeza de trilhas e lados:** `Monitor._saltar()` chama `detector.reiniciar_rastreio()` e `contador.esquecer_rastros()` (que limpa os lados mas preserva `entradas` e `saidas`), evitando cruzamentos falsos causados pelo "teletransporte" das caixas entre o frame antigo e o de destino.
+2. **Modo Replay (`_replay`):** `Monitor` guarda em `_frame_max_contado` o maior índice de frame já avaliado pelo contador. Quando o usuário volta o vídeo com `A`, enquanto `fonte.indice_atual <= _frame_max_contado`, o sistema entra em modo `REPLAY (sem contar)`: continua detectando e desenhando na tela para inspeção visual, mas não chama `contador.atualizar()`. A contagem só retoma automaticamente quando o vídeo ultrapassa o ponto onde estava antes do salto, impedindo contar a mesma pessoa duas vezes.
 
 ---
 
@@ -563,17 +578,13 @@ O parâmetro é opcional: chamar `executar()` sem ele, como fazem os scripts de 
 
 ---
 
-## 14. Limitações conhecidas do motor
+## 14. Correções aplicadas e cuidados de integração
 
-Pontos identificados em revisão e ainda não corrigidos no código:
+Pontos identificados em revisões anteriores que já foram corrigidos no código:
 
-| Onde | Limitação | Efeito |
-|---|---|---|
-| `contador.py` — cooldown | Atualiza o lado antes de testar o cooldown | Quem hesita na porta pode ser contado duas vezes (seção 8.7) |
-
-Corrigido: `Config.carregar()` repassava as chaves do JSON direto para os dataclasses, e uma chave desconhecida no `config.json` (um erro de digitação, por exemplo) impedia o programa de iniciar com `TypeError`. Agora cada seção passa por `_construir()`, que só usa as chaves conhecidas e avisa no terminal (`[config] chave desconhecida ignorada: ...`) as que descartou. A `contagem.linha`, que chega do JSON como lista, é convertida para tupla, como declara o dataclass.
-
-Corrigido: `Monitor.executar()` não reiniciava o estado da execução anterior. Reusar a mesma instância depois de um `parar()` fazia a nova execução terminar no primeiro frame, devolvendo as métricas antigas, e os IDs únicos, o FPS e o rastreador (o `persist=True` do ByteTrack) vinham da execução passada. Agora `executar()` zera `_parar`, as `Metricas`, a janela de FPS e o contador, e chama `DetectorPessoas.reiniciar_rastreio()`, que limpa as trilhas e recomeça os IDs. Consequência para o agendador: um `parar()` chamado **antes** de `executar()` começar é apagado por esse reset, então ele só deve ser chamado com a execução já em andamento.
+- **Cooldown sem atualizar lado (`contador.py`):** anteriormente, `rastro.lado` era atualizado antes do teste de `segundos_cooldown`, fazendo quem hesitasse na porta contar 2 entradas e 0 saídas. Agora `rastro.lado` só muda quando a contagem é efetivamente confirmada (seção 8.7).
+- **Chaves desconhecidas no `config.json` (`config.py`):** `Config.carregar()` passa cada seção por `_construir()`, que ignora chaves desconhecidas com aviso no terminal (`[config] chave desconhecida ignorada: ...`) em vez de levantar `TypeError`, e converte `contagem.linha` de lista JSON para tupla.
+- **Reuso de instância do `Monitor` (`monitor.py`):** `Monitor.executar()` agora zera `_parar`, `_pausado`, `Metricas`, janela de FPS, `_frame_max_contado` e `_replay`, e chama `DetectorPessoas.reiniciar_rastreio()` para limpar as trilhas do ByteTrack (`persist=True`). **Cuidado para o futuro agendador (APScheduler):** como `executar()` zera `self._parar = False` na primeira linha, `Monitor.parar()` só deve ser chamado depois que `executar()` já estiver em andamento.
 
 ---
 
@@ -595,6 +606,7 @@ Corrigido: `Monitor.executar()` não reiniciava o estado da execução anterior.
 | Posição da linha | Vertical em `x = 0.25` | Perto do portão, mas fora da zona onde o rastreio morre |
 | Sentido da entrada | Direita → esquerda | Lado da igreja de onde a câmera atual enquadra o portão |
 | Anti-tremor | Zona morta de ±3,5% da largura | Mesma garantia das 3 linhas antigas, com 1 parâmetro |
+| Salto no vídeo (A/D) | Modo replay (`_frame_max_contado`) | Permite rever trechos sem duplicar contagens |
 | Enquadramento | Câmera apontada para a entrada | Resolve fisicamente o que a ROI compensava em software |
 | Base de tempo da contagem | Tempo do vídeo, não da CPU | Reprodutibilidade entre execuções e hardwares |
 | Armazenamento de imagem | Inexistente no código | Conformidade estrutural com a LGPD |

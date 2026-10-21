@@ -25,6 +25,7 @@ class GravadorSessao:
         self.conexao = conexao
         self.sessao_id = sessao_id
         self.intervalo = intervalo
+        # -inf: o primeiro frame ja grava um instantaneo.
         self._ultimo = -math.inf
         self.pico = 0
         self._totais = (0, 0) # entradas e saidas finais
@@ -66,6 +67,7 @@ def sessao_de_monitoramento(monitor: Monitor, config: Config) -> Iterator[Gravad
     conexao = obter_conexao()
     agora = datetime.now()
 
+    # Celebracao por data + hora atual; se ja existe (UNIQUE no schema), reaproveita.
     celebracao_id = crud.obter_ou_criar_celebracao(
         conexao,
         titulo="Missa (monitoramento automatico)",
@@ -92,6 +94,7 @@ def sessao_de_monitoramento(monitor: Monitor, config: Config) -> Iterator[Gravad
         # normalmente e nao deve entrar no historico como se fosse valida.
         status = "interrompida"
         raise
+    # Sempre fecha a sessao, com os totais das ultimas metricas do monitor.
     finally:
         m = monitor.metricas
         crud.finalizar_sessao(

@@ -19,6 +19,7 @@ router = APIRouter()
 
 @router.get("/configuracoes", response_model=ConfiguracoesGlobais)
 def get_configuracoes(db: sqlite3.Connection = Depends(obter_db)):
+    # Banco (snake_case) -> schema (camelCase) campo a campo.
     agenda = [
         AgendaDia(
             id=linha["id"],
@@ -42,6 +43,7 @@ def get_configuracoes(db: sqlite3.Connection = Depends(obter_db)):
     else:
         imgsz = config.deteccao.imgsz
         info_camera = InfoCamera(
+            # URL RTSP pode ter senha: so a versao mascarada sai da API.
             fonte=mascarar_senha(config.camera.fonte) or "Não definida (CAMERA_FONTE no .env)",
             resolucao=f"{imgsz}x{imgsz} (processamento)",
             fpsProcessado=config.camera.fps_processamento,

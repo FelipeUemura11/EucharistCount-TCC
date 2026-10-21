@@ -17,6 +17,7 @@ import crud
 def calcular_e_gravar() -> None:
     conexao = obter_conexao()
 
+    # ocupacao_final > 0 evita divisao por zero; so entra missa com comunhao real.
     linhas = conexao.execute(
         """
         SELECT c.data, c.horario_missa, s.ocupacao_final, e.comungantes_reais
@@ -40,9 +41,11 @@ def calcular_e_gravar() -> None:
         print(f"{linha['data']:<12} {linha['horario_missa']:<8} "
               f"{linha['ocupacao_final']:>8} {linha['comungantes_reais']:>12} {razao:>8.2%}")
 
+    # Media simples das razoes: cada missa pesa igual, independente do tamanho.
     coeficiente = sum(razoes) / len(razoes)
     print(f"\nCoeficiente medio ({len(razoes)} celebracao(oes)): {coeficiente:.4f} ({coeficiente:.1%})")
 
+    # Insere nova versao (historico append-only); a mais recente vira a vigente.
     config_id = crud.definir_configuracao_estimativa(
         conexao,
         coeficiente_comunhao=round(coeficiente, 4),

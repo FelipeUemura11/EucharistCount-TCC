@@ -5,6 +5,7 @@ import type {
   CelebrationMassSchedule,
 } from '../types/celebrations';
 
+// Tudo neste arquivo e mock fixo (maio/2026), usado pela pagina Celebracoes.
 export const celebrationMonth = {
   label: 'Maio de 2026',
   monthName: 'maio',
@@ -25,6 +26,7 @@ const weekdayLabels = [
   'Sábado',
 ];
 
+// Agenda padrao simulada por dia da semana (0 = domingo).
 const globalSchedulesByWeekday: Record<number, Array<Omit<CelebrationMassSchedule, 'id' | 'source'>>> = {
   0: [
     { startTime: '08:00', recordingStartTime: '08:00', recordingEndTime: '09:00' },

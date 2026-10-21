@@ -49,6 +49,7 @@ class ConfigDeteccao:
     imgsz: int = 480
 
     # Limiar de confianca. Mais baixo detecta mais, com mais falsos positivos.
+    # Baixo de proposito para pegar gente distante; filtro geometrico e tracker seguram os falsos positivos.
     confianca: float = 0.15
     # IoU (Intersection over Union), métrica que mede o quanto duas caixas delimitadoras (bounding boxes) se sobrepõem.
     iou: float = 0.7
@@ -180,6 +181,7 @@ class Config:
         Precedencia dos parametros: linha de comando (cli.py) > config.json
         > padrao. A fonte da camera: linha de comando > .env.
         """
+        # Ordem: config.json (ou padroes) primeiro; o .env entra por ultimo e define a fonte.
         caminho = caminho or ARQUIVO_CONFIG
         if not caminho.exists():
             config = cls()

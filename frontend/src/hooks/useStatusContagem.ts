@@ -14,12 +14,14 @@ export function useStatusContagem() {
           if (mounted) setContagemAtiva(dados.contagemAtiva);
         }
       } catch (error) {
+        // Sem resposta da API: o header mostra contagem inativa.
         console.error(error);
         if (mounted) setContagemAtiva(false);
       }
     }
 
     verificarStatus();
+    // Poll de 5 s so para o indicador de contagem ativa no header.
     const interval = setInterval(verificarStatus, 5000);
 
     return () => {

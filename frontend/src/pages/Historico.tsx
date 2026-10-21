@@ -28,6 +28,7 @@ function isWithinPeriod(
     return diffInDays >= 0 && diffInDays <= periodInDays;
 }
 
+// Data de referencia = registro mais recente, nao hoje: o periodo conta a partir do ultimo dado.
 function getLatestRecordDate(registros: RegistroHistorico[]) {
     return registros.reduce((latestDate, registro) => {
         const recordDate = parseDateFromHistory(registro.data);
@@ -37,6 +38,7 @@ function getLatestRecordDate(registros: RegistroHistorico[]) {
 
 export default function Historico() {
     const { registros } = useHistorico();
+    // draft = o que esta nos inputs; applied = o que filtra a tabela (so muda ao clicar em aplicar).
     const [draftSearchTerm, setDraftSearchTerm] = useState("");
     const [draftPeriodInDays, setDraftPeriodInDays] = useState(30);
     const [appliedFilters, setAppliedFilters] = useState<HistoryFilterState>({
@@ -44,6 +46,7 @@ export default function Historico() {
         periodInDays: 30,
     });
 
+    // Filtro no cliente: a API devolve todos os registros e busca/periodo sao aplicados aqui.
     const filteredRecords = useMemo(() => {
         if (registros.length === 0) {
             return [];
@@ -78,6 +81,7 @@ export default function Historico() {
         });
     };
 
+    // Exportar ainda nao gera arquivo, so loga no console.
     const handleExportRecords = () => {
         console.log("Exportando registros de histórico...");
     };

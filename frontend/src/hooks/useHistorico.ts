@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { buscarHistorico } from '../services/historico';
 import type { RegistroHistorico } from '../types/history';
 
+// Historico muda pouco (so quando uma contagem fecha), entao poll mais lento: 10 s.
 const INTERVALO_ATUALIZADO_MS = 10000;
 
 export function useHistorico() {

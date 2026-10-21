@@ -9,6 +9,7 @@ export async function buscarHistorico(): Promise<RegistroHistorico[]> {
         return await response.json();
     } catch (error) {
         console.error("Falha ao consultar o histórico:", error);
+        // Relanca para o hook decidir o que fazer (ele mantem a tabela anterior).
         throw error;
     }
 }

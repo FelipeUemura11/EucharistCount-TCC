@@ -49,6 +49,7 @@ def callback_mouse(evento, x, y, _flags, _param):
 
     if len(pontos) == 2:
         (x1, y1), (x2, y2) = pontos
+        # Saida em fracao da resolucao (0 a 1): vale para qualquer tamanho de video.
         print(f'\n  "linha": [{x1 / largura:.3f}, {y1 / altura:.3f}, '
               f'{x2 / largura:.3f}, {y2 / altura:.3f}]\n')
 
@@ -109,6 +110,7 @@ def main() -> int:
     frame_atual = None
     ok = False
     while True:
+        # So rele do video quando o frame mudou (navegacao); senao reusa o atual.
         if not ok:
             cap.set(cv2.CAP_PROP_POS_FRAMES, indice)
             ok, frame_atual = cap.read()

@@ -112,6 +112,7 @@ class DetectorPessoas:
         Detecta pessoas em um frame, cada uma com um ID estavel entre
         frames — e o ID que permite contar sem duplicar.
         """
+        # track() faz deteccao e ByteTrack numa chamada: ja devolve caixas com ID.
         resultado = self.modelo.track(
             frame,
             imgsz=self.config.imgsz,
@@ -146,6 +147,7 @@ class DetectorPessoas:
         xyxy = caixas.xyxy.cpu().numpy()
         confs = caixas.conf.cpu().numpy()
 
+        # id vem None enquanto o tracker nao confirmou a trilha.
         if caixas.id is not None:
             ids = caixas.id.cpu().numpy().astype(int)
         else:
@@ -179,6 +181,7 @@ class DetectorPessoas:
         if largura <= 0 or altura <= 0:
             return False
 
+        # Filtro em duas etapas: area relativa ao frame, depois proporcao largura/altura.
         fracao_area = (largura * altura) / (largura_frame * altura_frame)
         if not (f.area_min <= fracao_area <= f.area_max):
             return False

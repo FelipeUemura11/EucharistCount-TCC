@@ -1,6 +1,6 @@
 # Backend — Eucharist Count
 
-Módulo de visão computacional para contagem de pessoas em celebrações litúrgicas.
+Módulo de visão computacional, banco de dados e API para contagem de pessoas em celebrações litúrgicas.
 
 Projetado para rodar **na máquina da paróquia**: CPU comum, sem placa de vídeo,
 sem conexão com a nuvem. Nenhuma imagem é armazenada.
@@ -15,6 +15,7 @@ backend/
 ├── cli.py                   # argumentos de linha de comando → Config
 ├── gerar_dados.py           # popula o banco com dados de demonstração
 ├── config.json              # parâmetros ajustáveis (editável)
+├── .env.example             # modelo de configuração local (CAMERA_FONTE)
 ├── bytetrack_ajustado.yaml  # tracker ajustado para esta cena
 ├── counting_people.csv      # contagem manual de referência (validação)
 ├── requirements.txt
@@ -24,8 +25,8 @@ backend/
 ├── DOCUMENTACAO_API.md      # API, ligação motor → banco, dashboard ao vivo
 │
 ├── motor/                   # Motor de Visão Computacional (OpenCV + YOLO + ByteTrack)
-│   ├── config.py            # carrega o config.json
-│   ├── camera.py            # captura: arquivo, webcam ou RTSP
+│   ├── config.py            # carrega o config.json e o .env
+│   ├── camera.py            # captura: arquivo, webcam ou RTSP (e salto A/D em arquivo)
 │   ├── detector.py          # YOLO + ByteTrack → lista de Pessoa
 │   ├── contador.py          # contagem por cruzamento de linha virtual
 │   ├── visual.py            # desenho (só para monitoramento)
@@ -33,16 +34,16 @@ backend/
 │
 ├── api/                     # servidor FastAPI — ver DOCUMENTACAO_API.md
 │   ├── app.py               # criar_app(): monta o FastAPI
-│   ├── servidor.py          # sobe o uvicorn numa thread
+│   ├── servidor.py          # sobe o uvicorn numa thread daemon (127.0.0.1:8000)
 │   ├── dependencias.py      # obter_db (uma conexão por requisição)
 │   ├── schemas.py           # modelos Pydantic (contrato com o frontend)
-│   ├── formatacao.py        # datas, hora local, dia da semana, status
+│   ├── formatacao.py        # datas, hora local, dia da semana
 │   ├── frontend.py          # serve o React compilado (frontend/dist)
-│   └── rotas/               # uma rota por tela: status, dashboard, celebracoes, historico
+│   └── rotas/               # uma rota por tela: status, dashboard, celebracoes, historico, configuracoes
 │
 ├── integracao/              # ponte motor ↔ banco
 │   ├── sessao.py            # GravadorSessao, abrir/fechar sessão, sessões presas
-│   └── estimativa.py        # estimativa de comunhão e hóstias
+│   └── estimativa.py        # estimativa de comunhão e hóstias (coeficiente fixo e regressão)
 │
 ├── db/                      # persistência SQLite — ver db/README.md
 │
@@ -51,7 +52,7 @@ backend/
 │   ├── calibrar.py          # descobre a melhor configuração pro seu vídeo
 │   └── calibrar_linha.py    # marca a linha de contagem por clique
 │
-├── modelos/                 # modelos .onnx (fora do Git)
+├── modelos/                 # modelos .onnx
 └── videos/                  # vídeos de teste (fora do Git)
 ```
 
@@ -89,7 +90,7 @@ copy .env.example .env          # Windows
 
 A fonte da câmera **não fica no `config.json`**: vem só do `.env` (ou do
 `--fonte` na linha de comando, que ganha dele). Sem nenhum dos dois, o motor
-avisa e não inicia, mas o dashboard continua no ar. Na tela de Configurações
+avisa no terminal e não inicia, mas o dashboard continua no ar para consultas. Na tela de Configurações
 e no `parametros_contagem` gravado no banco, a senha da URL aparece
 mascarada (`rtsp://usuario:***@...`).
 
@@ -103,8 +104,8 @@ mascarada (`rtsp://usuario:***@...`).
 python -m scripts.calibrar
 ```
 
-Testa combinações de modelo/resolução/confiança nos frames do
-`videos/20-09-teste.mp4` e mede a velocidade **nesta máquina**. Os frames de teste
+Testa combinações de modelo/resolução/confiança nos frames da fonte configurada
+(`CAMERA_FONTE` no `.env` ou `--fonte`) e mede a velocidade **nesta máquina**. Os frames de teste
 ficam só em memória durante a execução — nada é salvo em disco.
 
 O script recomenda uma configuração com base em quantidade de detecções
@@ -153,11 +154,12 @@ python main.py --linha 0.25,0.0,0.25,1.0
 python main.py --imgsz 480 --threads 2 --sem-janela
 ```
 
-**Teclas (janela do vídeo):** `ESC`/`Q` encerra a contagem · `ESPAÇO` pausa
+**Teclas (janela do vídeo):** `ESC`/`Q` encerra a contagem · `ESPAÇO` pausa · `A`/`D` volta/avança 10s (somente em arquivo de vídeo; ao voltar, o trecho já contado roda em modo `REPLAY` sem duplicar contagens)
 
 Quando o vídeo acaba (ou com `ESC`), a contagem é encerrada e gravada no
 banco, mas **o programa continua rodando**: o dashboard em
 `http://127.0.0.1:8000` segue no ar mostrando os números finais da missa.
+O mesmo acontece se o modelo ou a fonte de vídeo falharem ao abrir: o motor exibe um aviso no terminal e mantém a interface web ativa.
 Para fechar o programa, `Ctrl+C` no terminal.
 
 Se a execução anterior tiver sido encerrada à força (queda de energia,
@@ -303,8 +305,9 @@ versionados no Git — o `.gitignore` do projeto já bloqueia isso.
 - [x] API FastAPI servindo o dashboard — ver [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md)
 - [x] Motor gravando no banco durante a missa, com dashboard ao vivo
 - [x] Telas de Configurações (cadastro da agenda padrão) e Ajuda
-- [ ] Agendamento automático com APScheduler
-- [ ] Empacotamento com PyInstaller
+- [x] Estimativa de comunhão e hóstias por coeficiente fixo e por regressão linear (`.joblib`)
+- [ ] Agendamento automático com APScheduler *(em desenvolvimento)*
+- [ ] Empacotamento com PyInstaller *(em desenvolvimento)*
 
 `python main.py` já sobe tudo junto: o motor conta, grava no SQLite, e o
 dashboard em `http://127.0.0.1:8000` acompanha a contagem ao vivo e, ao fim

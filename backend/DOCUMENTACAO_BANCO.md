@@ -18,7 +18,7 @@ Para um guia rápido de uso (comandos, exemplos curtos), veja [`db/README.md`](.
 
 ## 1. Por que SQLite
 
-O banco é **SQLite**: um único arquivo, `backend/db/eucharist_count.db`, lido e escrito direto pelo Python. A escolha decorre do mesmo requisito que guia o resto do backend — rodar numa máquina comum de paróquia, sem nuvem e sem ninguém de TI por perto:
+O banco é **SQLite**: um único arquivo, `backend/db/eucharist_count.db` (e preparado em `db/database.py` para ser direcionado a `%APPDATA%\EucharistCount\eucharist_count.db` quando empacotado no instalador Windows), lido e escrito direto pelo Python. A escolha decorre do mesmo requisito que guia o resto do backend — rodar numa máquina comum de paróquia, sem nuvem e sem ninguém de TI por perto:
 
 - **Não existe servidor.** Não há um serviço de banco para instalar, iniciar, atualizar ou que possa cair. O backup é copiar um arquivo.
 - **Vem com o Python.** O módulo `sqlite3` é da biblioteca padrão: nenhuma dependência nova no executável.
@@ -158,7 +158,7 @@ PLANEJADO                                   EXECUTADO
 horario_padrao ──gera──▶ celebracao ──1:N──▶ sessao_monitoramento ──1:N──▶ instantaneo_ocupacao
 (agenda semanal)         (uma missa          (uma execução            │     (série do gráfico)
                           numa data)          real da contagem)       │
-                                                                      └─1:1──▶ estimativa_comunhao
+                                                                      └──1:1──▶ estimativa_comunhao
                                                                               (comungantes e hóstias)
 ```
 
@@ -220,7 +220,7 @@ A **série temporal** da ocupação dentro de uma sessão, que desenha o gráfic
 
 O motor grava uma linha **a cada 5 segundos de vídeo**. A justificativa desse intervalo está na seção 7.3.
 
-O índice `idx_instantaneo_sessao_tempo (sessao_id, registrado_em)` cobre exatamente a consulta do gráfico: "todos os instantâneos desta sessão, em ordem de tempo".
+O índice `idx_instantaneo_sessao_tempo (sessao_id, registrado_em)` cobre exatamente a consulta do gráfico: "todos os instantâneos desta sessão, em ordem de tempo". Na leitura (`crud.obter_instantaneos`), o banco ordena por `registrado_em, id` para desempatar pontos gravados no mesmo segundo.
 
 ### 3.5 `configuracao_estimativa`
 
@@ -234,7 +234,7 @@ Os parâmetros que convertem ocupação em estimativa de comungantes e de hósti
 | `modelo_path` | Caminho do modelo treinado (`.joblib`), relativo à pasta onde vive o banco (`CAMINHO_BANCO.parent`) |
 | `vigente_desde` | Quando essa versão passou a valer |
 
-**É uma tabela *append-only*:** para mudar o coeficiente, insere-se uma linha nova em vez de fazer `UPDATE`. A versão vigente é sempre a mais recente. Isso preserva o histórico: dá para saber qual coeficiente valia quando cada sessão antiga foi estimada, e a coluna `estimativa_comunhao.configuracao_estimativa_id` aponta exatamente para ele.
+**É uma tabela *append-only*:** para mudar o coeficiente, insere-se uma linha nova em vez de fazer `UPDATE`. A versão vigente é sempre a mais recente (`ORDER BY vigente_desde DESC, id DESC LIMIT 1` em `crud.obter_configuracao_estimativa_vigente`, usando `id DESC` como desempate caso duas configurações sejam inseridas no mesmo segundo). Isso preserva o histórico: dá para saber qual coeficiente valia quando cada sessão antiga foi estimada, e a coluna `estimativa_comunhao.configuracao_estimativa_id` aponta exatamente para ele.
 
 ### 3.6 `estimativa_comunhao`
 
@@ -242,7 +242,7 @@ Uma linha por sessão (`sessao_id` é `UNIQUE`), com **três fontes de valor lad
 
 | Fonte | Colunas | Quem preenche |
 |---|---|---|
-| **Real** | `comungantes_reais`, `hostias_reais` | A equipe, contando na missa. É a "verdade" contra a qual o sistema é medido. Hoje é a única preenchida (vem da planilha) |
+| **Real** | `comungantes_reais`, `hostias_reais` | A equipe, contando na missa. É a "verdade" contra a qual o sistema é medido. Hoje é a única preenchida nos registros manuais (vem da planilha) |
 | **Calculada** | `estimativa_calculada`, `hostias_calculadas`, `coeficiente_utilizado` | O sistema, pelo coeficiente ou pela regressão |
 | **Ajustada** | `estimativa_ajustada`, `hostias_ajustadas`, `ajustado_por`, `ajustado_em` | O ministro, corrigindo o valor calculado antes da missa |
 
@@ -540,7 +540,7 @@ No fim, `ocupacao_final` e `contagem_sistema` recebem o mesmo valor. A diferenç
 Há dois tipos de data e hora no banco, com regras diferentes:
 
 | Tipo | Colunas | Fuso | Motivo |
-|---|---|---|---|
+|---|---|---|
 | **Carimbos de tempo** (quando algo foi gravado) | `iniciado_em`, `finalizado_em`, `registrado_em`, `criado_em`, `atualizado_em`, `vigente_desde`, `ajustado_em` | **UTC** | Nunca são ambíguos (sem horário de verão) e sempre comparáveis entre si |
 | **Data civil** (quando a missa acontece) | `celebracao.data`, `horario_missa`, `horario_*_monitoramento` | **Hora local** | "Missa das 18h" é 18h no relógio da paróquia |
 
@@ -600,8 +600,8 @@ A média é **das razões**, e não "total de comungantes ÷ total de pessoas". 
 - **Mínimo de 15 celebrações.** Com menos que isso, uma regressão com várias variáveis só "decora" os pontos que viu. O script avisa e não treina nada.
 - **Validação *leave-one-out*.** Com poucos dados, separar treino e teste fixos desperdiçaria amostras. O script treina com todas as missas menos uma, testa nessa, repete para cada missa, e reporta o erro médio (MAE) e o R².
 - **Variáveis categóricas** (dia da semana, tipo) passam por *one-hot encoding*, com `handle_unknown="ignore"`: um tipo de missa novo, nunca visto no treino, não derruba a previsão.
-- **Armazenamento compatível com PyInstaller:** o modelo final é salvo em `CAMINHO_BANCO.parent / "modelos_estimativa" / "regressao_comunhao_<data>.joblib"`, garantindo que no executável empacotado (onde o banco vive em `%APPDATA%\EucharistCount`) o `.joblib` também fique salvo em disco persistente e nunca na pasta temporária `_MEI...`.
-- **Inferência em `integracao/estimativa.py`:** quando a configuração vigente tem `metodo = 'regressao'`, `calcular_estimativa()` carrega o modelo com cache em memória e prevê os comungantes usando o contexto da celebração. Caso o arquivo não seja encontrado ou falhe, cai automaticamente para o `coeficiente_comunhao` de reserva.
+- **Armazenamento compatível com PyInstaller:** o modelo final é salvo em `CAMINHO_BANCO.parent / "modelos_estimativa" / "regressao_comunhao_<data>.joblib"`, garantindo que quando o banco for direcionado para `%APPDATA%\EucharistCount` no executável empacotado, o `.joblib` também fique salvo em disco persistente e nunca na pasta temporária `_MEI...`.
+- **Inferência em `integracao/estimativa.py`:** quando a configuração vigente tem `metodo = 'regressao'`, `calcular_estimativa()` carrega o modelo com cache em memória (`_CACHE_MODELO`), prevê os comungantes usando o contexto da celebração e limita o valor ao intervalo físico `[0, ocupacao]`. Caso o arquivo não seja encontrado ou falhe, cai automaticamente para o `coeficiente_comunhao` de reserva.
 
 ### 9.3 Importação do CSV manual
 
@@ -615,7 +615,7 @@ A média é **das razões**, e não "total de comungantes ÷ total de pessoas". 
 | `communed` | `estimativa_comunhao.comungantes_reais` |
 | `hosts_consecrated` | `estimativa_comunhao.hostias_reais` |
 
-Cada linha vira uma celebração (reaproveitada se já existir a mesma data e horário), uma sessão `manual` já `concluida` e, se houver dado de comunhão, uma estimativa.
+Cada linha vira uma celebração (reaproveitada se já existir a mesma data e horário), uma sessão `manual` já `concluida` (também reaproveitada e atualizada em caso de reimportação do mesmo CSV, evitando duplicar pontos no treino da regressão) e, se houver dado de comunhão, uma estimativa.
 
 ---
 
