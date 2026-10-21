@@ -5,6 +5,7 @@ export const dashboardMock: DadosDashboard = {
   metricas: {
     ocupacaoAtual: 0,
     estimativaComunhao: 0,
+    hostiasSugeridas: 0,
     entradas: 0,
     saidas: 0,
     contagemAtiva: false,

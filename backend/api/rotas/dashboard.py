@@ -30,7 +30,7 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
     if not sessao:
         return DadosDashboard(
             metricas=MetricasDashboard(
-                ocupacaoAtual=0, estimativaComunhao=0,
+                ocupacaoAtual=0, estimativaComunhao=0, hostiasSugeridas=0,
                 entradas=0, saidas=0, contagemAtiva=False,
             ),
             graficoOcupacao=[], resumoCelebracao=None,
@@ -56,10 +56,15 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
         resumo = ResumoCelebracao(titulo="Desconhecido",
                                   inicioMonitoramento="", fimMonitoramento="")
 
+    # As hostias vem do backend (com a margem_hostias do banco), para o
+    # Dashboard mostrar o mesmo numero que o Historico.
+    estimativa = calcular_estimativa(db, ocupacao, celebracao=celebracao)
+
     return DadosDashboard(
         metricas=MetricasDashboard(
             ocupacaoAtual=ocupacao,
-            estimativaComunhao=calcular_estimativa(db, ocupacao, celebracao=celebracao).comungantes,
+            estimativaComunhao=estimativa.comungantes,
+            hostiasSugeridas=estimativa.hostias,
             entradas=sessao["total_entradas"],
             saidas=sessao["total_saidas"],
             contagemAtiva=ativa,

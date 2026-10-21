@@ -12,6 +12,7 @@ export interface ResumoCelebracao {
 export interface MetricasDashboard {
   ocupacaoAtual: number;
   estimativaComunhao: number;
+  hostiasSugeridas: number;
   entradas: number;
   saidas: number;
   contagemAtiva: boolean;

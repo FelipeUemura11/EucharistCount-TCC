@@ -42,6 +42,9 @@ class FonteVideo:
         # Indice do frame que acabou de ser entregue, contado na fonte.
         self.indice_atual = 0
 
+        # Salto pedido por pular(), aplicado na proxima leitura do __iter__.
+        self._salto: Optional[int] = None
+
     @property
     def tempo_atual(self) -> float:
         """
@@ -106,6 +109,26 @@ class FonteVideo:
 
             print("[camera] Falha ao reconectar. Tentando novamente...")
 
+    def pular(self, segundos: float) -> Optional[float]:
+        """
+        Avanca (positivo) ou volta (negativo) o video, so para arquivo.
+
+        O salto vale a partir da proxima leitura do __iter__. Retorna o
+        instante de destino em segundos, ou None se nao der para pular
+        (camera ao vivo nao tem como voltar nem adiantar).
+        """
+        if self._ao_vivo or self._cap is None:
+            return None
+
+        destino = self.indice_atual + round(segundos * self.fps_original)
+        if self.total_frames > 0:
+            destino = min(destino, self.total_frames - 1)
+        destino = max(0, destino)
+
+        self._cap.set(cv2.CAP_PROP_POS_FRAMES, destino)
+        self._salto = destino
+        return destino / max(self.fps_original, 1e-6)
+
     # ---------- Leitura ----------
 
     def __iter__(self) -> Iterator[np.ndarray]:
@@ -124,6 +147,11 @@ class FonteVideo:
         intervalo_minimo = 1.0 / self.fps_alvo if self.fps_alvo > 0 else 0.0
 
         while True:
+            if self._salto is not None:
+                # pular() reposicionou a captura: o proximo read() entrega
+                # o frame `_salto`, e o indice local precisa acompanhar.
+                indice, self._salto = self._salto, None
+
             ok, frame = self._cap.read()
 
             if not ok:
