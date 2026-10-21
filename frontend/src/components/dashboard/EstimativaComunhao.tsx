@@ -9,7 +9,7 @@ export default function EstimativaComunhao({ metricas }: EstimativaComunhaoProps
     const communionPercent = metricas.ocupacaoAtual > 0
         ? Math.round((metricas.estimativaComunhao / metricas.ocupacaoAtual) * 100)
         : 0;
-    const suggestedHosts = Math.ceil(metricas.estimativaComunhao * 1.1);
+    const suggestedHosts = metricas.hostiasSugeridas;
 
     const communionStats = [
         {

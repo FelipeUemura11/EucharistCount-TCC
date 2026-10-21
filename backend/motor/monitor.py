@@ -56,6 +56,9 @@ class Monitor:
 
     JANELA = "Eucharist Count - Monitoramento"
 
+    # Quanto as teclas A (voltar) e D (avancar) pulam no video.
+    SEGUNDOS_SALTO = 10.0
+
     def __init__(self, config: Config, raiz: Path):
         self.config = config
         self.raiz = raiz
@@ -75,6 +78,13 @@ class Monitor:
         self._pausado = False
         self._janela_fps: deque[float] = deque(maxlen=30)
         self.contador: ContadorLinha | None = None
+
+        # Navegacao no video (teclas A/D). Ao voltar, o trecho ja contado
+        # e so revisto ("replay"): a contagem retoma quando o video passa
+        # do maior frame ja contado, sem contar ninguem duas vezes.
+        self._fonte: FonteVideo | None = None
+        self._frame_max_contado = 0
+        self._replay = False
 
     def parar(self) -> None:
         """Interrompe o loop. Sera chamado pelo APScheduler ao fim da missa."""
@@ -114,6 +124,10 @@ class Monitor:
             if not fonte.reconectar():
                 raise RuntimeError("Monitoramento cancelado antes de conectar a camera.")
 
+        self._fonte = fonte
+        self._frame_max_contado = 0
+        self._replay = False
+
         print(fonte.resumo())
         print(f"Modelo     : {self.detector.caminho_modelo.name}")
         print(f"imgsz      : {cfg.deteccao.imgsz}")
@@ -136,7 +150,10 @@ class Monitor:
                 int(fonte.largura * cfg.visual.escala_janela),
                 int(fonte.altura * cfg.visual.escala_janela),
             )
-            print("ESC/Q = sair | ESPACO = pausa\n")
+            print(
+                "ESC/Q = sair | ESPACO = pausa | "
+                f"A/D = voltar/avancar {self.SEGUNDOS_SALTO:.0f}s\n"
+            )
 
         ultimo_instante = time.perf_counter()
 
@@ -147,7 +164,10 @@ class Monitor:
 
                 pessoas = self.detector.detectar(frame)
 
-                if self.contador is not None:
+                self._replay = fonte.indice_atual <= self._frame_max_contado
+
+                if self.contador is not None and not self._replay:
+                    self._frame_max_contado = fonte.indice_atual
                     # Tempo do video, nao da maquina: mantem a contagem
                     # identica em qualquer CPU e com qualquer modelo.
                     eventos = self.contador.atualizar(pessoas, fonte.tempo_atual)
@@ -226,6 +246,9 @@ class Monitor:
                 f"FPS              : {m.fps:.1f}",
             ]
 
+        if self._replay:
+            linhas_painel.append("REPLAY (sem contar)")
+
         desenhar_painel(frame, linhas_painel)
 
     def _tratar_teclado(self, frame) -> bool:
@@ -240,11 +263,47 @@ class Monitor:
 
         if tecla == ord(" "):
             self._pausado = not self._pausado
-            while self._pausado:
-                t = cv2.waitKey(30) & 0xFF
-                if t == ord(" "):
-                    self._pausado = False
-                elif t in (27, ord("q"), ord("Q")):
-                    return False
+        elif tecla in (ord("a"), ord("A"), ord("d"), ord("D")):
+            self._saltar(tecla)
+
+        while self._pausado:
+            t = cv2.waitKey(30) & 0xFF
+            if t == ord(" "):
+                self._pausado = False
+            elif t in (27, ord("q"), ord("Q")):
+                return False
+            elif t in (ord("a"), ord("A"), ord("d"), ord("D")):
+                # Continua pausado: o loop principal le e mostra o frame
+                # de destino e volta a parar aqui.
+                self._saltar(t)
+                break
 
         return True
+
+    def _saltar(self, tecla: int) -> None:
+        """Volta (A) ou avanca (D) o video e prepara rastreio e contagem."""
+        voltar = tecla in (ord("a"), ord("A"))
+        segundos = -self.SEGUNDOS_SALTO if voltar else self.SEGUNDOS_SALTO
+
+        destino = self._fonte.pular(segundos) if self._fonte else None
+        if destino is None:
+            print("[aviso] Voltar/avancar so funciona com arquivo de video.")
+            return
+
+        # Depois do salto as pessoas "teletransportam": trilhas e lados
+        # antigos gerariam IDs trocados e cruzamentos falsos.
+        self.detector.reiniciar_rastreio()
+        if self.contador is not None:
+            self.contador.esquecer_rastros()
+
+        minutos, segs = divmod(int(destino), 60)
+        if voltar:
+            print(
+                f"[VOLTOU] {minutos:02d}:{segs:02d}  "
+                "(replay: a contagem retoma ao passar do ponto anterior)"
+            )
+        else:
+            print(
+                f"[AVANCOU] {minutos:02d}:{segs:02d}  "
+                "(quem cruzou no trecho pulado nao foi contado)"
+            )

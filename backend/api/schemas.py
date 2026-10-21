@@ -22,6 +22,7 @@ class ResumoCelebracao(BaseModel):
 class MetricasDashboard(BaseModel):
     ocupacaoAtual: int
     estimativaComunhao: int
+    hostiasSugeridas: int
     entradas: int
     saidas: int
     contagemAtiva: bool
