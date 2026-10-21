@@ -35,6 +35,7 @@ PASTA_BASE_MODELOS = CAMINHO_BANCO.parent
 CAMINHO_MODELOS = PASTA_BASE_MODELOS / "modelos_estimativa"
 
 FEATURES_NUMERICAS = ["ocupacao_final", "minutos_missa"]
+# dia_semana vai como categoria (one-hot): 0..6 nao e uma escala ordenada.
 FEATURES_CATEGORICAS = ["dia_semana", "tipo"]
 ALVO = "comungantes_reais"
 
@@ -42,6 +43,7 @@ ALVO = "comungantes_reais"
 def montar_pipeline() -> Pipeline:
     pre_processador = ColumnTransformer(
         transformers=[
+            # handle_unknown='ignore': tipo/dia nunca visto no treino nao quebra a predicao.
             ("categoricas", OneHotEncoder(handle_unknown="ignore"), FEATURES_CATEGORICAS),
         ],
         remainder="passthrough",  # mantem as numericas como estao
@@ -85,17 +87,20 @@ def treinar() -> None:
     pipeline.fit(X, y)
 
     CAMINHO_MODELOS.mkdir(parents=True, exist_ok=True)
+    # Nome com timestamp UTC: cada treino gera um .joblib novo, sem sobrescrever o anterior.
     versao = pd.Timestamp.now("UTC").strftime("%Y%m%d_%H%M%S")
     caminho_modelo = CAMINHO_MODELOS / f"regressao_comunhao_{versao}.joblib"
     joblib.dump(pipeline, caminho_modelo)
 
     conexao = obter_conexao()
+    # Razao media vira o coeficiente de fallback quando o modelo nao consegue prever.
     coeficiente_fallback = (df[ALVO] / df["ocupacao_final"]).mean()
 
     config_id = crud.definir_configuracao_estimativa(
         conexao,
         coeficiente_comunhao=round(coeficiente_fallback, 4),
         metodo="regressao",
+        # Caminho relativo a pasta do banco; estimativa.py resolve ao carregar.
         modelo_path=str(caminho_modelo.relative_to(PASTA_BASE_MODELOS)),
         observacoes=f"Regressao linear treinada com {n} celebracoes. MAE={mae:.1f}, R2={r2:.3f}.",
     )

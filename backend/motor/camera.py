@@ -141,6 +141,7 @@ class FonteVideo:
         if self._cap is None:
             raise RuntimeError("Chame abrir() antes de iterar.")
 
+        # Arquivo usa passo (1 a cada N frames); stream usa intervalo minimo em segundos.
         passo = self._calcular_passo()
         indice = 0
         ultimo_envio = 0.0
@@ -154,6 +155,7 @@ class FonteVideo:
 
             ok, frame = self._cap.read()
 
+            # Falha de leitura: stream tenta reconectar, arquivo chegou ao fim.
             if not ok:
                 if self._ao_vivo and self.reconectar():
                     continue
@@ -200,6 +202,7 @@ class FonteVideo:
         """Quantos frames pular entre processamentos (somente arquivo)."""
         if self.fps_alvo <= 0 or self.fps_original <= 0:
             return 1
+        # Ex.: origem 30 fps e alvo 7.5 fps -> processa 1 a cada 4 frames.
         return max(1, int(round(self.fps_original / self.fps_alvo)))
 
     # ---------- Informacao ----------

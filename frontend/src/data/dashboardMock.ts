@@ -1,6 +1,7 @@
 import { LogIn, LogOut, Users } from 'lucide-react';
 import type { DadosDashboard } from '../types/dashboard';
 
+// Estado inicial zerado do dashboard; os valores reais vem de /api/dashboard.
 export const dashboardMock: DadosDashboard = {
   metricas: {
     ocupacaoAtual: 0,
@@ -14,6 +15,7 @@ export const dashboardMock: DadosDashboard = {
   resumoCelebracao: null,
 };
 
+// Titulos e icones dos cards (fixos no front); os numeros vem da API.
 export const dashboardMetricCards = {
   occupancy: {
     title: 'Pessoas presentes',

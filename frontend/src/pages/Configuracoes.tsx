@@ -54,6 +54,7 @@ export default function Configuracoes() {
 
     const handleAdicionarAgenda = async () => {
         if (!novaAgenda.horarioMissa || !novaAgenda.inicioGravacao || !novaAgenda.fimGravacao) return;
+        // Valida no cliente; o backend tambem recusa com 422 (tratado em criarAgendaPadrao).
         if (novaAgenda.fimGravacao <= novaAgenda.inicioGravacao) {
             setErroAgenda("O fim da gravação deve ser depois do início.");
             return;

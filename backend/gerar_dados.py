@@ -8,6 +8,7 @@ def popular_banco():
     cursor = db.cursor()
 
     try:
+        # Dados falsos para ver o frontend; ids fixos (998/999) e REPLACE permitem rodar de novo.
         hoje = datetime.now()
         data_hoje_str = hoje.strftime("%Y-%m-%d")
         
@@ -48,8 +49,10 @@ def popular_banco():
         entradas = [22, 48, 85, 120, 150]
         saidas = [2, 3, 5, 10, 20]
 
+        # Serie dos ultimos 40 min em UTC, mesmo fuso que o banco grava.
         hora_inicio = datetime.now(timezone.utc) - timedelta(minutes=40)
 
+        # Limpa antes: instantaneo nao tem REPLACE e acumularia pontos a cada execucao.
         cursor.execute("DELETE FROM instantaneo_ocupacao WHERE sessao_id = 999")
         for i in range(len(tempos_minutos)):
             tempo_reg = (hora_inicio + timedelta(minutes=tempos_minutos[i])).strftime("%Y-%m-%dT%H:%M:%S")

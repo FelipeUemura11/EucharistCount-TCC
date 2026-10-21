@@ -20,6 +20,7 @@ from db.database import inicializar_banco
 def main() -> int:
     multiprocessing.freeze_support()
 
+    # Precedencia: linha de comando > config.json > padrao. A CLI e aplicada por cima do que o Config carregou.
     args = montar_argumentos().parse_args()
     config = aplicar_argumentos(Config.carregar(), args)
 
@@ -28,13 +29,16 @@ def main() -> int:
     print("=" * 52)
 
     try:
+        # Ordem: banco -> limpa sessoes orfas -> API -> motor. A API precisa do banco pronto.
         inicializar_banco()
 
+        # Sessao que ficou em andamento (queda de energia, processo morto) viraria contagem ativa fantasma no dashboard.
         presas = fechar_sessoes_presas()
         if presas:
             print(f"[!] {presas} sessao(oes) de uma execucao anterior nao tinha(m) "
                   f"terminado e foi(ram) fechada(s) como interrompida(s).")
 
+        # API numa thread daemon; o motor de visao roda na thread principal (bloqueante).
         iniciar_em_background(criar_app())
         print("\n")
         print("[✓] Dashboard: http://127.0.0.1:8000")
@@ -46,6 +50,7 @@ def main() -> int:
             # gravar qualquer coisa no banco.
             monitor = Monitor(config, RAIZ)
 
+            # O gravador e o callback que o motor chama a cada atualizacao para gravar a contagem no banco.
             with sessao_de_monitoramento(monitor, config) as gravador:
                 metricas = monitor.executar(ao_atualizar=gravador)
 

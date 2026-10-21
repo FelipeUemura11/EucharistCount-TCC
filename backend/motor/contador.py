@@ -89,6 +89,7 @@ class ContadorLinha:
     def __init__(self, config: ConfigContagem, largura: int, altura: int):
         self.config = config
         self.linha = self._preparar_linha(largura, altura)
+        # A margem da config e fracao da largura; aqui vira pixels.
         self.margem = config.margem * largura
         self.entradas = 0
         self.saidas = 0
@@ -114,6 +115,7 @@ class ContadorLinha:
         (ax, ay), (bx, by) = self.linha
         px, py = ponto
 
+        # Produto vetorial dividido pelo comprimento da linha = distancia em pixels, com sinal.
         produto = (bx - ax) * (py - ay) - (by - ay) * (px - ax)
         comprimento = math.hypot(bx - ax, by - ay)
 

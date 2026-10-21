@@ -28,18 +28,19 @@ backend/
     ├── servidor.py         # sobe o uvicorn numa thread
     ├── dependencias.py     # obter_db: uma conexão por requisição
     ├── schemas.py          # modelos Pydantic (contrato com o frontend)
-    ├── formatacao.py       # datas, hora local, dia da semana, status
+    ├── formatacao.py       # datas, hora local, dia da semana
     ├── frontend.py         # serve o React compilado (catch-all)
     └── rotas/              # uma rota por tela do frontend
         ├── status.py
         ├── dashboard.py
         ├── celebracoes.py
-        └── historico.py
+        ├── historico.py
+        └── configuracoes.py
 ```
 
 | Pasta | Responsabilidade | Depende de |
 |---|---|---|
-| `api/` | Responder requisições HTTP | `db/`, `integracao/estimativa.py`. **Não importa o `motor`**: a API inteira roda sem a `ultralytics` instalada |
+| `api/` | Responder requisições HTTP | `db/`, `integracao/estimativa.py`, `motor/config.py` (para ler `config.json` em `/api/configuracoes`). **Não carrega o detector/YOLO** |
 | `integracao/` | Transformar o que o motor vê em linhas no banco | `db/`, `motor/` |
 | `motor/` | Visão computacional | Nada do resto: não sabe que banco e API existem (`DOCUMENTACAO_MOTOR.md`, seção 13) |
 | `db/` | Acesso ao SQLite | Nada do resto |
@@ -92,16 +93,16 @@ O que `main()` faz, em ordem:
 | # | Passo | Onde | Por quê |
 |---|---|---|---|
 | 1 | `multiprocessing.freeze_support()` | `main.py` | Exigência do PyInstaller no Windows: sem isso, o executável pode abrir cópias de si mesmo em loop |
-| 2 | Lê o `config.json` e aplica os argumentos | `cli.py` | O `config.json` define o padrão; os argumentos sobrescrevem só naquela execução |
+| 2 | Lê o `config.json` + `.env` e aplica os argumentos | `cli.py` | O `config.json` e o `.env` definem o padrão; os argumentos sobrescrevem só naquela execução |
 | 3 | `inicializar_banco()` | `db/database.py` | Cria as tabelas que ainda não existirem (`DOCUMENTACAO_BANCO.md`, seção 6.1) |
 | 4 | `fechar_sessoes_presas()` | `integracao/sessao.py` | Fecha como `interrompida` sessões de execuções anteriores que não terminaram (seção 6.6) |
 | 5 | `iniciar_em_background(criar_app())` | `api/` | O dashboard fica no ar antes do motor começar |
-| 6 | `Monitor(config, RAIZ)` | `motor/` | Carrega o modelo YOLO. **Vem antes de abrir a sessão** (seção 6.5) |
+| 6 | `Monitor(config, RAIZ)` | `motor/` | Valida a fonte e carrega o modelo YOLO. **Vem antes de abrir a sessão** (seção 6.5) |
 | 7 | `with sessao_de_monitoramento(...)` + `monitor.executar(...)` | `integracao/sessao.py` | Abre a sessão, conta até o vídeo acabar e fecha a sessão, aconteça o que acontecer |
 | 8 | Imprime o resumo | `main.py` | Entradas, saídas, dentro e FPS médio no terminal, quando o vídeo acaba |
 | 9 | `while True: time.sleep(1)` | `main.py` | Mantém o dashboard no ar até o Ctrl+C (seção 2.1) |
 
-Se o modelo não existir (`FileNotFoundError`) ou a fonte de vídeo não abrir (`RuntimeError`), o programa imprime o erro e sai com código 1. O Ctrl+C, a qualquer momento, encerra com código 0.
+Se o modelo não existir (`FileNotFoundError`) ou a fonte de vídeo não estiver configurada / não abrir (`RuntimeError`), o `main.py` captura a exceção, exibe um aviso no terminal e **mantém o dashboard ativo** no laço final para consultas ao histórico e configurações. O Ctrl+C, a qualquer momento, encerra com código 0.
 
 ### 3.1 Argumentos de linha de comando (`cli.py`)
 
@@ -129,8 +130,8 @@ A configuração efetiva, já com os argumentos aplicados, fica gravada em `sess
 | `GET /api/status` | `rotas/status.py` | Se há contagem ativa | Selo "Contagem ativa" no topo das páginas (a cada 5 s) |
 | `GET /api/dashboard` | `rotas/dashboard.py` | Métricas, gráfico e resumo da missa atual ou da última | Página Dashboard (a cada 2 s) |
 | `GET /api/celebracoes` | `rotas/celebracoes.py` | Celebrações do mês corrente | Ainda não usado (a página Celebrações usa dados fixos) |
-| `GET /api/historico` | `rotas/historico.py` | Missas encerradas, com os resultados | Página Histórico |
-| `GET /api/configuracoes` | `rotas/configuracoes.py` | Agenda padrão, dados da câmera e saúde dos serviços | Página Configurações |
+| `GET /api/historico` | `rotas/historico.py` | Missas encerradas, com os resultados | Página Histórico (a cada 10 s) |
+| `GET /api/configuracoes` | `rotas/configuracoes.py` | Agenda padrão e dados da câmera (`infoCamera`) | Página Configurações |
 | `POST /api/configuracoes/agenda` | `rotas/configuracoes.py` | O horário criado, com `id` | Página Configurações (botão "Adicionar") |
 | `DELETE /api/configuracoes/agenda/{id}` | `rotas/configuracoes.py` | `{ "sucesso": true }`, ou **404** | Página Configurações (lixeira) |
 | `GET /api/<inexistente>` | `frontend.py` | **404** | — |
@@ -157,7 +158,7 @@ def criar_app() -> FastAPI:
 - **A ordem importa.** O FastAPI testa as rotas na ordem em que foram registradas, e a rota do frontend aceita qualquer caminho. Se ela viesse antes, capturaria também as chamadas da API.
 - **`criar_app()` é uma *app factory*.** Em vez de uma variável global `app`, é uma função que monta um app novo a cada chamada. Um teste pode criar o seu app sem importar o `main.py`, o que evita carregar o YOLO e subir o motor.
 
-As respostas são descritas pelos **modelos Pydantic** de `api/schemas.py` (`DadosDashboard`, `Celebracao`, `RegistroHistorico`…). Eles espelham, campo a campo e com os mesmos nomes em português e *camelCase*, as interfaces TypeScript de `frontend/src/types/`. O FastAPI usa esses modelos para validar a saída: um campo com o tipo errado dá erro no servidor, e não vira um bug silencioso na tela.
+As respostas são descritas pelos **modelos Pydantic** de `api/schemas.py` (`DadosDashboard`, `Celebracao`, `RegistroHistorico`, `ConfiguracoesGlobais`…). Eles espelham, campo a campo e com os mesmos nomes em português e *camelCase*, as interfaces TypeScript de `frontend/src/types/`. O FastAPI usa esses modelos para validar a saída: um campo com o tipo errado dá erro no servidor, e não vira um bug silencioso na tela.
 
 As conversões de formato ficam em `api/formatacao.py`, como **funções puras** (recebem um valor e devolvem outro, sem tocar em banco nem rede). As rotas só as chamam:
 
@@ -197,6 +198,7 @@ Exemplo, com uma contagem em andamento:
   "metricas": {
     "ocupacaoAtual": 42,
     "estimativaComunhao": 32,
+    "hostiasSugeridas": 36,
     "entradas": 50,
     "saidas": 8,
     "contagemAtiva": true
@@ -221,6 +223,7 @@ De onde vem cada campo:
 | `ocupacaoAtual` | `sessao_monitoramento.ocupacao_final` | A cada passagem pela linha |
 | `entradas` / `saidas` | `sessao_monitoramento.total_entradas` / `total_saidas` | A cada passagem pela linha |
 | `estimativaComunhao` | `calcular_estimativa(db, ocupação, celebracao=celebracao).comungantes` (seção 8) | Junto com a ocupação |
+| `hostiasSugeridas` | `calcular_estimativa(db, ocupação, celebracao=celebracao).hostias` (com `margem_hostias` do banco) | Junto com a ocupação |
 | `contagemAtiva` | `sessao["status"] == "em_andamento"` | `false` quando mostra a última missa encerrada |
 | `graficoOcupacao[]` | `instantaneo_ocupacao`: `hora` = `hora_de_timestamp(registrado_em)`, `ocupacao` = `ocupacao_atual` | A cada 5 s de vídeo |
 | `resumoCelebracao` | Título e janela de monitoramento da celebração | — |
@@ -265,7 +268,7 @@ A agenda semanal padrão fica na tabela `horario_padrao` (`DOCUMENTACAO_BANCO.md
 
 | Rota | Comportamento |
 |---|---|
-| `GET /api/configuracoes` | `agendaPadrao`: horários ativos, por dia e hora. `infoCamera`: fonte (do `.env`), `imgsz` e FPS (do `config.json`) lidos por `Config.carregar()`, resolvidos pela raiz do backend. Sem `CAMERA_FONTE`, a fonte aparece como "Não definida". A senha de uma URL RTSP sai mascarada (`mascarar_senha`: `rtsp://usuario:***@...`) |
+| `GET /api/configuracoes` | `agendaPadrao`: horários ativos, por dia e hora. `infoCamera`: fonte (do `.env`), `imgsz` e FPS (do `config.json`) lidos por `Config.carregar()`, resolvidos pela raiz do backend. Sem `CAMERA_FONTE`, a fonte aparece como "Não definida (CAMERA_FONTE no .env)". A senha de uma URL RTSP sai mascarada (`mascarar_senha`: `rtsp://usuario:***@...`) |
 | `POST /api/configuracoes/agenda` | Recebe `diaSemana` (0 = domingo a 6), `horarioMissa`, `inicioGravacao` e `fimGravacao` (`HH:MM`). Fora do formato, ou com o fim antes do início, responde **422** |
 | `DELETE /api/configuracoes/agenda/{id}` | *Soft delete* (`ativo = 0`): celebrações geradas pelo horário mantêm a referência. **404** se não houver horário ativo com o `id` |
 
@@ -483,7 +486,7 @@ stateDiagram-v2
 
 ### 7.3 Consulta repetida (*polling*)
 
-O frontend busca `/api/dashboard` a cada 2 segundos (`frontend/src/hooks/useDashboard.ts`, constante `INTERVALO_ATUALIZACAO_MS`). O selo de status no topo das páginas faz o mesmo com `/api/status`, a cada 5 segundos.
+O frontend busca `/api/dashboard` a cada 2 segundos (`frontend/src/hooks/useDashboard.ts`, constante `INTERVALO_ATUALIZACAO_MS`). O selo de status no topo das páginas faz o mesmo com `/api/status` a cada 5 segundos (`useStatusContagem.ts`), e a tela Histórico consulta `/api/historico` a cada 10 segundos (`useHistorico.ts`).
 
 A alternativa seria o servidor **empurrar** os dados para o navegador, por WebSocket ou *Server-Sent Events*. A consulta repetida foi escolhida porque, neste cenário, as vantagens do *push* não compensam a complexidade:
 
@@ -510,7 +513,7 @@ Se o dashboard e o histórico tivessem cada um a sua cópia da conta, bastaria a
 
 A regra opera em duas fases conforme a linha vigente de `configuracao_estimativa` (`DOCUMENTACAO_BANCO.md`, seções 9.1 e 9.2):
 
-1. **Modo `regressao`:** quando `metodo == 'regressao'` e `modelo_path` aponta para um artefato `.joblib` válido (salvo na pasta do banco, `CAMINHO_BANCO.parent / "modelos_estimativa"`), o pipeline scikit-learn é carregado com cache em memória (`_CACHE_MODELO`) e prevê a quantidade de comungantes a partir de `ocupacao_final`, `minutos_missa`, `dia_semana` e `tipo` da celebração.
+1. **Modo `regressao`:** quando `metodo == 'regressao'` e `modelo_path` aponta para um artefato `.joblib` válido (salvo na pasta do banco, `CAMINHO_BANCO.parent / "modelos_estimativa"`), o pipeline scikit-learn é carregado com cache em memória (`_CACHE_MODELO`) e prevê a quantidade de comungantes a partir de `ocupacao_final`, `minutos_missa`, `dia_semana` e `tipo` da celebração (limitada ao intervalo `[0, ocupacao]`).
 2. **Modo `coeficiente_fixo` (ou fallback):** enquanto não há modelo de regressão (ou caso o arquivo `.joblib` não possa ser carregado), aplica a proporção direta:
 
 ```python
@@ -535,10 +538,10 @@ python -c "from db.database import obter_conexao; from integracao.estimativa imp
 
 ---
 
-## 9. Próximos passos previstos
+## 9. Próximos passos previstos (em desenvolvimento)
 
 - **Agendamento automático (APScheduler).** Iniciar o monitoramento sozinho no horário de cada missa, sem janela (`--sem-janela`), usando o mesmo `with sessao_de_monitoramento(...)` + `monitor.executar(...)`. Com ele, a celebração deixaria de ser criada na hora (seção 6.5) e passaria a vir da agenda (`horario_padrao`). O `Monitor.parar()` já existe para encerrar a contagem no fim da janela.
-- **Empacotamento (PyInstaller).** O código já prevê o executável: `freeze_support()`, a resolução de caminhos estáticos por `sys._MEIPASS` e os arquivos mutáveis (`.db` e modelos `.joblib` de regressão) direcionados para a mesma pasta de dados (`CAMINHO_BANCO.parent`).
+- **Empacotamento (PyInstaller + Inno Setup).** O código já traz a preparação para o executável: `freeze_support()` no `main.py`, resolução de caminhos estáticos por `sys._MEIPASS` no `api/frontend.py`, leitura do `.env` na pasta do `.exe` em `motor/config.py`, e modelos `.joblib` de regressão salvos junto à pasta do banco (`CAMINHO_BANCO.parent`).
 - **Controle manual da contagem.** Hoje não há botões no dashboard nem rotas na API para iniciar ou encerrar o motor: ele começa com o `main.py` e termina no fim do vídeo, por ESC/Q na janela ou por Ctrl+C.
 
 ---
@@ -548,4 +551,6 @@ python -c "from db.database import obter_conexao; from integracao.estimativa imp
 | Onde | Limitação | Efeito |
 |---|---|---|
 | `integracao/sessao.py` | O fechamento da sessão não chama `registrar_estimativa_da_sessao` | **Toda contagem nova entra no Histórico com estimativa e hóstias 0**, até alguém rodar `preencher_estimativas_pendentes` (seção 8). Correção: no `finally` de `sessao_de_monitoramento`, depois do `finalizar_sessao`, chamar `registrar_estimativa_da_sessao(conexao, sessao_id, m.dentro)` quando `status == "concluida"` |
-| `EstimativaComunhao.tsx` | O frontend calcula as hóstias do dashboard com `× 1,1` fixo | Se a `margem_hostias` do banco mudar, o dashboard e o Histórico sugerem números diferentes. A rota do dashboard poderia enviar as hóstias já calculadas |
+| `Celebracoes.tsx` | A tela de Celebrações ainda usa `celebrationsMock.ts` | As alterações feitas no calendário ficam apenas em memória no navegador; a rota `GET /api/celebracoes` já existe no backend, mas ainda não foi integrada à página |
+
+Corrigido: `EstimativaComunhao.tsx` antes calculava as hóstias sugeridas no próprio frontend multiplicando por `1.1` fixo. Agora `GET /api/dashboard` devolve `hostiasSugeridas` diretamente de `calcular_estimativa(db, ocupacao, celebracao).hostias`, garantindo que o Dashboard e o Histórico usem sempre a mesma `margem_hostias` configurada no banco.

@@ -12,6 +12,7 @@ import type { CelebrationMassScheduleChanges } from "../types/celebrations";
 
 export default function Celebracoes() {
     const [selectedDay, setSelectedDay] = useState<number | null>(null);
+    // Dados vindos de celebrationsMock (maio/2026): esta tela ainda nao usa a API.
     const [daySchedules, setDaySchedules] = useState(createInitialDaySchedules);
 
     const selectedDayInfo = useMemo(
@@ -103,6 +104,7 @@ export default function Celebracoes() {
                     onAddSchedule={addSchedule}
                     onClose={() => setSelectedDay(null)}
                     onRemoveSchedule={removeSchedule}
+                    // Salvar so fecha o modal: as edicoes ja ficam no estado local, nada vai ao backend.
                     onSave={() => setSelectedDay(null)}
                     onUpdateSchedule={updateSchedule}
                 />

@@ -18,6 +18,7 @@ def montar_argumentos() -> argparse.ArgumentParser:
     return p
 
 def aplicar_argumentos(config: Config, args: argparse.Namespace) -> Config:
+    # So sobrescreve o que foi passado (None = nao informado), mantendo o valor do config.json.
     if args.fonte is not None: config.camera.fonte = args.fonte
     if args.modelo is not None: config.deteccao.modelo = args.modelo
     if args.fps is not None: config.camera.fps_processamento = args.fps
@@ -25,6 +26,7 @@ def aplicar_argumentos(config: Config, args: argparse.Namespace) -> Config:
     if args.conf is not None: config.deteccao.confianca = args.conf
     if args.threads is not None: config.deteccao.threads = args.threads
     if args.sem_janela: config.visual.mostrar_janela = False
+    # Linha vem como texto "x1,y1,x2,y2" e e convertida em tupla de 4 floats.
     if args.linha:
         valores = tuple(float(v) for v in args.linha.split(","))
         if len(valores) != 4: raise SystemExit("--linha precisa de 4 numeros: x1,y1,x2,y2")

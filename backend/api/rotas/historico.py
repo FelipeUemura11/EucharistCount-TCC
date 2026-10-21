@@ -13,6 +13,7 @@ router = APIRouter()
 
 @router.get("/historico", response_model=list[RegistroHistorico])
 def get_historico(db: sqlite3.Connection = Depends(obter_db)):
+    # A view pode devolver NULL; o `or` garante os tipos que o schema exige.
     return [
         RegistroHistorico(
             id=r["sessao_id"] or 0,

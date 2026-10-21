@@ -72,6 +72,7 @@ def _carregar_modelo(modelo_path: str) -> Any:
     """Carrega o pipeline scikit-learn do disco apenas se o arquivo mudou."""
     global _CACHE_MODELO
     caminho = _resolver_caminho_modelo(modelo_path)
+    # Cada treino gera um .joblib com nome novo, entao o caminho serve de chave do cache.
     if _CACHE_MODELO is not None and _CACHE_MODELO[0] == caminho:
         return _CACHE_MODELO[1]
 
@@ -142,9 +143,11 @@ def calcular_estimativa(
         metodo = "coeficiente_fixo"
         modelo_path = None
 
+    # Ocupacao negativa vira 0 antes de qualquer conta.
     ocupacao_positiva = max(ocupacao, 0)
     comungantes: int | None = None
 
+    # Sala vazia: nem chama o modelo.
     if ocupacao_positiva == 0:
         comungantes = 0
     elif metodo == "regressao" and modelo_path:
@@ -157,6 +160,7 @@ def calcular_estimativa(
     if comungantes is None:
         comungantes = int(ocupacao_positiva * coeficiente)
 
+    # ceil para nao faltar hostia; a margem vem da configuracao vigente.
     hostias = math.ceil(comungantes * (1 + margem))
     return Estimativa(comungantes, hostias, coeficiente, configuracao_id)
 

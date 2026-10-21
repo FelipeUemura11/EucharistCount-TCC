@@ -14,6 +14,7 @@ router = APIRouter()
 
 @router.get("/celebracoes", response_model=list[Celebracao])
 def get_celebracoes(db: sqlite3.Connection = Depends(obter_db)):
+    # Mes corrente pela hora local; data ISO do banco vira dia (int) e dia da semana.
     hoje = datetime.now()
     return [
         Celebracao(

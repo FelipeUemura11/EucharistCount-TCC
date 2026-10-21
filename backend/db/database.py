@@ -36,8 +36,11 @@ CAMINHO_BANCO = RAIZ / "eucharist_count.db"
 
 def obter_conexao(caminho: Path = CAMINHO_BANCO) -> sqlite3.Connection:
     """Abre uma conexao com o banco, com chaves estrangeiras ativas."""
+    # check_same_thread=False: a conexao pode ser usada em thread diferente da que abriu.
     conexao = sqlite3.connect(caminho, check_same_thread=False)
+    # No SQLite a FK e por conexao; sem o PRAGMA o ON DELETE CASCADE nao vale.
     conexao.execute("PRAGMA foreign_keys = ON")
+    # Row permite acessar coluna por nome (e dict(row) na API).
     conexao.row_factory = sqlite3.Row
     return conexao
 

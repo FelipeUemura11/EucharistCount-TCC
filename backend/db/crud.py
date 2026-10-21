@@ -130,6 +130,7 @@ def listar_proximas_celebracoes(conexao: sqlite3.Connection, a_partir_de: str, l
 
 def listar_celebracoes_do_mes(conexao: sqlite3.Connection, ano: int, mes: int) -> list[sqlite3.Row]:
     """Para o calendario mensal da tela Celebracoes. `mes` de 1 a 12."""
+    # data e TEXT ISO, entao LIKE 'YYYY-MM%' pega o mes inteiro.
     prefixo = f"{ano:04d}-{mes:02d}"
     return conexao.execute(
         "SELECT * FROM celebracao WHERE data LIKE ? ORDER BY data, horario_missa",
@@ -201,6 +202,7 @@ def atualizar_totais_sessao(conexao: sqlite3.Connection, sessao_id: int,
 
 def obter_ou_criar_celebracao(conexao: sqlite3.Connection, titulo: str,
                               data: str, horario_missa: str, **extras) -> int:
+    # Chave natural (data, horario_missa), a mesma do UNIQUE do schema.
     linha = conexao.execute(
         "SELECT id FROM celebracao WHERE data = ? AND horario_missa = ?",
         (data, horario_missa),
@@ -234,6 +236,7 @@ def finalizar_sessao(
     'interrompida' quando terminou por erro — so as concluidas entram
     no historico (vw_historico).
     """
+    # COALESCE nos opcionais: None preserva o valor que a sessao ja tinha.
     conexao.execute(
         """
         UPDATE sessao_monitoramento
@@ -368,6 +371,7 @@ def registrar_estimativa(
     `comungantes_reais`/`hostias_reais`; quando o modelo existir,
     `estimativa_calculada`/`hostias_calculadas`/`coeficiente_utilizado`.
     """
+    # Upsert (1 linha por sessao): COALESCE so sobrescreve campo que veio preenchido.
     conexao.execute(
         """
         INSERT INTO estimativa_comunhao
@@ -414,6 +418,7 @@ def ajustar_estimativa(conexao: sqlite3.Connection, sessao_id: int,
 def obter_historico(conexao: sqlite3.Connection, data_inicio: str | None = None,
                      data_fim: str | None = None) -> list[sqlite3.Row]:
     """Le direto da view vw_historico, ja no formato das colunas do frontend."""
+    # WHERE 1=1 so para encadear os filtros opcionais com AND.
     query = "SELECT * FROM vw_historico WHERE 1=1"
     parametros: list[str] = []
 

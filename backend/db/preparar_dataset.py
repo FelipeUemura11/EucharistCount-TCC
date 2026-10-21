@@ -38,6 +38,7 @@ def _minutos(horario: str) -> int:
 def montar_dataset() -> pd.DataFrame:
     conexao = obter_conexao()
 
+    # Mesmo filtro do coeficiente inicial: ocupacao > 0 e comunhao real preenchida.
     linhas = conexao.execute(
         """
         SELECT c.data, c.horario_missa, c.tipo,
@@ -51,6 +52,7 @@ def montar_dataset() -> pd.DataFrame:
     ).fetchall()
     conexao.close()
 
+    # Deriva dia_semana e minutos_missa de data/horario, que sao texto no banco.
     registros = []
     for linha in linhas:
         registros.append({

@@ -6,6 +6,7 @@ export async function buscarDashboard(): Promise<DadosDashboard> {
         if (!response.ok) {
             throw new Error(`Erro de rede: ${response.status}`);
         }
+        // O JSON da API e tipado como DadosDashboard (espelha DadosDashboard em schemas.py).
         const dados: DadosDashboard = await response.json();
         return dados;
     } catch (error) {

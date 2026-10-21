@@ -1,3 +1,4 @@
+// Os types deste arquivo e de history.ts espelham os models Pydantic de backend/api/schemas.py.
 export interface PontoOcupacao {
   hora: string;
   ocupacao: number;

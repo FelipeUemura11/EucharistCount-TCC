@@ -55,6 +55,7 @@ def importar(caminho_csv: Path, caminho_banco: Path = CAMINHO_BANCO) -> None:
                 horario = _vazio_para_none(linha.get("time"))
                 pessoas = _int_ou_none(linha.get("people"))
 
+                # data, horario e people sao obrigatorios; o resto pode vir vazio.
                 if not data or not horario or pessoas is None:
                     print(f"[aviso] linha ignorada (faltam dados obrigatorios): {linha}")
                     ignoradas += 1
@@ -126,6 +127,7 @@ def importar(caminho_csv: Path, caminho_banco: Path = CAMINHO_BANCO) -> None:
                     )
                     sessao_id = cursor.lastrowid
 
+                # So grava estimativa se o CSV trouxe algum valor real de comunhao.
                 if comungantes is not None or hostias_reais is not None:
                     cursor = conexao.execute(
                         "SELECT id FROM estimativa_comunhao WHERE sessao_id = ?",
@@ -154,6 +156,7 @@ def importar(caminho_csv: Path, caminho_banco: Path = CAMINHO_BANCO) -> None:
 
                 importadas += 1
 
+        # Commit unico no fim: erro no meio do CSV nao deixa importacao pela metade.
         conexao.commit()
     finally:
         conexao.close()
