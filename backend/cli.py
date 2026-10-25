@@ -15,7 +15,15 @@ def montar_argumentos() -> argparse.ArgumentParser:
     p.add_argument("--threads", type=int, help="limite de threads de CPU")
     p.add_argument("--sem-janela", action="store_true", help="roda sem interface grafica")
     p.add_argument("--linha", type=str, help="linha de contagem: x1,y1,x2,y2 em fracoes (0-1)")
+    p.add_argument("--agora", action="store_true", help="conta imediatamente, sem esperar a agenda (passar --fonte tambem faz isso)")
     return p
+
+def modo_manual(args: argparse.Namespace) -> bool:
+    """
+    Manual = contar ja, como sempre foi (testes com video, demonstracao).
+    Sem --agora nem --fonte, o programa segue a agenda da tela Configuracoes.
+    """
+    return args.agora or args.fonte is not None
 
 def aplicar_argumentos(config: Config, args: argparse.Namespace) -> Config:
     # So sobrescreve o que foi passado (None = nao informado), mantendo o valor do config.json.
