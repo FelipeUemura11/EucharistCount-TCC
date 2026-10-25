@@ -57,24 +57,33 @@ class GravadorSessao:
             saidas_acumuladas=metricas.saidas
         )
 @contextmanager
-def sessao_de_monitoramento(monitor: Monitor, config: Config) -> Iterator[GravadorSessao]:
+def sessao_de_monitoramento(
+    monitor: Monitor,
+    config: Config,
+    celebracao_id: int | None = None,
+) -> Iterator[GravadorSessao]:
     """
         Abre uma sessao no banco, entrega o gravador e fecha a sessao no fim,
         aconteca o que acontecer (ESC, erro ou Ctrl+C): nenhuma sessao fica orfa.
 
             with sessao_de_monitoramento(monitor, config) as gravador:
                 monitor.executar(ao_atualizar=gravador)
+
+        `celebracao_id`: a celebracao da agenda, quando a contagem vem do
+        agendador. Sem ele (execucao manual), cria uma celebracao com a data
+        e a hora de agora, como antes.
     """
     conexao = obter_conexao()
-    agora = datetime.now()
 
-    # Celebracao por data + hora atual; se ja existe (UNIQUE no schema), reaproveita.
-    celebracao_id = crud.obter_ou_criar_celebracao(
-        conexao,
-        titulo="Missa (monitoramento automatico)",
-        data=agora.strftime("%Y-%m-%d"),
-        horario_missa=agora.strftime("%H:%M"),
-    )
+    if celebracao_id is None:
+        agora = datetime.now()
+        # Celebracao por data + hora atual; se ja existe (UNIQUE no schema), reaproveita.
+        celebracao_id = crud.obter_ou_criar_celebracao(
+            conexao,
+            titulo="Missa (monitoramento automatico)",
+            data=agora.strftime("%Y-%m-%d"),
+            horario_missa=agora.strftime("%H:%M"),
+        )
     # A fonte pode ser uma URL RTSP com senha: o banco guarda so a mascarada.
     parametros = asdict(config)
     parametros["camera"]["fonte"] = mascarar_senha(config.camera.fonte)
