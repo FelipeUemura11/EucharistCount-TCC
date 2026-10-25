@@ -654,8 +654,6 @@ O banco **não tem nenhuma coluna capaz de guardar imagem, vídeo ou dado biomé
 
 ## 12. Limitações conhecidas
 
-Pontos identificados em revisão e ainda não corrigidos no código:
+Nenhuma no momento.
 
-| Onde | Limitação | Efeito |
-|---|---|---|
-| `integracao/sessao.py` | O fechamento da sessão não chama `registrar_estimativa_da_sessao` | Toda contagem nova entra no Histórico com estimativa e hóstias 0, até alguém rodar `preencher_estimativas_pendentes` (seção 10) |
+Corrigido: o fechamento da sessão não gravava a estimativa, e toda contagem nova entrava no Histórico com estimativa e hóstias 0. Agora `sessao_de_monitoramento` chama `registrar_estimativa_da_sessao` ao fechar uma sessão `concluida`, e o `main.py` roda `preencher_estimativas_pendentes` ao iniciar, para as sessões que ficaram sem.

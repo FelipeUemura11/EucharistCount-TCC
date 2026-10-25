@@ -10,7 +10,7 @@ from api.app import criar_app
 from api.servidor import iniciar_em_background
 
 from cli import aplicar_argumentos, montar_argumentos
-from integracao.sessao import fechar_sessoes_presas, sessao_de_monitoramento
+from integracao.sessao import fechar_sessoes_presas, preencher_estimativas_atrasadas, sessao_de_monitoramento
 
 from motor.monitor import Monitor
 from motor.config import RAIZ, Config
@@ -37,6 +37,11 @@ def main() -> int:
         if presas:
             print(f"[!] {presas} sessao(oes) de uma execucao anterior nao tinha(m) "
                   f"terminado e foi(ram) fechada(s) como interrompida(s).")
+
+        # Contagens antigas (ou cuja estimativa falhou) que ficaram com estimativa zerada no Historico.
+        atrasadas = preencher_estimativas_atrasadas()
+        if atrasadas:
+            print(f"[!] Estimativa calculada para {atrasadas} contagem(ns) que estava(m) sem.")
 
         # API numa thread daemon; o motor de visao roda na thread principal (bloqueante).
         iniciar_em_background(criar_app())

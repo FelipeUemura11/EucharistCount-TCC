@@ -88,7 +88,7 @@ Este é um TCC em duas etapas. **O que está implementado até aqui:** a visão 
 | Persistência (SQLite) — o motor grava cada missa durante a contagem | ✅ Implementado |
 | API (FastAPI) — status, dashboard, celebrações, histórico e configurações, em [`backend/api/`](./backend/api/) | ✅ Implementado |
 | Dashboard web (React) — Dashboard ao vivo, Histórico, Configurações e Ajuda (FAQ) ligados à API | 🚧 Celebrações ainda com dados fictícios |
-| Estimativa de comunhão e hóstias sugeridas (`integracao/estimativa.py`) | 🚧 Coeficiente fixo e inferência por regressão (`.joblib`) no Dashboard prontos; gravação automática no fechamento da sessão pendente |
+| Estimativa de comunhão e hóstias sugeridas (`integracao/estimativa.py`) | ✅ Coeficiente fixo e regressão (`.joblib`); estimativa gravada automaticamente ao fechar a sessão |
 | Agendamento automático (APScheduler) | ⏳ Em desenvolvimento |
 | Empacotamento (PyInstaller) | ⏳ Em desenvolvimento |
 

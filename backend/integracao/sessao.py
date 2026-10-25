@@ -15,6 +15,7 @@ from typing import Iterator
 
 from db import crud
 from db.database import obter_conexao
+from integracao.estimativa import preencher_estimativas_pendentes, registrar_estimativa_da_sessao
 from motor.config import Config, mascarar_senha
 from motor.monitor import Metricas, Monitor
 
@@ -106,6 +107,13 @@ def sessao_de_monitoramento(monitor: Monitor, config: Config) -> Iterator[Gravad
             contagem_sistema=m.dentro,
             status=status,
         )
+        # So contagem concluida entra no Historico, entao so ela precisa de estimativa.
+        if status == "concluida":
+            try:
+                registrar_estimativa_da_sessao(conexao, sessao_id, m.dentro)
+            except Exception as e:
+                # A sessao ja esta salva; a estimativa e refeita na proxima vez que o programa abrir.
+                print(f"[AVISO] Nao foi possivel calcular a estimativa da sessao {sessao_id}: {e}")
         conexao.close()
 
 def fechar_sessoes_presas() -> int:
@@ -113,5 +121,13 @@ def fechar_sessoes_presas() -> int:
     conexao = obter_conexao()
     try:
         return crud.interromper_sessoes_orfas(conexao)
+    finally:
+        conexao.close()
+
+def preencher_estimativas_atrasadas() -> int:
+    """Grava a estimativa das sessoes concluidas que ficaram sem. Ver estimativa.preencher_estimativas_pendentes."""
+    conexao = obter_conexao()
+    try:
+        return preencher_estimativas_pendentes(conexao)
     finally:
         conexao.close()

@@ -506,8 +506,8 @@ A estimativa é calculada **num lugar só**. O arquivo tem três funções públ
 | Função | O que faz | Quem chama hoje |
 |---|---|---|
 | `calcular_estimativa(conexao, ocupacao, celebracao=None)` | Calcula comungantes e hóstias (via regressão ou coeficiente fixo) | `api/rotas/dashboard.py`, a cada consulta |
-| `registrar_estimativa_da_sessao(conexao, sessao_id, ocupacao)` | Calcula e **grava** em `estimativa_comunhao`, de onde o Histórico lê | `preencher_estimativas_pendentes` |
-| `preencher_estimativas_pendentes(conexao)` | Grava a estimativa de toda sessão concluída que ainda não tem uma | Rodada manualmente (comando abaixo) |
+| `registrar_estimativa_da_sessao(conexao, sessao_id, ocupacao)` | Calcula e **grava** em `estimativa_comunhao`, de onde o Histórico lê | `integracao/sessao.py`, ao fechar uma sessão concluída (e `preencher_estimativas_pendentes`) |
+| `preencher_estimativas_pendentes(conexao)` | Grava a estimativa de toda sessão concluída que ainda não tem uma | `main.py`, ao iniciar (e manualmente, comando abaixo) |
 
 Se o dashboard e o histórico tivessem cada um a sua cópia da conta, bastaria alguém mudar uma delas para os dois mostrarem números diferentes. Com uma função só, os dois sempre concordam.
 
@@ -550,7 +550,6 @@ python -c "from db.database import obter_conexao; from integracao.estimativa imp
 
 | Onde | Limitação | Efeito |
 |---|---|---|
-| `integracao/sessao.py` | O fechamento da sessão não chama `registrar_estimativa_da_sessao` | **Toda contagem nova entra no Histórico com estimativa e hóstias 0**, até alguém rodar `preencher_estimativas_pendentes` (seção 8). Correção: no `finally` de `sessao_de_monitoramento`, depois do `finalizar_sessao`, chamar `registrar_estimativa_da_sessao(conexao, sessao_id, m.dentro)` quando `status == "concluida"` |
 | `Celebracoes.tsx` | A tela de Celebrações ainda usa `celebrationsMock.ts` | As alterações feitas no calendário ficam apenas em memória no navegador; a rota `GET /api/celebracoes` já existe no backend, mas ainda não foi integrada à página |
 
 Corrigido: `EstimativaComunhao.tsx` antes calculava as hóstias sugeridas no próprio frontend multiplicando por `1.1` fixo. Agora `GET /api/dashboard` devolve `hostiasSugeridas` diretamente de `calcular_estimativa(db, ocupacao, celebracao).hostias`, garantindo que o Dashboard e o Histórico usem sempre a mesma `margem_hostias` configurada no banco.
