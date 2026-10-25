@@ -33,3 +33,6 @@ pydantic>=2.7.0
 
 # Segredos da maquina (URL RTSP com senha) no .env, fora do Git
 python-dotenv==1.2.4
+
+# Agenda: liga e desliga a contagem nos horarios da tela Configuracoes
+apscheduler>=3.10,<4
