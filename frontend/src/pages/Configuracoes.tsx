@@ -104,7 +104,7 @@ export default function Configuracoes() {
                             Agenda Semanal Padrão
                         </h3>
                         <p className="text-sm text-text-muted mb-6">
-                            Cadastre os horários fixos das missas e o período de gravação de cada uma. O agendamento automático do monitoramento a partir desta agenda ainda está em desenvolvimento. Celebrações especiais podem ser ajustadas na aba "Celebrações".
+                            Cadastre os horários fixos das missas e o período de gravação de cada uma. Com o programa aberto, a contagem liga e desliga sozinha nesses horários, e as alterações valem na hora. Celebrações especiais podem ser ajustadas na aba "Celebrações".
                         </p>
 
                         {/* Formulário de Adição */}
