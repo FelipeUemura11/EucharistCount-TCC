@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from api.dependencias import obter_db
 from api.schemas import AgendaDia, AgendaDiaCriar, ConfiguracoesGlobais, InfoCamera
 from db import crud
+from integracao.agendador import recarregar_agenda
 from motor.config import Config, mascarar_senha
 
 router = APIRouter()
@@ -57,6 +58,8 @@ def criar_agenda(agenda: AgendaDiaCriar, db: sqlite3.Connection = Depends(obter_
     novo_id = crud.criar_horario_padrao(
         db, agenda.diaSemana, agenda.horarioMissa, agenda.inicioGravacao, agenda.fimGravacao
     )
+    # O horario novo passa a valer na hora, sem reiniciar o programa.
+    recarregar_agenda()
     return AgendaDia(id=novo_id, **agenda.model_dump())
 
 
@@ -65,4 +68,5 @@ def deletar_agenda(agenda_id: int, db: sqlite3.Connection = Depends(obter_db)):
     # Soft delete: celebracoes geradas por este horario mantem a referencia.
     if not crud.remover_horario_padrao(db, agenda_id):
         raise HTTPException(status_code=404, detail="Horario nao encontrado")
+    recarregar_agenda()
     return {"sucesso": True}
