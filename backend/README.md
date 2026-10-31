@@ -50,6 +50,7 @@ backend/
 │
 ├── db/                      # persistência SQLite — ver db/README.md
 │
+├── tests/                   # testes automatizados (unittest)
 ├── scripts/
 │   ├── preparar_modelo.py   # baixa e exporta o modelo para ONNX
 │   ├── calibrar.py          # descobre a melhor configuração pro seu vídeo
@@ -174,6 +175,16 @@ ou salvo em arquivo.
 
 Depois de qualquer mudança no frontend, rode `npm run build` na pasta
 `frontend`: o `main.py` serve a versão compilada (`frontend/dist`).
+
+---
+
+## Testes
+
+```bash
+python -m unittest discover -s tests -t .
+```
+
+Cobrem as celebrações avulsas (validação, rotas, agendador e limpeza). Cada teste usa um banco SQLite temporário, então o `eucharist_count.db` não é tocado, e nenhum disparo real do agendador acontece. Não precisam de câmera, modelo nem dependência extra além do `requirements.txt`.
 
 ---
 
