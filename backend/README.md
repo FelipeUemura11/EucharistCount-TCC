@@ -309,7 +309,7 @@ versionados no Git — o `.gitignore` do projeto já bloqueia isso.
 - [x] Motor gravando no banco durante a missa, com dashboard ao vivo
 - [x] Telas de Configurações (cadastro da agenda padrão) e Ajuda
 - [x] Estimativa de comunhão e hóstias por coeficiente fixo e por regressão linear (`.joblib`)
-- [ ] Agendamento automático com APScheduler *(em desenvolvimento)*
+- [x] Agendamento automático com APScheduler — agenda semanal e celebrações avulsas (`POST /api/celebracoes`), ver [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md), seção 6.7
 - [x] Empacotamento com PyInstaller — receita em `eucharist_count.spec`, ver [`DOCUMENTACAO_DISTRIBUICAO.md`](./DOCUMENTACAO_DISTRIBUICAO.md) *(build ainda não validado em Windows)*
 - [ ] Instalador (Inno Setup)
 
@@ -322,5 +322,5 @@ código em `api/` e `integracao/`,
 e [`../frontend/README.md`](../frontend/README.md) para o dashboard.
 
 A classe `Monitor` é controlada de fora por `executar(ao_atualizar=...)`
-e `parar()`, a mesma interface que o APScheduler vai usar para iniciar e
+e `parar()`, a mesma interface que o APScheduler usa para iniciar e
 encerrar o monitoramento no horário de cada missa.

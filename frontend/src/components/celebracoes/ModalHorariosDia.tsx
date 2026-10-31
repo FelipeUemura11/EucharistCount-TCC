@@ -1,46 +1,41 @@
-import { Clock3, Pencil, Plus, Save, Trash2 } from 'lucide-react';
-import { useState } from 'react';
-import type {
-  CelebrationDayInfo,
-  CelebrationMassSchedule,
-  CelebrationMassScheduleChanges,
-} from '../../types/celebrations';
+import { Clock3, Plus, Trash2 } from 'lucide-react';
+import type { Celebracao, StatusCelebracao } from '../../types/celebrations';
 
 interface ModalHorariosDiaProps {
-  dayInfo: CelebrationDayInfo;
-  schedules: CelebrationMassSchedule[];
-  onAddSchedule: () => void;
+  dateLabel: string;
+  celebracoes: Celebracao[];
   onClose: () => void;
-  onRemoveSchedule: (scheduleId: string) => void;
-  onSave: () => void;
-  onUpdateSchedule: (scheduleId: string, changes: CelebrationMassScheduleChanges) => void;
+  onNovaCelebracao: () => void;
+  onCancelar: (celebracao: Celebracao) => void;
 }
 
-const timeInputClassName = 'w-full rounded-lg border border-border bg-white px-3 py-2 text-sm font-bold text-text-dark outline-none [&::-webkit-calendar-picker-indicator]:cursor-pointer';
+const statusLabel: Record<StatusCelebracao, string> = {
+  agendada: 'Agendada',
+  em_andamento: 'Em andamento',
+  finalizada: 'Finalizada',
+  cancelada: 'Cancelada',
+};
+
+const statusStyle: Record<StatusCelebracao, string> = {
+  agendada: 'bg-secondary/10 text-secondary',
+  em_andamento: 'bg-emerald-50 text-emerald-600',
+  finalizada: 'bg-border-light text-text-muted',
+  cancelada: 'bg-red-50 text-red-600',
+};
 
 export default function ModalHorariosDia({
-  dayInfo,
-  schedules,
-  onAddSchedule,
+  dateLabel,
+  celebracoes,
   onClose,
-  onRemoveSchedule,
-  onSave,
-  onUpdateSchedule,
+  onNovaCelebracao,
+  onCancelar,
 }: ModalHorariosDiaProps) {
-  // Horario em edicao: so os campos dele ficam liberados.
-  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
-
   return (
-    <div className="fixed inset-0 z-100] flex items-center justify-center bg-black/40 px-4 py-6">
-      <section className="max-h-full w-full max-w-4xl overflow-y-auto rounded-lg bg-white shadow-sm">
+    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/40 px-4 py-6">
+      <section className="max-h-full w-full max-w-3xl overflow-y-auto rounded-lg bg-white shadow-sm">
         <div className="border-b border-border p-6">
-          <div>
-            <p className="m-0 text-sm font-semibold uppercase text-text-muted">Configuração do dia</p>
-            <h3 className="m-0 mt-1 text-2xl font-extrabold text-text-dark">{dayInfo.dateLabel}</h3>
-            <p className="m-0 mt-1 text-sm text-text-muted">
-              Os horários abaixo partem da configuração global e podem ser ajustados para esta data.
-            </p>
-          </div>
+          <p className="m-0 text-sm font-semibold uppercase text-text-muted">Celebrações do dia</p>
+          <h3 className="m-0 mt-1 text-2xl font-extrabold text-text-dark">{dateLabel}</h3>
         </div>
 
         <div className="p-6">
@@ -49,118 +44,69 @@ export default function ModalHorariosDia({
               <div className="flex size-11 items-center justify-center rounded-lg bg-secondary/10 text-secondary">
                 <Clock3 size={22} />
               </div>
-              <div>
-                <h4 className="m-0 text-base font-bold text-text-dark">Horários da data</h4>
-                <p className="m-0 text-sm text-text-muted">
-                  {schedules.length === 0 ? 'Nenhuma missa configurada' : `${schedules.length} horário(s) configurado(s)`}
-                </p>
-              </div>
+              <p className="m-0 text-sm text-text-muted">
+                {celebracoes.length === 0
+                  ? 'Nenhuma celebração cadastrada neste dia'
+                  : `${celebracoes.length} celebração(ões) neste dia`}
+              </p>
             </div>
 
             <button
               type="button"
-              onClick={onAddSchedule}
+              onClick={onNovaCelebracao}
               className="flex items-center gap-2 rounded-lg bg-secondary px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-secondary/90"
             >
               <Plus size={18} />
-              Adicionar horário
+              Nova celebração
             </button>
           </div>
 
-          {schedules.length === 0 ? (
+          {celebracoes.length === 0 ? (
             <p className="m-0 rounded-lg border border-dashed border-border bg-app-bg p-4 text-sm font-semibold text-text-muted">
-              A configuração global deste dia não possui missas. Adicione um horário para criar uma celebração especial nesta data.
+              As missas da agenda semanal aparecem aqui quando a contagem delas começa. Use "Nova celebração" para cadastrar uma missa fora da rotina.
             </p>
           ) : (
             <div className="flex flex-col gap-3">
-              {schedules.map((schedule) => {
-                const isEditing = editingScheduleId === schedule.id;
+              {celebracoes.map((celebracao) => (
+                <article key={celebracao.id} className="rounded-lg border border-border bg-app-bg p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h4 className="m-0 truncate text-base font-bold text-text-dark">{celebracao.titulo}</h4>
+                      <p className="m-0 mt-1 text-sm text-text-muted">
+                        Missa às {celebracao.horarioMissa} · gravação {celebracao.inicioMonitoramento || '—'} às {celebracao.fimMonitoramento || '—'}
+                      </p>
+                    </div>
 
-                return (
-                  <article key={schedule.id} className="rounded-lg border border-border bg-app-bg p-4">
-                    <div className="mb-4 flex items-start justify-between gap-3">
-                      <div>
-                        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-text-muted">
-                          {schedule.source === 'global' ? 'Configuração global' : 'Alteração desta data'}
-                        </span>
-                      </div>
-
-                      <div className="flex gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className={`rounded-full px-3 py-1 text-xs font-bold ${statusStyle[celebracao.status]}`}>
+                        {statusLabel[celebracao.status]}
+                      </span>
+                      {/* Só a agendada pode ser cancelada: em andamento e finalizada já têm contagem. */}
+                      {celebracao.status === 'agendada' && (
                         <button
                           type="button"
-                          onClick={() => setEditingScheduleId(isEditing ? null : schedule.id)}
-                          className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-bold text-text-dark hover:bg-border-light"
-                        >
-                          <Pencil size={16} />
-                          {isEditing ? 'Concluir' : 'Alterar'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onRemoveSchedule(schedule.id)}
+                          onClick={() => onCancelar(celebracao)}
                           className="flex items-center gap-2 rounded-lg border border-red-100 bg-white px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50"
                         >
                           <Trash2 size={16} />
-                          Remover
+                          Cancelar
                         </button>
-                      </div>
+                      )}
                     </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      <label className="flex flex-col gap-2">
-                        <span className="text-xs font-bold uppercase text-text-muted">Horário da missa</span>
-                        <input
-                          type="time"
-                          value={schedule.startTime}
-                          disabled={!isEditing}
-                          onChange={(event) => onUpdateSchedule(schedule.id, { startTime: event.target.value })}
-                          className={`${timeInputClassName} ${isEditing ? '' : 'bg-border-light text-text-muted'}`}
-                        />
-                      </label>
-
-                      <label className="flex flex-col gap-2">
-                        <span className="text-xs font-bold uppercase text-text-muted">Início da gravação</span>
-                        <input
-                          type="time"
-                          value={schedule.recordingStartTime}
-                          disabled={!isEditing}
-                          onChange={(event) => onUpdateSchedule(schedule.id, { recordingStartTime: event.target.value })}
-                          className={`${timeInputClassName} ${isEditing ? '' : 'bg-border-light text-text-muted'}`}
-                        />
-                      </label>
-
-                      <label className="flex flex-col gap-2">
-                        <span className="text-xs font-bold uppercase text-text-muted">Fim da gravação</span>
-                        <input
-                          type="time"
-                          value={schedule.recordingEndTime}
-                          disabled={!isEditing}
-                          onChange={(event) => onUpdateSchedule(schedule.id, { recordingEndTime: event.target.value })}
-                          className={`${timeInputClassName} ${isEditing ? '' : 'bg-border-light text-text-muted'}`}
-                        />
-                      </label>
-                    </div>
-                  </article>
-                );
-              })}
+                  </div>
+                </article>
+              ))}
             </div>
           )}
         </div>
 
-        <div className="flex justify-end gap-3 border-t border-border p-6">
+        <div className="flex justify-end border-t border-border p-6">
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg border border-border px-4 py-2.5 text-sm font-bold text-text-dark transition hover:bg-app-bg"
           >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            className="flex items-center gap-2 rounded-lg bg-secondary px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-secondary/90"
-          >
-            <Save size={18} />
-            Salvar alterações
+            Fechar
           </button>
         </div>
       </section>

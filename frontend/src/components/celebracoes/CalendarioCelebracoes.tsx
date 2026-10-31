@@ -7,6 +7,8 @@ interface CalendarioCelebracoesProps {
   selectedDay: number | null;
   weekDays: string[];
   onSelectDay: (day: number) => void;
+  onPreviousMonth: () => void;
+  onNextMonth: () => void;
 }
 
 export default function CalendarioCelebracoes({
@@ -15,6 +17,8 @@ export default function CalendarioCelebracoes({
   selectedDay,
   weekDays,
   onSelectDay,
+  onPreviousMonth,
+  onNextMonth,
 }: CalendarioCelebracoesProps) {
   return (
     <section className="rounded-lg border border-border bg-white p-6 shadow-sm">
@@ -29,12 +33,11 @@ export default function CalendarioCelebracoes({
           </div>
         </div>
 
-        {/* Setas de mes ainda sem acao: o calendario e fixo. */}
         <div className="flex gap-2">
-          <button type="button" className="flex size-9 items-center justify-center rounded-lg border border-border text-text-muted hover:bg-app-bg">
+          <button type="button" aria-label="Mês anterior" onClick={onPreviousMonth} className="flex size-9 items-center justify-center rounded-lg border border-border text-text-muted hover:bg-app-bg">
             <ChevronLeft size={18} />
           </button>
-          <button type="button" className="flex size-9 items-center justify-center rounded-lg border border-border text-text-muted hover:bg-app-bg">
+          <button type="button" aria-label="Próximo mês" onClick={onNextMonth} className="flex size-9 items-center justify-center rounded-lg border border-border text-text-muted hover:bg-app-bg">
             <ChevronRight size={18} />
           </button>
         </div>

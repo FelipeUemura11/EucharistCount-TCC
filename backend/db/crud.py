@@ -116,6 +116,87 @@ def obter_celebracao(conexao: sqlite3.Connection, celebracao_id: int) -> sqlite3
     return conexao.execute("SELECT * FROM celebracao WHERE id = ?", (celebracao_id,)).fetchone()
 
 
+def obter_celebracao_do_horario(conexao: sqlite3.Connection, data: str, horario_missa: str) -> sqlite3.Row | None:
+    """A celebracao daquela data e horario, se existir (chave natural, a mesma do UNIQUE)."""
+    return conexao.execute(
+        "SELECT * FROM celebracao WHERE data = ? AND horario_missa = ?",
+        (data, horario_missa),
+    ).fetchone()
+
+
+def listar_celebracoes_do_dia(conexao: sqlite3.Connection, data: str) -> list[sqlite3.Row]:
+    """Celebracoes de uma data que ainda contam como ocupando a agenda (as canceladas ficam de fora)."""
+    return conexao.execute(
+        "SELECT * FROM celebracao WHERE data = ? AND status != 'cancelada' ORDER BY horario_missa",
+        (data,),
+    ).fetchall()
+
+
+def listar_celebracoes_avulsas_agendadas(conexao: sqlite3.Connection, a_partir_de: str) -> list[sqlite3.Row]:
+    """
+    Celebracoes avulsas (sem horario da agenda semanal) ainda por contar, de
+    `a_partir_de` ('YYYY-MM-DD') em diante. E o que o agendador le para
+    criar um disparo de data unica por celebracao.
+    """
+    # Sem janela de monitoramento nao ha o que agendar.
+    return conexao.execute(
+        """
+        SELECT * FROM celebracao
+        WHERE horario_padrao_id IS NULL
+          AND status = 'agendada'
+          AND data >= ?
+          AND horario_inicio_monitoramento IS NOT NULL
+          AND horario_fim_monitoramento IS NOT NULL
+        ORDER BY data, horario_missa
+        """,
+        (a_partir_de,),
+    ).fetchall()
+
+
+def remover_celebracao_cancelada(conexao: sqlite3.Connection, celebracao_id: int) -> bool:
+    """
+    Apaga uma celebracao cancelada que nunca foi contada, para liberar o
+    UNIQUE (data, horario_missa) a quem quiser cadastrar de novo.
+    Retorna False se ela nao e cancelada ou ja tem sessao.
+    """
+    cursor = conexao.execute(
+        """
+        DELETE FROM celebracao
+        WHERE id = ? AND status = 'cancelada'
+          AND NOT EXISTS (SELECT 1 FROM sessao_monitoramento WHERE celebracao_id = celebracao.id)
+        """,
+        (celebracao_id,),
+    )
+    conexao.commit()
+    return cursor.rowcount > 0
+
+
+def limpar_celebracoes_vencidas(conexao: sqlite3.Connection, limite: str) -> int:
+    """
+    Apaga celebracoes avulsas que passaram sem serem contadas.
+
+    `limite` e 'YYYY-MM-DDTHH:MM': so sai quem terminou antes dele (o
+    chamador passa "agora menos 24h"). Devolve quantas foram apagadas.
+
+    So entram canceladas ou ainda 'agendada' (a contagem nunca rodou) E sem
+    nenhuma sessao: apagar a celebracao leva as sessoes junto (CASCADE) e o
+    Historico le a celebracao, entao uma missa contada nunca pode ser apagada.
+    """
+    cursor = conexao.execute(
+        """
+        DELETE FROM celebracao
+        WHERE horario_padrao_id IS NULL
+          AND origem = 'personalizada'
+          AND status IN ('agendada', 'cancelada')
+          AND (data || 'T' || COALESCE(horario_fim_monitoramento, horario_missa)) < ?
+          AND NOT EXISTS (SELECT 1 FROM sessao_monitoramento WHERE celebracao_id = celebracao.id)
+        """,
+        (limite,),
+    )
+    conexao.commit()
+    return cursor.rowcount
+
+
 def listar_proximas_celebracoes(conexao: sqlite3.Connection, a_partir_de: str, limite: int = 20) -> list[sqlite3.Row]:
     """`a_partir_de` no formato 'YYYY-MM-DD' — normalmente a data de hoje."""
     return conexao.execute(

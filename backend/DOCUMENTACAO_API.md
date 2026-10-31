@@ -238,17 +238,42 @@ Três detalhes:
 
 Sem nenhuma sessão (nem ativa, nem encerrada), a rota devolve o mesmo formato, zerado, com o gráfico vazio e `resumoCelebracao: null`. O frontend mostra "Nenhuma missa registrada ainda." no lugar do resumo.
 
-### 4.4 `GET /api/celebracoes`
+### 4.4 `/api/celebracoes`
 
-Lista as celebrações do **mês atual** (`crud.listar_celebracoes_do_mes`, que filtra por `data LIKE 'AAAA-MM%'`).
+Tela Celebrações. A agenda semanal fica em `/api/configuracoes` (seção 4.6); aqui entram as missas **fora da rotina** (Natal, Páscoa, casamento, exéquias, missa de última hora) e o calendário do mês.
+
+| Rota | Comportamento |
+|---|---|
+| `GET /api/celebracoes?ano=&mes=` | Celebrações do mês pedido (`crud.listar_celebracoes_do_mes`, que filtra por `data LIKE 'AAAA-MM%'`). Sem `ano` e `mes`, vale o mês atual. `mes` fora de 1 a 12 responde **422** |
+| `POST /api/celebracoes` | Cria uma celebração **agendada** e responde **201** com o registro criado |
+| `DELETE /api/celebracoes/{id}` | Cancela (`status = 'cancelada'`). **404** se não existir; **409** se já estiver `em_andamento` ou `finalizada` |
+
+Campos devolvidos pelo `GET` e pelo `POST`:
 
 | Campo | Origem |
 |---|---|
-| `id`, `titulo` | `celebracao.id`, `titulo` |
+| `id`, `titulo`, `tipo` | `celebracao.id`, `titulo`, `tipo` |
 | `dia`, `diaSemana` | Derivados de `celebracao.data` (`dia_do_mes`, `formatar_dia_semana`) |
 | `horarioMissa`, `inicioMonitoramento`, `fimMonitoramento` | `horario_missa`, `horario_inicio/fim_monitoramento` |
 | `pessoasEsperadas`, `capacidade` | `pessoas_esperadas`, `capacidade` (`0` se vazios) |
 | `status` | `celebracao.status`, sem conversão: `agendada`, `em_andamento`, `finalizada` ou `cancelada` |
+
+**Corpo do `POST`** (`CelebracaoCriar`): `titulo`, `tipo` (`comum`, `especial`, `natal`, `pascoa`, `casamento` ou `exequias`), `data` (`AAAA-MM-DD`), `horarioMissa`, `inicioGravacao`, `fimGravacao` (`HH:MM`) e `repetirSemanalmente`.
+
+**Validações**, as mesmas da agenda mais as da data:
+
+| Situação | Resposta |
+|---|---|
+| Hora fora do formato `HH:MM`, fim da gravação não depois do início, data impossível ou no passado, tipo fora da lista, título vazio | **422** |
+| Data de hoje com o fim da gravação já passado | **422** (não haveria o que contar) |
+| Já existe celebração naquela data e horário | **409** (`UNIQUE (data, horario_missa)`) |
+| A janela de gravação se sobrepõe a outra celebração do dia ou a uma missa da agenda daquele dia da semana | **409** (a contagem é uma por vez) |
+
+Uma celebração **cancelada** no mesmo dia e horário não bloqueia: ela é apagada para dar lugar à nova (só se nunca foi contada).
+
+**`repetirSemanalmente`:** além da celebração, grava um horário em `horario_padrao` (mesmo dia da semana e horário da missa), de modo que a missa passa a se repetir toda semana pela agenda existente, sem tabela nova. Se a agenda já tem esse dia e horário, ele é reaproveitado, sem duplicar. A celebração criada fica ligada a esse horário (`horario_padrao_id`), então o disparo semanal a reaproveita, com o título e o tipo escolhidos (seção 6.7).
+
+Depois de salvar ou cancelar, a rota chama `recarregar_agenda()`, e a mudança vale na hora, sem reiniciar o programa.
 
 ### 4.5 `GET /api/historico`
 
@@ -274,7 +299,7 @@ A agenda semanal padrão fica na tabela `horario_padrao` (`DOCUMENTACAO_BANCO.md
 | `POST /api/configuracoes/agenda` | Recebe `diaSemana` (0 = domingo a 6), `horarioMissa`, `inicioGravacao` e `fimGravacao` (`HH:MM`). Fora do formato, ou com o fim antes do início, responde **422** |
 | `DELETE /api/configuracoes/agenda/{id}` | *Soft delete* (`ativo = 0`): celebrações geradas pelo horário mantêm a referência. **404** se não houver horário ativo com o `id` |
 
-A agenda ainda **não dispara o monitoramento**: isso depende do APScheduler (seção 9).
+Criar ou remover um horário chama `recarregar_agenda()`: o agendador refaz as tarefas e a mudança vale na hora (seção 6.7).
 
 ### 4.7 Uma conexão por requisição (`api/dependencias.py`)
 
@@ -425,7 +450,7 @@ def sessao_de_monitoramento(monitor, config):
 - **Concluída ou interrompida.** Se o bloco termina normalmente (fim do vídeo, ESC), a sessão fecha como `concluida`. Se termina por exceção (a fonte não abriu, um erro no motor, Ctrl+C), o `except` anota `interrompida` e relança a exceção, para o `main.py` ainda mostrar a mensagem. O `BaseException` é necessário porque o `KeyboardInterrupt` do Ctrl+C não herda de `Exception`. Só sessões `concluida` entram no Histórico, então uma contagem que falhou não aparece lá como resultado válido com zeros.
 - **Uma conexão para a missa inteira.** O gravador usa a mesma conexão durante toda a sessão, ao contrário da API, que abre uma por requisição (`DOCUMENTACAO_BANCO.md`, seção 7.5).
 
-**Qual celebração é usada:** enquanto o agendamento automático não existe (seção 9), a celebração é criada na hora, com a data e o horário em que o programa foi iniciado e o título "Missa (monitoramento automatico)". Reiniciar no mesmo minuto reaproveita a celebração (`obter_ou_criar_celebracao`) e cria uma segunda sessão nela.
+**Qual celebração é usada:** no modo manual (`--fonte` ou `--agora`), a celebração é criada na hora, com a data e o horário em que o programa foi iniciado e o título "Missa (monitoramento automatico)". Reiniciar no mesmo minuto reaproveita a celebração (`obter_ou_criar_celebracao`) e cria uma segunda sessão nela.
 
 ### 6.6 Sessões presas: `fechar_sessoes_presas()`
 
@@ -440,6 +465,38 @@ presas = fechar_sessoes_presas()   # crud.interromper_sessoes_orfas()
 Toda sessão ainda `em_andamento` é marcada como `interrompida`, com `finalizado_em`, e a celebração dela como `finalizada`. O programa avisa no terminal quantas fechou.
 
 É seguro porque **só um processo roda o motor**. No instante em que o programa está começando, nenhuma contagem pode estar legitimamente em andamento: qualquer sessão nesse estado é de uma execução anterior que não terminou.
+
+### 6.7 O agendador e as celebrações avulsas (`integracao/agendador.py`)
+
+No modo agendado, o `Agendador` (APScheduler) liga e desliga a contagem sozinho. Ele tem **duas fontes** de disparos:
+
+| Fonte | Disparo | Quando existe |
+|---|---|---|
+| Agenda semanal (`horario_padrao`) | `CronTrigger` semanal no horário de início da gravação | Um por horário ativo |
+| Celebração avulsa (`celebracao` com `horario_padrao_id` nulo e `status = 'agendada'`) | `DateTrigger` de data única no início da gravação | Uma por celebração, de hoje em diante |
+
+Antes só a primeira fonte existia, e uma missa fora da rotina só era contada com `python main.py --agora`, entrando como "Missa (monitoramento automatico)". Agora `recarregar()` lê as duas e registra os disparos; as rotas de `/api/celebracoes` e `/api/configuracoes` chamam `recarregar_agenda()` depois de cada mudança.
+
+**O que as duas fontes compartilham:**
+
+- A contagem em si (`_contar`) e a trava de uma contagem por vez. Se duas janelas se sobrepõem, a segunda é ignorada, com aviso no terminal.
+- `_reservar()` pega a trava e marca a janela como feita no dia. A chave é `(origem, id, dia)`, e a origem (`"agenda"` ou `"celebracao"`) evita colisão entre ids de tabelas diferentes.
+- Computador ligado no meio da janela: o disparo de data única já venceu, mas o `misfire_grace_time` é a duração da janela, então ele roda na hora. Depois do fim, não começa mais.
+- Celebração `cancelada` não é contada, e cancelar tira o disparo da agenda.
+
+**`repetirSemanalmente`:** a celebração criada fica ligada ao horário da agenda (`horario_padrao_id`). Por isso o agendador **não** cria um disparo avulso para ela, e quem a conta é o disparo semanal, que encontra a celebração pela chave `(data, horario_missa)` e a reaproveita (`obter_ou_criar_celebracao`), preservando título e tipo.
+
+**Limpeza (`limpar_celebracoes_vencidas`):**
+
+Celebração avulsa que passou e **nunca foi contada** é apagada 24 horas depois do fim da gravação. Roda na inicialização (`main.py`) e todo dia às 03:00 no próprio agendador, porque o computador pode ficar ligado por dias.
+
+| Regra | Motivo |
+|---|---|
+| Só `origem = 'personalizada'` e sem `horario_padrao_id` | Celebrações ligadas à agenda semanal não são avulsas |
+| Só `agendada` ou `cancelada` | Em andamento e finalizada têm contagem |
+| Só sem nenhuma sessão | `sessao_monitoramento` tem `ON DELETE CASCADE`: apagar a celebração apagaria a contagem, e o Histórico lê a celebração |
+
+Missa contada **nunca** é apagada: ela fica como `finalizada` e é o que alimenta o Histórico.
 
 ---
 
@@ -542,7 +599,7 @@ python -c "from db.database import obter_conexao; from integracao.estimativa imp
 
 ## 9. Próximos passos previstos (em desenvolvimento)
 
-- **Agendamento automático (APScheduler).** Iniciar o monitoramento sozinho no horário de cada missa, sem janela (`--sem-janela`), usando o mesmo `with sessao_de_monitoramento(...)` + `monitor.executar(...)`. Com ele, a celebração deixaria de ser criada na hora (seção 6.5) e passaria a vir da agenda (`horario_padrao`). O `Monitor.parar()` já existe para encerrar a contagem no fim da janela.
+- **Agendamento automático (APScheduler).** Implementado: seção 6.7.
 - **Empacotamento (PyInstaller + Inno Setup).** O `.exe` único, o banco em `%APPDATA%`, o início com o Windows e a abertura automática do dashboard já estão no código e estão descritos em [`DOCUMENTACAO_DISTRIBUICAO.md`](./DOCUMENTACAO_DISTRIBUICAO.md). Falta validar o build numa máquina Windows e criar o instalador (Inno Setup).
 - **Controle manual da contagem.** Hoje não há botões no dashboard nem rotas na API para iniciar ou encerrar o motor: ele começa com o `main.py` e termina no fim do vídeo, por ESC/Q na janela ou por Ctrl+C.
 
@@ -552,6 +609,6 @@ python -c "from db.database import obter_conexao; from integracao.estimativa imp
 
 | Onde | Limitação | Efeito |
 |---|---|---|
-| `Celebracoes.tsx` | A tela de Celebrações ainda usa `celebrationsMock.ts` | As alterações feitas no calendário ficam apenas em memória no navegador; a rota `GET /api/celebracoes` já existe no backend, mas ainda não foi integrada à página |
+| `Celebracoes.tsx` | O calendário lista só o que está na tabela `celebracao` | As missas da agenda semanal aparecem ali quando a contagem delas começa (é nesse momento que a celebração é criada); as futuras ainda não são mostradas. Celebrações avulsas aparecem desde o cadastro |
 
 Corrigido: `EstimativaComunhao.tsx` antes calculava as hóstias sugeridas no próprio frontend multiplicando por `1.1` fixo. Agora `GET /api/dashboard` devolve `hostiasSugeridas` diretamente de `calcular_estimativa(db, ocupacao, celebracao).hostias`, garantindo que o Dashboard e o Histórico usem sempre a mesma `margem_hostias` configurada no banco.

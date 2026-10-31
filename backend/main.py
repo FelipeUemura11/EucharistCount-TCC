@@ -125,6 +125,11 @@ def main() -> int:
         if atrasadas:
             print(f"[!] Estimativa calculada para {atrasadas} contagem(ns) que estava(m) sem.")
 
+        # Celebracoes avulsas que passaram ha mais de 24h sem serem contadas (o Historico nao e afetado).
+        vencidas = agenda.limpar_celebracoes_vencidas()
+        if vencidas:
+            print(f"[!] {vencidas} celebracao(oes) avulsa(s) vencida(s) removida(s).")
+
         # API numa thread daemon; o motor de visao roda na thread principal (bloqueante).
         iniciar_em_background(criar_app())
         print("\n")

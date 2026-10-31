@@ -177,7 +177,7 @@ A agenda semanal fixa (tela Configurações): cada linha é uma missa recorrente
 - `dia_semana` segue a convenção **0 = domingo … 6 = sábado**, travada por `CHECK (dia_semana BETWEEN 0 AND 6)`. Atenção: o Python usa segunda = 0; a conversão está em `preparar_dataset._dia_semana()`.
 - Remover um horário não apaga a linha: `crud.remover_horario_padrao()` faz `ativo = 0` (*soft delete*), para que celebrações antigas geradas a partir dele não percam a referência.
 
-A tela de Configurações lê, cria e remove horários por `api/rotas/configuracoes.py` (`GET /api/configuracoes`, `POST /api/configuracoes/agenda` e `DELETE /api/configuracoes/agenda/{id}`). O motor ainda não a usa: isso fica para o agendamento automático (APScheduler).
+A tela de Configurações lê, cria e remove horários por `api/rotas/configuracoes.py` (`GET /api/configuracoes`, `POST /api/configuracoes/agenda` e `DELETE /api/configuracoes/agenda/{id}`). O agendador (`integracao/agendador.py`) lê a agenda e liga a contagem nos horários dela, e refaz as tarefas sempre que ela muda.
 
 ### 3.2 `celebracao`
 
@@ -185,7 +185,7 @@ Uma data concreta com missa.
 
 | Coluna | Regra | Para que serve |
 |---|---|---|
-| `horario_padrao_id` | FK opcional, `ON DELETE SET NULL` | De qual horário fixo ela veio. `NULL` para celebrações avulsas (Natal, missa especial) |
+| `horario_padrao_id` | FK opcional, `ON DELETE SET NULL` | De qual horário fixo ela veio. `NULL` para celebrações avulsas (Natal, missa especial), que o agendador dispara por data única. Preenchido quando cadastrada com "repetir toda semana" |
 | `titulo`, `tipo` | `tipo` padrão `'comum'` | Nome exibido e categoria (usada como variável na regressão, seção 9) |
 | `data`, `horario_missa` | **`UNIQUE (data, horario_missa)`** | Impede duas missas no mesmo dia e horário |
 | `horario_inicio/fim_monitoramento` | opcionais | Janela em que a câmera deve contar. Vazios em registros só manuais |
@@ -194,6 +194,8 @@ Uma data concreta com missa.
 | `status` | ver seção 5 | Onde a missa está no seu ciclo de vida |
 
 `atualizado_em` é mantido por um gatilho (seção 4.3).
+
+**Celebrações avulsas que passam sem ser contadas são apagadas.** Uma avulsa (`origem = 'personalizada'`, sem `horario_padrao_id`) `agendada` ou `cancelada`, sem nenhuma sessão, é removida 24 horas depois do fim da gravação (`crud.limpar_celebracoes_vencidas`). A condição "sem sessão" é obrigatória: a sessão tem `ON DELETE CASCADE` e o `vw_historico` lê a celebração, então apagar uma missa contada apagaria o Histórico. As contadas ficam como `finalizada` para sempre.
 
 ### 3.3 `sessao_monitoramento`
 
@@ -341,8 +343,9 @@ stateDiagram-v2
     agendada --> em_andamento : iniciar_sessao()
     em_andamento --> finalizada : finalizar_sessao()
     agendada --> cancelada : atualizar_status_celebracao()
+    agendada --> [*] : limpar_celebracoes_vencidas() (avulsa vencida, sem sessão)
+    cancelada --> [*] : limpar_celebracoes_vencidas() (avulsa vencida, sem sessão)
     finalizada --> [*]
-    cancelada --> [*]
 ```
 
 `iniciar_sessao()` e `finalizar_sessao()` mudam o status da celebração **na mesma transação** em que abrem e fecham a sessão, então as duas tabelas nunca ficam em estados contraditórios. O `import_csv.py` cria celebrações já como `finalizada`, porque importa missas que já aconteceram.
@@ -396,8 +399,9 @@ Toda função recebe a conexão como primeiro argumento (não abre nem fecha con
 | Agenda | `criar_horario_padrao`, `listar_horarios_padrao`, `remover_horario_padrao` | `api/rotas/configuracoes.py` |
 | Celebração | `criar_celebracao`, `obter_ou_criar_celebracao` | `integracao/sessao.py` |
 | | `obter_celebracao` | `api/rotas/dashboard.py`, `integracao/estimativa.py` |
-| | `listar_celebracoes_do_mes` | `api/rotas/celebracoes.py` |
-| | `listar_proximas_celebracoes`, `atualizar_status_celebracao` | — |
+| | `listar_celebracoes_do_mes`, `listar_celebracoes_do_dia`, `obter_celebracao_do_horario`, `remover_celebracao_cancelada`, `atualizar_status_celebracao` | `api/rotas/celebracoes.py` |
+| | `listar_celebracoes_avulsas_agendadas`, `limpar_celebracoes_vencidas` | `integracao/agendador.py` |
+| | `listar_proximas_celebracoes` | — |
 | Sessão | `iniciar_sessao`, `atualizar_totais_sessao`, `registrar_instantaneo`, `finalizar_sessao` | `integracao/sessao.py` |
 | | `interromper_sessoes_orfas` | `integracao/sessao.py` (`fechar_sessoes_presas`, no início do programa) |
 | | `obter_sessao_ativa` | `api/rotas/status.py` e `api/rotas/dashboard.py` |
