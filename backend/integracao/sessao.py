@@ -96,6 +96,7 @@ def sessao_de_monitoramento(
 
     gravador = GravadorSessao(conexao, sessao_id)
 
+    # Status final: 'concluida' ate que algum erro ou interrupcao mude para 'interrompida'.
     status = "concluida"
     try:
         yield gravador

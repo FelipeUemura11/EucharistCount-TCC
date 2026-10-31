@@ -2,6 +2,7 @@ import sqlite3
 from datetime import datetime, timezone, timedelta
 from db.database import obter_conexao, inicializar_banco
 
+# Demonstracao: uma missa encerrada (Historico) e uma ao vivo com serie de ocupacao (Dashboard).
 def popular_banco():
     inicializar_banco()
     db = obter_conexao()

@@ -30,6 +30,7 @@ from database import CAMINHO_BANCO, inicializar_banco, obter_conexao
 
 
 def _vazio_para_none(valor: str):
+    # Campo vazio do CSV vira None (NULL no banco).
     valor = (valor or "").strip()
     return valor if valor else None
 
@@ -50,6 +51,7 @@ def importar(caminho_csv: Path, caminho_banco: Path = CAMINHO_BANCO) -> None:
         with open(caminho_csv, newline="", encoding="utf-8") as arquivo:
             leitor = csv.DictReader(arquivo)
 
+            # Cada linha vira celebracao + sessao manual + estimativa de comunhao.
             for linha in leitor:
                 data = _vazio_para_none(linha.get("date"))
                 horario = _vazio_para_none(linha.get("time"))

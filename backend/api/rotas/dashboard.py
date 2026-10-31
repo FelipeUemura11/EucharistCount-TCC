@@ -41,6 +41,7 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
     ativa = sessao["status"] == "em_andamento"
     ocupacao = sessao["ocupacao_final"]
 
+    # Serie do grafico: um ponto por instantaneo gravado, com a hora no fuso local.
     grafico = [
         PontoOcupacao(hora=hora_de_timestamp(inst["registrado_em"]),
                       ocupacao=inst["ocupacao_atual"])

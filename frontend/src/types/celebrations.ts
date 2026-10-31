@@ -13,6 +13,7 @@ export interface Celebracao {
   status: StatusCelebracao;
 }
 
+// Celebracao espelha schemas.py; os tipos abaixo so alimentam o calendario da pagina Celebracoes.
 export interface CalendarDay {
   id: string;
   day?: number;

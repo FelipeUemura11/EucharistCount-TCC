@@ -36,6 +36,7 @@ function ExpandableImage({ src, alt, onZoom }: { src: string; alt: string; onZoo
 }
 
 export default function Ajuda() {
+    // Item do FAQ aberto (acordeao) e imagem ampliada no lightbox.
     const [openId, setOpenId] = useState<string | null>("nova-missa");
     const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 

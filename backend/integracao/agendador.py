@@ -128,6 +128,7 @@ class Agendador:
         finally:
             conexao.close()
 
+        # Apaga as tarefas antigas da agenda; sao recriadas a partir do banco logo abaixo.
         for tarefa in self._scheduler.get_jobs():
             if tarefa.id.startswith("agenda-"):
                 tarefa.remove()
@@ -240,6 +241,7 @@ class Agendador:
         # Import aqui (e nao no topo): ver docstring do modulo.
         from integracao.sessao import sessao_de_monitoramento
 
+        # O vigia roda em paralelo e para o motor quando a janela acaba.
         terminou = threading.Event()
         vigia = threading.Thread(target=self._parar_no_fim, args=(fim, terminou), daemon=True)
 

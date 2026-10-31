@@ -6,6 +6,7 @@ interface EstimativaComunhaoProps {
 }
 
 export default function EstimativaComunhao({ metricas }: EstimativaComunhaoProps) {
+    // % de comungantes sobre os presentes; 0 sem ninguem na igreja (evita dividir por zero).
     const communionPercent = metricas.ocupacaoAtual > 0
         ? Math.round((metricas.estimativaComunhao / metricas.ocupacaoAtual) * 100)
         : 0;

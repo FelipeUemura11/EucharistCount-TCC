@@ -57,6 +57,7 @@ def criar_horario_padrao(conexao: sqlite3.Connection, dia_semana: int, horario_m
 
 
 def listar_horarios_padrao(conexao: sqlite3.Connection, apenas_ativos: bool = True) -> list[sqlite3.Row]:
+    # Horarios removidos ficam no banco com ativo = 0; por padrao nao aparecem.
     query = "SELECT * FROM horario_padrao"
     if apenas_ativos:
         query += " WHERE ativo = 1"
@@ -186,6 +187,7 @@ def atualizar_totais_sessao(conexao: sqlite3.Connection, sessao_id: int,
     Mantem os totais da sessao ativa em dia durante a missa — e o que o
     Dashboard ao vivo le. Chamado a cada entrada/saida, nao a cada frame.
     """
+    # Com a sessao aberta, ocupacao_final guarda a ocupacao corrente.
     conexao.execute(
         """
         UPDATE sessao_monitoramento
@@ -300,6 +302,7 @@ def obter_ultima_sessao_concluida(conexao: sqlite3.Connection) -> sqlite3.Row | 
     """
     A ultima contagem que ocorreu para aparecer no Dashboard
     """
+    # So da camera: a contagem manual importada do CSV nao entra aqui.
     return conexao.execute(
         """
         SELECT * FROM sessao_monitoramento

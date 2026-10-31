@@ -24,6 +24,7 @@ export default function Celebracoes() {
         ? (daySchedules[selectedDay] ?? [])
         : [];
 
+    // Horario novo entra como "custom", com valores padrao para editar.
     const addSchedule = () => {
         if (!selectedDay) {
             return;
@@ -44,6 +45,7 @@ export default function Celebracoes() {
         }));
     };
 
+    // Qualquer alteracao marca o horario do dia como "custom" (diferente da configuracao global).
     const updateSchedule = (
         scheduleId: string,
         changes: CelebrationMassScheduleChanges,

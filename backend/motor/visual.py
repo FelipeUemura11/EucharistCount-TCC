@@ -44,6 +44,7 @@ def desenhar_pessoa(frame: np.ndarray, pessoa: Pessoa) -> None:
 
     cv2.rectangle(frame, (pessoa.x1, pessoa.y1), (pessoa.x2, pessoa.y2), cor, 2)
 
+    # Rotulo "ID n confianca" sobre a caixa, com fundo na cor do ID.
     rotulo = f"ID {pessoa.id}" if pessoa.id is not None else "pessoa"
     rotulo += f" {pessoa.confianca:.2f}"
 

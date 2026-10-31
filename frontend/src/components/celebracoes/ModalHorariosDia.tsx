@@ -27,6 +27,7 @@ export default function ModalHorariosDia({
   onSave,
   onUpdateSchedule,
 }: ModalHorariosDiaProps) {
+  // Horario em edicao: so os campos dele ficam liberados.
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
 
   return (

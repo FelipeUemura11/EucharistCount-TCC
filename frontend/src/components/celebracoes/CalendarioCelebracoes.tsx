@@ -29,6 +29,7 @@ export default function CalendarioCelebracoes({
           </div>
         </div>
 
+        {/* Setas de mes ainda sem acao: o calendario e fixo. */}
         <div className="flex gap-2">
           <button type="button" className="flex size-9 items-center justify-center rounded-lg border border-border text-text-muted hover:bg-app-bg">
             <ChevronLeft size={18} />

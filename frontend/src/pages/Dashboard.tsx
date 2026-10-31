@@ -5,11 +5,13 @@ import GraficoOcupacao from "../components/dashboard/GraficoOcupacao";
 import { useDashboard } from "../hooks/useDashboard";
 
 export default function Dashboard() {
+    // O hook consulta /api/dashboard periodicamente; a pagina so distribui os dados.
     const { dados } = useDashboard();
     const { metricas, graficoOcupacao, resumoCelebracao } = dados;
 
     return (
         <div className="flex flex-col gap-6">
+            {/* Cards no topo; grafico e resumo lado a lado; estimativa de comunhao por ultimo. */}
             <EstatisticasDashboard metricas={metricas} />
             <section>
                 <div className="grid grid-cols-[1fr_380px] gap-6 max-[1400px]:grid-cols-[1fr_340px] max-[1024px]:grid-cols-1">

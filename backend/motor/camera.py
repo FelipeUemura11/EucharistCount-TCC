@@ -95,6 +95,7 @@ class FonteVideo:
         )
         self.fechar()
 
+        # Laco ate reabrir; so sai antes se o monitoramento for parado.
         while True:
 
             if self.checar_interrupcao and self.checar_interrupcao():

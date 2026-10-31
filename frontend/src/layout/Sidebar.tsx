@@ -3,6 +3,7 @@ import { CalendarDays, History, LayoutDashboard, Settings, HelpCircle } from "lu
 import logo from "../assets/logo.png";
 import logoEucharistCount from "../assets/LogoEucaristCount.png";
 
+// Link da pagina atual em branco pleno; os demais esmaecidos.
 function linkClass({ isActive }: { isActive: boolean }) {
     return `flex items-center gap-3 w-[calc(100%-24px)] mx-3 my-1 px-4 py-3 border-0 rounded-lg text-sm font-medium text-left cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1 ${
         isActive

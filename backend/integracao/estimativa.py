@@ -129,6 +129,7 @@ def calcular_estimativa(
       1. 'regressao': usa o modelo .joblib se disponivel (e deriva o coeficiente efetivo).
       2. 'coeficiente_fixo' (ou fallback): multiplica ocupacao pelo coeficiente_comunhao.
     """
+    # Parametros vindos da configuracao vigente; sem ela, valem os padroes do modulo.
     config = crud.obter_configuracao_estimativa_vigente(conexao)
     if config:
         coeficiente = config["coeficiente_comunhao"]
@@ -181,6 +182,7 @@ def registrar_estimativa_da_sessao(conexao: sqlite3.Connection, sessao_id: int, 
 
 def preencher_estimativas_pendentes(conexao: sqlite3.Connection) -> int:
     """Grava a estimativa das sessoes concluidas que ainda nao tem uma. Devolve quantas."""
+    # Pendente = sessao concluida sem linha em estimativa_comunhao.
     pendentes = conexao.execute(
         """
         SELECT id, ocupacao_final FROM sessao_monitoramento

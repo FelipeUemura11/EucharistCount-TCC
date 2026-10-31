@@ -92,6 +92,7 @@ class DetectorPessoas:
         if n <= 0:
             return
 
+        # Limite vale para as bibliotecas numericas (OpenMP, MKL, OpenBLAS) e para o PyTorch.
         import os
 
         for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS",

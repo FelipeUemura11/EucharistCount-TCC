@@ -13,6 +13,7 @@ export const criarAgendaPadrao = async (agenda: AgendaDiaCriar): Promise<AgendaD
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(agenda)
     });
+    // 422 = validacao do backend (formato de hora ou fim antes do inicio).
     if (res.status === 422) throw new Error("Horário inválido: o fim da gravação deve ser depois do início.");
     if (!res.ok) throw new Error("Erro ao criar agenda");
     return res.json();

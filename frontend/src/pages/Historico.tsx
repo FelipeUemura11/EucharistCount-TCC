@@ -9,12 +9,14 @@ interface HistoryFilterState {
     periodInDays: number;
 }
 
+// A API entrega a data como dd/mm/aaaa.
 function parseDateFromHistory(dateString: string) {
     const [day, month, year] = dateString.split("/").map(Number);
 
     return new Date(year, month - 1, day);
 }
 
+// Dentro do periodo = ate N dias antes da data de referencia.
 function isWithinPeriod(
     recordDate: Date,
     referenceDate: Date,

@@ -31,6 +31,7 @@ class MetricasDashboard(BaseModel):
 class DadosDashboard(BaseModel):
     metricas: MetricasDashboard
     graficoOcupacao: list[PontoOcupacao]
+    # None enquanto nao existe nenhuma sessao no banco.
     resumoCelebracao: ResumoCelebracao | None
 
 

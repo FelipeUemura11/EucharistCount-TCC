@@ -11,6 +11,7 @@ export default function HeaderPage({ title, isActive, showStatus = true }: Heade
                 <h1 className="text-2xl font-bold text-text-dark m-0">{title}</h1>
             </div>
         
+            {/* Selo de status: verde com contagem ativa, vermelho sem. */}
             {showStatus && (
                 <div className="flex items-center gap-5">
                     <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold ${isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>

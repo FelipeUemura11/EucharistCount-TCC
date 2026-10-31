@@ -15,6 +15,7 @@ def criar_app() -> FastAPI:
     # pelo main.py, ou pelo proxy do Vite em desenvolvimento). Assim, outro
     # site aberto no navegador deste PC nao consegue usar a API.
 
+    # Uma rota por tela, todas sob /api.
     for rotas in (status, dashboard, celebracoes, historico, configuracoes):
         app.include_router(rotas.router, prefix="/api")
 
