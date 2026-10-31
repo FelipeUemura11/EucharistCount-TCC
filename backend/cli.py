@@ -16,6 +16,7 @@ def montar_argumentos() -> argparse.ArgumentParser:
     p.add_argument("--sem-janela", action="store_true", help="roda sem interface grafica")
     p.add_argument("--linha", type=str, help="linha de contagem: x1,y1,x2,y2 em fracoes (0-1)")
     p.add_argument("--agora", action="store_true", help="conta imediatamente, sem esperar a agenda (passar --fonte tambem faz isso)")
+    p.add_argument("--boot", action="store_true", help="iniciado pelo Windows: segue a agenda sem abrir o navegador")
     return p
 
 def modo_manual(args: argparse.Namespace) -> bool:

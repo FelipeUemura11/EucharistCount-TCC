@@ -11,8 +11,10 @@ Dois modos:
 
 import multiprocessing
 import sys
+import threading
 import time
 
+import inicializacao
 from api.app import criar_app
 from api.servidor import iniciar_em_background
 
@@ -21,10 +23,11 @@ from integracao import agendador as agenda
 from integracao.sessao import fechar_sessoes_presas, preencher_estimativas_atrasadas, sessao_de_monitoramento
 
 from motor.monitor import Monitor
-from motor.config import RAIZ, Config
+from motor.config import EMPACOTADO, RAIZ, Config
 
 from db.database import inicializar_banco
 
+# Indice = dia_semana do banco (0 = domingo); usado so para listar as proximas contagens.
 DIAS = ("domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado")
 
 
@@ -85,11 +88,22 @@ def iniciar_agendado(config: Config) -> agenda.Agendador | None:
 
 
 def main() -> int:
+    # Necessario no executavel do PyInstaller (Windows); sem efeito fora dele.
     multiprocessing.freeze_support()
+
+    # .exe sem console: o log em arquivo precisa existir antes de qualquer print.
+    if EMPACOTADO:
+        inicializacao.preparar_saida()
 
     # Precedencia: linha de comando > config.json > padrao. A CLI e aplicada por cima do que o Config carregou.
     args = montar_argumentos().parse_args()
     config = aplicar_argumentos(Config.carregar(), args)
+
+    # Programa ja aberto (ex.: iniciou com o Windows e o padre clicou no atalho): so mostra o dashboard.
+    if EMPACOTADO and not inicializacao.adquirir_instancia_unica():
+        if not args.boot:
+            inicializacao.abrir_dashboard()
+        return 0
 
     print("=" * 52)
     print("  EUCHARIST COUNT — Dashboard & Sistema ON-PREMISE")
@@ -116,6 +130,12 @@ def main() -> int:
         print("\n")
         print("[✓] Dashboard: http://127.0.0.1:8000")
         print("[✓] Documentação da API: http://127.0.0.1:8000/docs")
+
+        # .exe: inicia com o Windows e mostra o dashboard (no boot fica quieto: a agenda conta sozinha).
+        if EMPACOTADO:
+            inicializacao.registrar_inicio_com_windows()
+            if not args.boot:
+                threading.Thread(target=inicializacao.abrir_dashboard, daemon=True).start()
 
         if modo_manual(args):
             print("[✓] Modo manual: puxando motor visual e câmeras...\n")

@@ -9,6 +9,7 @@ Este documento explica **como as peças do backend foram ligadas**: o servidor F
 | [`DOCUMENTACAO_MOTOR.md`](./DOCUMENTACAO_MOTOR.md) | Motor de visão computacional: câmera, detecção, rastreio e contagem |
 | [`DOCUMENTACAO_BANCO.md`](./DOCUMENTACAO_BANCO.md) | Modelo de dados, camada de acesso e estimativa de comunhão |
 | **`DOCUMENTACAO_API.md`** (este) | Servidor FastAPI, ligação motor → banco e dashboard ao vivo |
+| [`DOCUMENTACAO_DISTRIBUICAO.md`](./DOCUMENTACAO_DISTRIBUICAO.md) | Empacotamento em `.exe`, caminhos e início com o Windows |
 
 ---
 
@@ -116,6 +117,7 @@ Se o modelo não existir (`FileNotFoundError`) ou a fonte de vídeo não estiver
 | `--threads` | `deteccao.threads` | `--threads 2` |
 | `--linha` | `contagem.linha` | `--linha 0.25,0.0,0.25,1.0` |
 | `--sem-janela` | `visual.mostrar_janela = false` | produção, sem interface gráfica |
+| `--boot` | não abre o navegador | usado pela entrada de início do Windows (`DOCUMENTACAO_DISTRIBUICAO.md`, seção 3.1) |
 
 Os argumentos numéricos são testados com `is not None`, e não com `if valor:`. Isso porque em Python `0` é falso: o teste antigo ignorava um `--threads 0` digitado de propósito. O `argparse` usa `None` para "não informado", e é exatamente isso que o teste verifica.
 
@@ -541,7 +543,7 @@ python -c "from db.database import obter_conexao; from integracao.estimativa imp
 ## 9. Próximos passos previstos (em desenvolvimento)
 
 - **Agendamento automático (APScheduler).** Iniciar o monitoramento sozinho no horário de cada missa, sem janela (`--sem-janela`), usando o mesmo `with sessao_de_monitoramento(...)` + `monitor.executar(...)`. Com ele, a celebração deixaria de ser criada na hora (seção 6.5) e passaria a vir da agenda (`horario_padrao`). O `Monitor.parar()` já existe para encerrar a contagem no fim da janela.
-- **Empacotamento (PyInstaller + Inno Setup).** O código já traz a preparação para o executável: `freeze_support()` no `main.py`, resolução de caminhos estáticos por `sys._MEIPASS` no `api/frontend.py`, leitura do `.env` na pasta do `.exe` em `motor/config.py`, e modelos `.joblib` de regressão salvos junto à pasta do banco (`CAMINHO_BANCO.parent`).
+- **Empacotamento (PyInstaller + Inno Setup).** O `.exe` único, o banco em `%APPDATA%`, o início com o Windows e a abertura automática do dashboard já estão no código e estão descritos em [`DOCUMENTACAO_DISTRIBUICAO.md`](./DOCUMENTACAO_DISTRIBUICAO.md). Falta validar o build numa máquina Windows e criar o instalador (Inno Setup).
 - **Controle manual da contagem.** Hoje não há botões no dashboard nem rotas na API para iniciar ou encerrar o motor: ele começa com o `main.py` e termina no fim do vídeo, por ESC/Q na janela ou por Ctrl+C.
 
 ---

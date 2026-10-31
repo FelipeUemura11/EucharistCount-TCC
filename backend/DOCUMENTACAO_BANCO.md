@@ -18,7 +18,7 @@ Para um guia rápido de uso (comandos, exemplos curtos), veja [`db/README.md`](.
 
 ## 1. Por que SQLite
 
-O banco é **SQLite**: um único arquivo, `backend/db/eucharist_count.db` (e preparado em `db/database.py` para ser direcionado a `%APPDATA%\EucharistCount\eucharist_count.db` quando empacotado no instalador Windows), lido e escrito direto pelo Python. A escolha decorre do mesmo requisito que guia o resto do backend — rodar numa máquina comum de paróquia, sem nuvem e sem ninguém de TI por perto:
+O banco é **SQLite**: um único arquivo, `backend/db/eucharist_count.db` (que, quando o programa roda como `.exe`, passa a ficar em `%APPDATA%\EucharistCount\eucharist_count.db`, escolha feita em `db/database.py` — ver `DOCUMENTACAO_DISTRIBUICAO.md`), lido e escrito direto pelo Python. A escolha decorre do mesmo requisito que guia o resto do backend — rodar numa máquina comum de paróquia, sem nuvem e sem ninguém de TI por perto:
 
 - **Não existe servidor.** Não há um serviço de banco para instalar, iniciar, atualizar ou que possa cair. O backup é copiar um arquivo.
 - **Vem com o Python.** O módulo `sqlite3` é da biblioteca padrão: nenhuma dependência nova no executável.

@@ -23,6 +23,9 @@ backend/
 ├── DOCUMENTACAO_MOTOR.md    # o porquê de cada decisão do motor
 ├── DOCUMENTACAO_BANCO.md    # modelo de dados, com diagramas das tabelas
 ├── DOCUMENTACAO_API.md      # API, ligação motor → banco, dashboard ao vivo
+├── DOCUMENTACAO_DISTRIBUICAO.md  # empacotamento em .exe, caminhos, início com o Windows
+├── eucharist_count.spec     # receita do PyInstaller (um único .exe)
+├── inicializacao.py         # comportamento do .exe: log, instância única, início com o Windows
 │
 ├── motor/                   # Motor de Visão Computacional (OpenCV + YOLO + ByteTrack)
 │   ├── config.py            # carrega o config.json e o .env
@@ -307,7 +310,8 @@ versionados no Git — o `.gitignore` do projeto já bloqueia isso.
 - [x] Telas de Configurações (cadastro da agenda padrão) e Ajuda
 - [x] Estimativa de comunhão e hóstias por coeficiente fixo e por regressão linear (`.joblib`)
 - [ ] Agendamento automático com APScheduler *(em desenvolvimento)*
-- [ ] Empacotamento com PyInstaller *(em desenvolvimento)*
+- [x] Empacotamento com PyInstaller — receita em `eucharist_count.spec`, ver [`DOCUMENTACAO_DISTRIBUICAO.md`](./DOCUMENTACAO_DISTRIBUICAO.md) *(build ainda não validado em Windows)*
+- [ ] Instalador (Inno Setup)
 
 `python main.py` já sobe tudo junto: o motor conta, grava no SQLite, e o
 dashboard em `http://127.0.0.1:8000` acompanha a contagem ao vivo e, ao fim

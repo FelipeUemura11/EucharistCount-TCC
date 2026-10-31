@@ -70,7 +70,7 @@ Conforme especificado no documento do TCC:
 | Frontend | **React + TypeScript + Vite + Tailwind** | Dashboard, Celebrações, Histórico, Configurações e Ajuda (FAQ) |
 | Gráficos | **Recharts** | Evolução da ocupação ao longo da celebração |
 | HTTP client | **Fetch API** | Comunicação do frontend com a API local (`/api/...`) |
-| Empacotamento | **PyInstaller** *(em desenvolvimento)* | Executável autônomo para a máquina da paróquia |
+| Empacotamento | **PyInstaller** | Executável autônomo para a máquina da paróquia |
 
 ---
 
@@ -90,7 +90,7 @@ Este é um TCC em duas etapas. **O que está implementado até aqui:** a visão 
 | Dashboard web (React) — Dashboard ao vivo, Histórico, Configurações e Ajuda (FAQ) ligados à API | 🚧 Celebrações ainda com dados fictícios |
 | Estimativa de comunhão e hóstias sugeridas (`integracao/estimativa.py`) | ✅ Coeficiente fixo e regressão (`.joblib`); estimativa gravada automaticamente ao fechar a sessão |
 | Agendamento automático (APScheduler) | ⏳ Em desenvolvimento |
-| Empacotamento (PyInstaller) | ⏳ Em desenvolvimento |
+| Empacotamento (PyInstaller) — `.exe` único com dashboard, modelo e configuração; início com o Windows | 🚧 Implementado, build ainda não validado em Windows |
 
 Detalhes de uso, configuração e arquitetura interna do módulo de visão computacional estão em [`backend/README.md`](./backend/README.md).
 
@@ -223,7 +223,8 @@ A documentação técnica do backend está dividida por parte:
 
 - [`backend/DOCUMENTACAO_MOTOR.md`](./backend/DOCUMENTACAO_MOTOR.md) — o porquê de cada decisão do motor de visão computacional: fórmulas, parâmetros e as medições que os justificam;
 - [`backend/DOCUMENTACAO_BANCO.md`](./backend/DOCUMENTACAO_BANCO.md) — o modelo de dados com diagramas das tabelas, como uma missa é gravada e a estimativa de comunhão;
-- [`backend/DOCUMENTACAO_API.md`](./backend/DOCUMENTACAO_API.md) — a API FastAPI, a ligação do motor com o banco e o dashboard ao vivo.
+- [`backend/DOCUMENTACAO_API.md`](./backend/DOCUMENTACAO_API.md) — a API FastAPI, a ligação do motor com o banco e o dashboard ao vivo;
+- [`backend/DOCUMENTACAO_DISTRIBUICAO.md`](./backend/DOCUMENTACAO_DISTRIBUICAO.md) — o `.exe` único, onde ficam os dados, o início com o Windows e os trabalhos futuros de distribuição.
 
 ---
 

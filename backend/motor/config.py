@@ -11,11 +11,24 @@ from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 
+# RAIZ = pasta backend/; config, modelos e .env partem dela.
+# No .exe (onefile) vira a pasta temporaria _MEI...: so leitura na pratica.
 RAIZ = Path(__file__).resolve().parent.parent
+
+# True quando roda como .exe do PyInstaller.
+EMPACOTADO = getattr(sys, "frozen", False)
+
+# Dados que sobrevivem ao fechamento do .exe: banco, log e config.json alterado.
+PASTA_DADOS = Path(os.getenv("APPDATA") or Path.home()) / "EucharistCount"
+
+# O config.json embutido e o padrao de fabrica; um copiado para PASTA_DADOS tem prioridade.
 ARQUIVO_CONFIG = RAIZ / "config.json"
+if EMPACOTADO and (PASTA_DADOS / "config.json").exists():
+    ARQUIVO_CONFIG = PASTA_DADOS / "config.json"
 PASTA_MODELOS = RAIZ / "modelos"
 
-if getattr(sys, "frozen", False):
+# Executavel (PyInstaller): o .env fica ao lado do .exe.
+if EMPACOTADO:
     ARQUIVO_ENV = Path(sys.executable).parent / ".env"
 else:
     ARQUIVO_ENV = RAIZ / ".env"
@@ -141,6 +154,7 @@ class ConfigVisual:
 
 def mascarar_senha(fonte: str) -> str:
     """rtsp://admin:***@ip/stream"""
+    # Usada ao exibir ou gravar a fonte (Configuracoes, banco): a senha nunca sai da maquina.
     partes = urlsplit(fonte)
     if not partes.password:
         return fonte
