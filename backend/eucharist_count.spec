@@ -1,12 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
 #
-# Receita do PyInstaller: um unico EucharistCount.exe com tudo dentro
-# (codigo, dashboard compilado, modelo ONNX e configuracao padrao).
-#
-# Pre-requisitos, na maquina de build (ver DOCUMENTACAO_DISTRIBUICAO.md):
-#   1. cd ../frontend && npm run build              -> gera frontend/dist
-#   2. python -m scripts.preparar_modelo            -> gera modelos/yolo11n.onnx
-#   3. pyinstaller eucharist_count.spec             -> gera dist/EucharistCount.exe
+# Receita do PyInstaller: gera um unico EucharistCount.exe.
+# Antes: npm run build (em frontend/) e python -m scripts.preparar_modelo.
+# Depois: pyinstaller eucharist_count.spec  ->  dist/EucharistCount.exe
+# Passo a passo em DOCUMENTACAO_DISTRIBUICAO.md.
 
 from pathlib import Path
 
@@ -14,8 +11,8 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy
 
 RAIZ = Path(SPECPATH)  # backend/
 
-# Arquivos que o codigo le do disco e o PyInstaller nao detecta sozinho.
-# O destino reproduz a estrutura de backend/, que e onde o codigo os procura.
+# Arquivos lidos do disco que o PyInstaller nao detecta sozinho
+# (no exe ficam na mesma estrutura de pastas de backend/).
 datas = [
     (str(RAIZ.parent / "frontend" / "dist"), "frontend/dist"),  # api/frontend.py
     (str(RAIZ / "modelos"), "modelos"),                          # deteccao.modelo
@@ -24,15 +21,14 @@ datas = [
     (str(RAIZ / "db" / "schema.sql"), "db"),                     # inicializar_banco()
 ]
 
-# Arquivos de dados internos do Ultralytics (YAMLs de configuracao e trackers).
+# YAMLs internos do Ultralytics (configuracao e trackers).
 datas += collect_data_files("ultralytics")
 
-# Imports carregados por nome em tempo de execucao.
+# Modulos carregados por nome, que o PyInstaller nao enxerga.
 hiddenimports = collect_submodules("uvicorn") + collect_submodules("apscheduler")
 
-# O Ultralytics confere a versao dos pacotes pelos metadados e, se nao os
-# achar, tenta rodar "pip install" (o que nao existe no .exe). O APScheduler
-# localiza triggers e executores pelos metadados.
+# Ultralytics e APScheduler consultam os metadados dos pacotes; sem eles
+# o Ultralytics tenta instalar via pip, o que nao funciona dentro do exe.
 for pacote in (
     "ultralytics", "onnx", "onnxruntime", "lap", "torch", "torchvision",
     "numpy", "opencv-python", "pillow", "pyyaml", "requests", "scipy",
@@ -51,7 +47,7 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
-# Unico arquivo: binarios e dados vao dentro do EXE (sem pasta ao lado).
+# Arquivo unico: binarios e dados vao dentro do exe.
 exe = EXE(
     pyz,
     a.scripts,
@@ -59,6 +55,6 @@ exe = EXE(
     a.datas,
     [],
     name="EucharistCount",
-    console=False,  # sem terminal; a saida vai para o log (inicializacao.py)
+    console=False,  # sem terminal; a saida vai para o log
     upx=False,
 )

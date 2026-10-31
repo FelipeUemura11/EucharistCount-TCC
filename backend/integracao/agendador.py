@@ -20,10 +20,9 @@ Regras que evitam contagem errada:
     na hora, atrasada. Depois do fim da janela, nao comeca mais.
   - Celebracao marcada como 'cancelada' nao e contada.
 
-Alem da agenda semanal, o agendador le as celebracoes avulsas da tabela
-celebracao (horario_padrao_id nulo: Natal, Pascoa, casamento, missa de
-ultima hora). Cada uma ganha um disparo de data unica e passa pela mesma
-contagem (_contar). Quem fica para tras e apagado por
+Alem da agenda semanal, conta as celebracoes avulsas (Natal, Pascoa,
+casamento, missa de ultima hora) cadastradas na tela Celebracoes, cada uma
+num disparo de data unica. As que passam sem ser contadas sao apagadas por
 limpar_celebracoes_vencidas().
 
 Este modulo nao importa o motor no topo de proposito: as rotas da API usam
@@ -297,11 +296,7 @@ class Agendador:
             self._ocupado.release()
 
     def _reservar(self, chave: tuple[str, int, date], rotulo: str) -> bool:
-        """
-        Pega a vez da contagem e marca a janela como feita hoje. False se ela
-        ja rodou ou se ha outra contagem em andamento. Quem recebe True deve
-        soltar `_ocupado` no fim.
-        """
+        """Pega a vez da contagem e marca a janela como feita hoje. False se ja rodou ou ha outra em andamento."""
         with self._feitas_lock:
             if chave in self._feitas:
                 return False
@@ -357,11 +352,7 @@ class Agendador:
 
 
 def limpar_celebracoes_vencidas(agora: datetime | None = None) -> int:
-    """
-    Apaga as celebracoes avulsas que passaram ha mais de 24h sem serem contadas
-    (canceladas, ou agendadas que nunca rodaram). Missa contada fica no
-    Historico para sempre. Regra e motivo em crud.limpar_celebracoes_vencidas.
-    """
+    """Apaga as celebracoes avulsas que passaram ha mais de 24h sem serem contadas. Missa contada fica no Historico."""
     limite = ((agora or datetime.now()) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M")
     conexao = obter_conexao()
     try:

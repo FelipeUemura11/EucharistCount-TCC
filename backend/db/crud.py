@@ -133,11 +133,7 @@ def listar_celebracoes_do_dia(conexao: sqlite3.Connection, data: str) -> list[sq
 
 
 def listar_celebracoes_avulsas_agendadas(conexao: sqlite3.Connection, a_partir_de: str) -> list[sqlite3.Row]:
-    """
-    Celebracoes avulsas (sem horario da agenda semanal) ainda por contar, de
-    `a_partir_de` ('YYYY-MM-DD') em diante. E o que o agendador le para
-    criar um disparo de data unica por celebracao.
-    """
+    """Celebracoes avulsas (fora da agenda semanal) ainda por contar, de `a_partir_de` (YYYY-MM-DD) em diante."""
     # Sem janela de monitoramento nao ha o que agendar.
     return conexao.execute(
         """
@@ -154,11 +150,7 @@ def listar_celebracoes_avulsas_agendadas(conexao: sqlite3.Connection, a_partir_d
 
 
 def remover_celebracao_cancelada(conexao: sqlite3.Connection, celebracao_id: int) -> bool:
-    """
-    Apaga uma celebracao cancelada que nunca foi contada, para liberar o
-    UNIQUE (data, horario_missa) a quem quiser cadastrar de novo.
-    Retorna False se ela nao e cancelada ou ja tem sessao.
-    """
+    """Apaga uma celebracao cancelada que nunca foi contada, liberando o horario para cadastrar de novo."""
     cursor = conexao.execute(
         """
         DELETE FROM celebracao
@@ -173,15 +165,10 @@ def remover_celebracao_cancelada(conexao: sqlite3.Connection, celebracao_id: int
 
 def limpar_celebracoes_vencidas(conexao: sqlite3.Connection, limite: str) -> int:
     """
-    Apaga celebracoes avulsas que passaram sem serem contadas.
-
-    `limite` e 'YYYY-MM-DDTHH:MM': so sai quem terminou antes dele (o
-    chamador passa "agora menos 24h"). Devolve quantas foram apagadas.
-
-    So entram canceladas ou ainda 'agendada' (a contagem nunca rodou) E sem
-    nenhuma sessao: apagar a celebracao leva as sessoes junto (CASCADE) e o
-    Historico le a celebracao, entao uma missa contada nunca pode ser apagada.
+    Apaga avulsas que passaram sem serem contadas. `limite` e 'YYYY-MM-DDTHH:MM'
+    (o chamador passa agora menos 24h). Devolve quantas foram apagadas.
     """
+    # Nunca apaga quem tem sessao: ela iria junto (CASCADE) e o Historico depende da celebracao.
     cursor = conexao.execute(
         """
         DELETE FROM celebracao

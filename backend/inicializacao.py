@@ -1,15 +1,8 @@
 """
-Comportamento do programa empacotado (.exe) no computador da paroquia.
+Comportamento do programa quando roda como .exe, sem terminal: log em
+arquivo, instancia unica, inicio com o Windows e abertura do dashboard.
 
-Como o .exe roda sem terminal, quatro coisas deixam de vir de graca:
-
-  - saida em arquivo de log (sem console, sys.stdout e None);
-  - instancia unica (clicar de novo nao sobe um segundo programa);
-  - iniciar junto com o Windows;
-  - abrir o dashboard no navegador.
-
-Todas so sao chamadas pelo main.py quando EMPACOTADO: `python main.py` em
-desenvolvimento se comporta como antes.
+So e chamado pelo main.py quando empacotado.
 """
 
 import socket
@@ -36,12 +29,7 @@ _trava: socket.socket | None = None
 
 
 def preparar_saida() -> Path | None:
-    """
-    Manda print() e erros para PASTA_DADOS/eucharist_count.log quando nao ha console.
-
-    Sem console (--noconsole) sys.stdout e None e o uvicorn quebra ao
-    configurar o log. Com console (teste do .exe num terminal) nao mexe.
-    """
+    """Sem console, manda print() e erros para um arquivo de log em PASTA_DADOS."""
     if sys.stdout is not None and sys.stderr is not None:
         return None
 
@@ -60,12 +48,7 @@ def preparar_saida() -> Path | None:
 
 
 def adquirir_instancia_unica() -> bool:
-    """
-    True se este e o unico programa aberto; False se ja existe outro.
-
-    A trava e uma porta local: o sistema a libera sozinho quando o processo
-    morre, mesmo por queda de energia, sem arquivo de lock para limpar.
-    """
+    """True se este e o unico programa aberto. A trava e uma porta local, liberada quando o processo morre."""
     global _trava
     trava = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
@@ -78,12 +61,7 @@ def adquirir_instancia_unica() -> bool:
 
 
 def abrir_dashboard(esperar: float = 20.0) -> None:
-    """
-    Abre o dashboard no navegador assim que a API responde.
-
-    Bloqueia ate a porta atender (ou `esperar` segundos): o chamador roda
-    numa thread, para nao atrasar a inicializacao.
-    """
+    """Espera a API responder e abre o dashboard no navegador. Roda numa thread, para nao atrasar a inicializacao."""
     limite = time.monotonic() + esperar
     while time.monotonic() < limite:
         try:
@@ -95,19 +73,13 @@ def abrir_dashboard(esperar: float = 20.0) -> None:
 
 
 def registrar_inicio_com_windows() -> None:
-    """
-    Faz o Windows abrir o programa ao ligar o PC (chave Run do usuario
-    atual, sem precisar de administrador).
-
-    Regravada a cada execucao: se o .exe mudar de pasta, o caminho se
-    corrige sozinho. O --boot evita abrir o navegador no boot; a contagem
-    segue a agenda sem ninguem na frente do PC.
-    """
+    """Faz o Windows abrir o programa ao ligar o PC (chave Run do usuario, sem administrador)."""
     if sys.platform != "win32":
         return
     try:
         import winreg
 
+        # --boot: no boot o navegador nao abre, a contagem segue a agenda.
         comando = f'"{sys.executable}" --boot'
         with winreg.OpenKey(
             winreg.HKEY_CURRENT_USER, CHAVE_INICIO_WINDOWS, 0, winreg.KEY_SET_VALUE

@@ -84,7 +84,7 @@ def criar_celebracao(corpo: CelebracaoCriar, db: sqlite3.Connection = Depends(ob
             None,
         )
 
-    # A contagem e uma por vez: duas janelas sobrepostas no mesmo dia nao podem coexistir.
+    # So ha uma contagem por vez: janelas sobrepostas no mesmo dia nao podem coexistir.
     for h in horarios:
         if h["dia_semana"] != dia_semana or h is horario_existente:
             continue
@@ -108,8 +108,7 @@ def criar_celebracao(corpo: CelebracaoCriar, db: sqlite3.Connection = Depends(ob
 
     horario_padrao_id = None
     if corpo.repetirSemanalmente:
-        # A celebracao fica ligada ao horario da agenda: o disparo semanal a reaproveita
-        # (mesma data e horario) e o agendador nao cria um segundo disparo para ela.
+        # Fica ligada ao horario da agenda: quem conta e o disparo semanal, sem disparo avulso duplicado.
         horario_padrao_id = (
             horario_existente["id"] if horario_existente is not None
             else crud.criar_horario_padrao(
