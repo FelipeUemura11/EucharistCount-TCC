@@ -21,6 +21,8 @@ backend/modelos/
 .aiassistant
 .agents
 .gemini
+CLAUDE.md
+.claude/
 
 # Videos — NUNCA versionar filmagens de fieis (LGPD)
 backend/videos/
