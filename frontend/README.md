@@ -2,7 +2,7 @@
 
 Dashboard web do sistema de contagem. React + TypeScript + Vite + Tailwind CSS.
 
-As telas **Dashboard**, **Histórico** e **Configurações** já estão conectadas à API FastAPI em tempo real através dos módulos em `src/services/` e `src/hooks/`. A tela **Celebrações** ainda utiliza dados fictícios locais (`src/data/celebrationsMock.ts`), e a tela **Ajuda** exibe o guia visual de uso (FAQ).
+As telas **Dashboard**, **Histórico** e **Configurações** já estão conectadas à API FastAPI em tempo real através dos módulos em `src/services/` e `src/hooks/`. A agenda cadastrada em **Configurações** é a que liga e desliga a contagem sozinha (agendador do backend), e as mudanças valem na hora, sem reiniciar o programa. A tela **Celebrações** ainda utiliza dados fictícios locais (`src/data/celebrationsMock.ts`), e a tela **Ajuda** exibe o guia visual de uso (FAQ).
 
 ## Rodar (Modo Desenvolvimento)
 
@@ -12,7 +12,7 @@ npm install
 npm run dev
 ```
 
-O `npm run dev` precisa do backend rodando (`python main.py`): as telas chamam a API por endereço relativo (`/api/...`), e o *proxy* do `vite.config.ts` repassa essas chamadas para `http://127.0.0.1:8000`.
+O `npm run dev` precisa do backend rodando (`python main.py`, ou `python main.py --agora` para já ter uma contagem acontecendo): as telas chamam a API por endereço relativo (`/api/...`), e o *proxy* do `vite.config.ts` repassa essas chamadas para `http://127.0.0.1:8000`.
 
 > **Nota:** Em produção/demonstração on-premise, rode `npm run build`. O arquivo principal do backend (`main.py`) já serve essa pasta `dist` empacotada automaticamente na porta 8000.
 

@@ -118,7 +118,7 @@ Um grafo ONNX pode ter a resolução de entrada **fixa** ou **dinâmica**, e o s
 
 A opção dinâmica é o padrão porque a resolução é um dos parâmetros que mais se ajusta durante a calibração de uma instalação nova (ver a tabela "Ajustando para máquina fraca" no `README.md`), e reexportar o modelo a cada tentativa seria um atrito sem ganho.
 
-Atenção: `yolo11s.onnx` e `yolov8n.onnx`, que também estão em `modelos/`, foram exportados no modo fixo (só o tamanho do lote é variável). Usá-los exige o mesmo `imgsz` com que foram exportados. A versão dinâmica do modelo `s` é `yolo11s_dyn.onnx`.
+Atenção: a pasta `modelos/` não vai para o Git, então cada máquina tem os modelos que exportou. Um `.onnx` exportado com `--fixo` (ou por uma versão antiga do script, antes de o modo dinâmico virar o padrão) só aceita o `imgsz` com que foi exportado. Na dúvida, exporte de novo sem `--fixo`.
 
 ### Por que os parâmetros de exportação são esses
 
@@ -537,7 +537,7 @@ Essa separação não é só estética. Ela tem três consequências práticas d
 
 1. **Testabilidade.** `ContadorLinha`, por exemplo, recebe objetos `Pessoa` (dataclasses simples) e devolve `Evento`s — nada de OpenCV, nada de YOLO. É possível escrever um teste automatizado que simula uma "pessoa" andando por posições específicas e verificar se a contagem funciona corretamente, sem precisar rodar um vídeo real. Isso será importante na fase de validação de acurácia do TCC II.
 2. **Substituibilidade.** Se um dia o projeto trocar o algoritmo de rastreamento, ou adicionar suporte a múltiplas câmeras, as mudanças ficam isoladas em `detector.py`/`camera.py` sem tocar na lógica de contagem.
-3. **Integração.** A classe `Monitor` expõe uma interface pequena para ser controlada de fora: `executar(ao_atualizar=...)` para rodar e publicar as métricas a cada frame, e `parar()` para encerrar. Foi por essa interface que o banco de dados e a API foram ligados ao motor sem alterar a lógica de visão (seção 13), e é o formato que o APScheduler vai precisar para iniciar e encerrar o monitoramento no horário de cada celebração.
+3. **Integração.** A classe `Monitor` expõe uma interface pequena para ser controlada de fora: `executar(ao_atualizar=...)` para rodar e publicar as métricas a cada frame, e `parar()` para encerrar. Foi por essa interface que o banco de dados e a API foram ligados ao motor sem alterar a lógica de visão (seção 13), e é por ela que o agendador (`integracao/agendador.py`) inicia e encerra o monitoramento no horário de cada celebração.
 
 ---
 
@@ -572,7 +572,7 @@ O contrato é simples:
 
 Esse padrão se chama **callback**: o motor avisa "atualizei", e quem passou a função decide o que fazer com o aviso. O motor continua sem importar nada de `db/`, e continua testável sem banco.
 
-Quem escuta, hoje, é o `GravadorSessao` de `integracao/sessao.py`, que grava os totais no banco a cada passagem pela linha e um ponto do gráfico a cada 5 segundos de vídeo. Esse lado está descrito em [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md), seção 6, e o motivo do intervalo de 5 segundos em [`DOCUMENTACAO_BANCO.md`](./DOCUMENTACAO_BANCO.md), seção 7.3.
+Quem escuta, hoje, é o `GravadorSessao` de `integracao/sessao.py`, que grava os totais no banco a cada passagem pela linha e um ponto do gráfico a cada 5 segundos de vídeo. É o mesmo nos dois modos do programa: na contagem manual (`main.py --agora`) e na agendada (`integracao/agendador.py`), que reaproveita a mesma instância do `Monitor` em todas as missas. Esse lado está descrito em [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md), seção 6, e o motivo do intervalo de 5 segundos em [`DOCUMENTACAO_BANCO.md`](./DOCUMENTACAO_BANCO.md), seção 7.3.
 
 O parâmetro é opcional: chamar `executar()` sem ele, como fazem os scripts de calibração, funciona exatamente como antes.
 
@@ -584,7 +584,7 @@ Pontos identificados em revisões anteriores que já foram corrigidos no código
 
 - **Cooldown sem atualizar lado (`contador.py`):** anteriormente, `rastro.lado` era atualizado antes do teste de `segundos_cooldown`, fazendo quem hesitasse na porta contar 2 entradas e 0 saídas. Agora `rastro.lado` só muda quando a contagem é efetivamente confirmada (seção 8.7).
 - **Chaves desconhecidas no `config.json` (`config.py`):** `Config.carregar()` passa cada seção por `_construir()`, que ignora chaves desconhecidas com aviso no terminal (`[config] chave desconhecida ignorada: ...`) em vez de levantar `TypeError`, e converte `contagem.linha` de lista JSON para tupla.
-- **Reuso de instância do `Monitor` (`monitor.py`):** `Monitor.executar()` agora zera `_parar`, `_pausado`, `Metricas`, janela de FPS, `_frame_max_contado` e `_replay`, e chama `DetectorPessoas.reiniciar_rastreio()` para limpar as trilhas do ByteTrack (`persist=True`). **Cuidado para o futuro agendador (APScheduler):** como `executar()` zera `self._parar = False` na primeira linha, `Monitor.parar()` só deve ser chamado depois que `executar()` já estiver em andamento.
+- **Reuso de instância do `Monitor` (`monitor.py`):** `Monitor.executar()` agora zera `_parar`, `_pausado`, `Metricas`, janela de FPS, `_frame_max_contado` e `_replay`, e chama `DetectorPessoas.reiniciar_rastreio()` para limpar as trilhas do ByteTrack (`persist=True`). **Cuidado com o agendador:** como `executar()` zera `self._parar = False` na primeira linha, um `Monitor.parar()` chamado antes de `executar()` começar se perde. Por isso o vigia do agendador (`integracao/agendador.py`) repete `parar()` a cada segundo até a contagem terminar (`DOCUMENTACAO_API.md`, seção 9.3).
 
 ---
 
