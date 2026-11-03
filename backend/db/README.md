@@ -1,6 +1,6 @@
 # backend/db — camada de persistência
 
-Esqueleto do banco (SQLite) do Eucharist Count. Nenhuma imagem/vídeo é
+Banco (SQLite) do Eucharist Count. Nenhuma imagem/vídeo é
 armazenado aqui — só números (contagens, horários, estimativas), conforme
 exigido pela LGPD no TCC.
 
@@ -11,11 +11,11 @@ exigido pela LGPD no TCC.
 | `schema.sql` | Cria todas as tabelas, índices, trigger e a view. Fonte da verdade da estrutura. |
 | `database.py` | `inicializar_banco()` roda o schema; `obter_conexao()` abre uma conexão (com FKs ligadas). |
 | `crud.py` | **Use isto na API.** Uma função por operação (criar celebração, iniciar sessão, registrar instantâneo, etc.). Não escreva SQL novo nas rotas — se faltar uma operação, adicione a função aqui. |
-| `import_csv.py` | Importa o `counting_people.csv` (contagem manual) para o schema normalizado. |
+| `import_csv.py` | Importa o `counting_people.csv` (contagem manual, contagem da câmera e comungantes) para o schema normalizado. Formato na seção "O arquivo `counting_people.csv`". |
 | `calcular_coeficiente_inicial.py` | Calcula a média `comungantes_reais / ocupacao_final` dos dados já importados e grava em `configuracao_estimativa` (modo `coeficiente_fixo`). Rodar de novo sempre que importar dado novo. |
 | `preparar_dataset.py` | Monta o dataset de treino (ocupação, dia da semana, horário, tipo → comungantes reais) a partir do banco. Usado pelo script de treino, mas também roda sozinho pra inspecionar o dataset (`python3 preparar_dataset.py`). |
 | `treinar_regressao.py` | Treina a regressão (modo `regressao`), valida com leave-one-out, salva o modelo em `modelos_estimativa/*.joblib` (na mesma pasta onde vive o banco, `CAMINHO_BANCO.parent`) e registra a versão em `configuracao_estimativa`. **Só treina com 15+ celebrações no banco** — com menos que isso, ele avisa e não faz nada (ver seção "Estimativa de comunhão" abaixo). |
-| `requirements.txt` | Dependências só deste módulo (`pandas`, `scikit-learn`, `joblib`) — não é o `requirements.txt` do motor de visão, são libs separadas. |
+| `requirements.txt` | Dependências só deste módulo (`pandas`, `scikit-learn`, `joblib`), nas mesmas versões do `backend/requirements.txt`, que já as inclui. Serve para quem quer rodar só os scripts do banco sem instalar o motor de visão. |
 
 ## Como a API usa este módulo
 
@@ -53,16 +53,19 @@ instantaneo_ocupacao            estimativa_comunhao
 - **`celebracao`** é o *planejado* (agenda). **`sessao_monitoramento`** é o
   *executado* (o que de fato rolou naquele dia) — são tabelas separadas
   porque uma celebração pode ter o monitoramento reiniciado (queda de
-  energia, travamento), e porque hoje (modo manual) e amanhã (câmera)
-  escrevem na mesma tabela sem precisar mudar nada.
+  energia, travamento), e porque a contagem manual importada da planilha
+  e a contagem da câmera escrevem na mesma tabela, separadas só por
+  `origem_contagem`.
 - **`estimativa_comunhao`** guarda três fontes de valor lado a lado, de
   propósito:
-  - `comungantes_reais` / `hostias_reais` — contagem manual real (o que
-    está na planilha do colega, coluna `communed`). É o único valor que
-    existe hoje.
+  - `comungantes_reais` / `hostias_reais` — o número real, informado
+    pela equipe (coluna `communed` do `counting_people.csv`, importada pelo
+    `import_csv.py`).
   - `estimativa_calculada` / `hostias_calculadas` — o que o sistema
-    prevê (coeficiente fixo hoje, regressão depois). `NULL` até esse
-    módulo existir.
+    prevê (coeficiente fixo ou regressão). Gravado automaticamente quando
+    uma contagem da câmera termina como `concluida`
+    (`integracao/sessao.py`), e completado no início do programa para as
+    sessões concluídas que ficaram sem (`main.py`).
   - `estimativa_ajustada` / `hostias_ajustadas` — correção humana em
     cima do valor calculado (fluxo *human-in-the-loop* do TCC).
 - **`vw_historico`** já entrega as colunas prontas para a tela Histórico
@@ -83,9 +86,11 @@ O sistema opera em duas fases, sem precisar trocar de schema entre elas
    `comungantes_reais` preenchido no banco, `treinar_regressao.py` treina
    um modelo (ocupação + dia da semana + horário + tipo → comungantes) e
    grava o caminho do artefato em `configuracao_estimativa.modelo_path`
-   (salvo em `CAMINHO_BANCO.parent / "modelos_estimativa"`, garantindo que
-   no executável PyInstaller o modelo fique persistido em `%APPDATA%` junto ao
-   banco e fora da pasta temporária).
+   (salvo em `CAMINHO_BANCO.parent / "modelos_estimativa"`, ou seja, sempre
+   ao lado do banco). Hoje o banco fica em `backend/db/`; o `database.py` já
+   traz comentadas as linhas que o movem para `%APPDATA%\EucharistCount` no
+   executável, e aí o modelo vai junto, fora da pasta temporária do
+   PyInstaller.
 
 Rotina recomendada: sempre que importar um lote novo de dados
 (`import_csv.py`), rodar os dois scripts de novo, nessa ordem:
@@ -111,15 +116,22 @@ assim que o modelo é treinado.
 ## Ligação com o motor de visão
 
 O motor já grava no banco durante a missa. Todo o ciclo da sessão fica em
-`backend/integracao/sessao.py`, e o `main.py` só o usa:
+`backend/integracao/sessao.py`, e o `main.py` (modo manual) e o agendador
+(`integracao/agendador.py`, modo agendado) só o usam:
 
 ```python
-fechar_sessoes_presas()        # no inicio: sessoes de execucoes anteriores -> 'interrompida'
+fechar_sessoes_presas()            # no inicio: sessoes de execucoes anteriores -> 'interrompida'
+preencher_estimativas_atrasadas()  # no inicio: estimativa das concluidas que ficaram sem
 
-with sessao_de_monitoramento(monitor, config) as gravador:
+with sessao_de_monitoramento(monitor, config, celebracao_id=...) as gravador:
     metricas = monitor.executar(ao_atualizar=gravador)
-# ao sair do "with": finalizar_sessao() com 'concluida' ou, se houve erro, 'interrompida'
+# ao sair do "with": finalizar_sessao() com 'concluida' ou, se houve erro, 'interrompida';
+# se 'concluida', grava a estimativa (registrar_estimativa_da_sessao)
 ```
+
+`celebracao_id` vem do agendador (a celebração da agenda, ex.: "Missa das
+10:00"). No modo manual ele não é passado, e a sessão cria a celebração
+"Missa (monitoramento automatico)" com a data e a hora de agora.
 
 O `GravadorSessao` grava os totais a cada passagem pela linha e um ponto do
 gráfico a cada 5 segundos de vídeo.
@@ -143,22 +155,42 @@ seção 7, e o lado da API em [`../DOCUMENTACAO_API.md`](../DOCUMENTACAO_API.md)
 - O arquivo `.db` gerado (`eucharist_count.db`) e a pasta `modelos_estimativa/`
   (artefatos `.joblib`) **não devem ir para o git** — são dados/artefatos
   gerados, regeneráveis a qualquer momento rodando os scripts. Só o código
-  (`.py`, `.sql`, `.md`) é versionado. Confira se isso está no `.gitignore`
-  da raiz do projeto:
-  ```
-  backend/db/*.db
-  backend/db/modelos_estimativa/
-  ```
+  (`.py`, `.sql`, `.md`) é versionado. O `.gitignore` da raiz já cobre os
+  dois (`*.db` e `backend/db/modelos_estimativa/`).
+
+## O arquivo `counting_people.csv`
+
+Os dados de campo: uma linha por missa, com **exatamente 9 colunas**
+(uma vírgula a mais desloca o `notes` para uma coluna sem nome, e ele não é
+importado).
+
+| Coluna | Obrigatória | Conteúdo | Vai para |
+|---|---|---|---|
+| `id` | — | Número da linha (não é usado na importação) | — |
+| `date` | sim | Data da missa, `AAAA-MM-DD` | `celebracao.data` |
+| `time` | sim | Horário da missa, `HH:MM` | `celebracao.horario_missa` |
+| `celebration_type` | — | Tipo (`common`, ...); vazio vira `comum` | `celebracao.tipo` |
+| `people` | sim | Pessoas contadas manualmente | `sessao_monitoramento.ocupacao_final` |
+| `communed` | — | Comungantes reais | `estimativa_comunhao.comungantes_reais` |
+| `system_count` | — | Pessoas contadas pela câmera | `sessao_monitoramento.contagem_sistema` |
+| `hosts_consecrated` | — | Hóstias consagradas | `estimativa_comunhao.hostias_reais` |
+| `notes` | — | Observação livre (ex.: `camera_mal_posicionada`) | `sessao_monitoramento.observacoes` |
+
+Linhas sem `date`, `time` ou `people` são ignoradas com aviso. Só as linhas
+com `communed` entram no cálculo do coeficiente e no treino da regressão.
+Reimportar o CSV (por exemplo, depois de corrigir uma linha) atualiza a
+sessão e os comungantes da missa já importada (mesma data e horário), sem
+duplicar.
 
 ## Testar
 
 ```bash
 pip install -r requirements.txt               # pandas, scikit-learn, joblib
 
-python3 database.py                           # cria o banco
-python3 import_csv.py ../counting_people.csv  # importa dados reais existentes
-python3 calcular_coeficiente_inicial.py       # calcula e grava o coeficiente
-python3 treinar_regressao.py                  # tenta treinar (avisa se faltar dado)
+python database.py                            # cria o banco
+python import_csv.py ../counting_people.csv   # importa os dados de campo
+python calcular_coeficiente_inicial.py        # calcula e grava o coeficiente
+python treinar_regressao.py                   # tenta treinar (avisa se faltar dado)
 ```
 
 Para inspecionar: `sqlite3 eucharist_count.db` (ou DB Browser for SQLite),

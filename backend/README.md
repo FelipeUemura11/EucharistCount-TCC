@@ -11,13 +11,13 @@ sem conexão com a nuvem. Nenhuma imagem é armazenada.
 
 ```
 backend/
-├── main.py                  # ponto de entrada: só orquestra (argumentos → banco → API → motor)
+├── main.py                  # ponto de entrada: só orquestra (argumentos → banco → API → motor, agora ou pela agenda)
 ├── cli.py                   # argumentos de linha de comando → Config
 ├── gerar_dados.py           # popula o banco com dados de demonstração
 ├── config.json              # parâmetros ajustáveis (editável)
 ├── .env.example             # modelo de configuração local (CAMERA_FONTE)
 ├── bytetrack_ajustado.yaml  # tracker ajustado para esta cena
-├── counting_people.csv      # contagem manual de referência (validação)
+├── counting_people.csv      # contagem manual × câmera × comungantes, por missa (formato em db/README.md)
 ├── requirements.txt
 │
 ├── DOCUMENTACAO_MOTOR.md    # o porquê de cada decisão do motor
@@ -43,7 +43,8 @@ backend/
 │
 ├── integracao/              # ponte motor ↔ banco
 │   ├── sessao.py            # GravadorSessao, abrir/fechar sessão, sessões presas
-│   └── estimativa.py        # estimativa de comunhão e hóstias (coeficiente fixo e regressão)
+│   ├── estimativa.py        # estimativa de comunhão e hóstias (coeficiente fixo e regressão)
+│   └── agendador.py         # APScheduler: liga e desliga a contagem nos horários da agenda
 │
 ├── db/                      # persistência SQLite — ver db/README.md
 │
@@ -117,14 +118,22 @@ e velocidade.
 python -m scripts.preparar_modelo --modelo yolo11n --imgsz 640
 ```
 
-Exporta para ONNX, que roda 2 a 4× mais rápido em CPU que o `.pt`.
+Exporta para ONNX, que roda 2 a 4× mais rápido em CPU que o `.pt`, e
+salva em `modelos/`. Por padrão o modelo é exportado com resolução
+**dinâmica**: o mesmo `.onnx` aceita qualquer `imgsz` (múltiplo de 32)
+definido no `config.json`. `--fixo` trava o modelo no `--imgsz` da
+exportação.
 
 ### 3. Posicione a linha de contagem e rode
 
 ```bash
 python -m scripts.calibrar_linha     # opcional: clique os 2 pontos da linha
-python main.py
+python main.py --agora               # conta agora, com a janela do vídeo
 ```
+
+Use `--agora` (ou `--fonte`) para testar: sem eles, o `main.py` entra no
+modo agendado e só conta nos horários cadastrados em Configurações
+(seção *Uso*).
 
 Ajuste `contagem.linha` no `config.json` até a linha amarela ficar sobre
 o portão. A seta verde **ENTRA** aponta para a esquerda e a vermelha
@@ -140,7 +149,13 @@ tupla pronta para colar no `config.json`.
 ## Uso
 
 ```bash
-# vídeo de teste
+# modo agendado (padrao): segue a agenda da tela Configuracoes, sem janela
+python main.py
+
+# modo manual: conta agora, com a fonte do .env
+python main.py --agora
+
+# vídeo de teste (passar --fonte tambem e modo manual)
 python main.py --fonte videos/20-09-teste.mp4
 
 # câmera IP da igreja (no dia a dia, prefira CAMERA_FONTE no .env:
@@ -154,9 +169,9 @@ python main.py --linha 0.25,0.0,0.25,1.0
 python main.py --imgsz 480 --threads 2 --sem-janela
 ```
 
-**Teclas (janela do vídeo):** `ESC`/`Q` encerra a contagem · `ESPAÇO` pausa · `A`/`D` volta/avança 10s (somente em arquivo de vídeo; ao voltar, o trecho já contado roda em modo `REPLAY` sem duplicar contagens)
+**Teclas (janela do vídeo, só no modo manual):** `ESC`/`Q` encerra a contagem · `ESPAÇO` pausa · `A`/`D` volta/avança 10s (somente em arquivo de vídeo; ao voltar, o trecho já contado roda em modo `REPLAY` sem duplicar contagens)
 
-Quando o vídeo acaba (ou com `ESC`), a contagem é encerrada e gravada no
+No modo manual, quando o vídeo acaba (ou com `ESC`), a contagem é encerrada e gravada no
 banco, mas **o programa continua rodando**: o dashboard em
 `http://127.0.0.1:8000` segue no ar mostrando os números finais da missa.
 O mesmo acontece se o modelo ou a fonte de vídeo falharem ao abrir: o motor exibe um aviso no terminal e mantém a interface web ativa.
@@ -209,8 +224,9 @@ A cada frame o sistema calcula a **distância com sinal** entre os pés de
 cada pessoa e essa linha: o sinal diz de que lado ela está, o módulo diz
 a quantos pixels. Quando o lado muda, conta-se uma entrada ou uma saída.
 
-Em volta da linha existe uma **zona morta** de `margem` pixels para cada
-lado, onde nenhum lado é decidido. É ela que impede o tremor natural da
+Em volta da linha existe uma **zona morta** de `margem` para cada lado
+(uma fração da largura do frame; `0.035` = 3,5%), onde nenhum lado é
+decidido. É ela que impede o tremor natural da
 caixa delimitadora — o YOLO nunca desenha a caixa no mesmo pixel dois
 frames seguidos — de virar entrada e saída falsas para alguém parado em
 cima da linha. A travessia da faixa não precisa acontecer num único
@@ -278,6 +294,7 @@ Se as pessoas do fundo não forem detectadas, o problema quase sempre é o
 - `imgsz` — resolução de inferência, múltiplo de 32
 - `confianca` — limiar (0–1); mais baixo detecta mais e erra mais
 - `iou` — limiar do NMS; baixo demais funde pessoas próximas numa caixa só
+- `max_deteccoes` — teto de pessoas por frame (padrão `300`)
 - `threads` — limite de núcleos; `0` = automático
 
 **rastreio**
@@ -292,8 +309,14 @@ Se as pessoas do fundo não forem detectadas, o problema quase sempre é o
 **filtro** — descarta caixas com geometria improvável para uma pessoa.
 Os limites são permissivos de propósito: numa igreja há gente sentada,
 de perfil e parcialmente oculta pelos bancos.
+- `ativo` — liga/desliga o filtro
+- `area_min` / `area_max` — área da caixa em fração da área do frame
+  (padrão `0.0001` a `0.35`)
+- `aspecto_min` / `aspecto_max` — proporção largura/altura da caixa
+  (padrão `0.10` a `3.2`)
 
 **contagem**
+- `ativo` — liga/desliga a contagem por linha
 - `linha` — dois pontos (x1,y1,x2,y2), em frações do frame, definindo a
   linha sobre o portão. Os pontos são ordenados de cima para baixo pelo
   próprio contador, então a ordem em que você os escreve não troca
@@ -304,6 +327,12 @@ de perfil e parcialmente oculta pelos bancos.
 - `segundos_cooldown` / `segundos_esquecer` — tempo mínimo entre duas
   contagens da mesma pessoa e tempo até esquecer quem sumiu do
   enquadramento, contados no tempo do vídeo (não da CPU)
+
+**visual** — a janela de monitoramento
+- `mostrar_janela` — abre a janela do vídeo. No modo agendado ela fica
+  sempre desligada (a contagem roda numa thread do agendador)
+- `escala_janela` — tamanho da janela em relação ao frame (padrão `0.6`)
+- `mostrar_linhas` — desenha a linha de contagem e a zona morta
 
 ---
 
@@ -331,17 +360,20 @@ versionados no Git — o `.gitignore` do projeto já bloqueia isso.
 - [x] Motor gravando no banco durante a missa, com dashboard ao vivo
 - [x] Telas de Configurações (cadastro da agenda padrão) e Ajuda
 - [x] Estimativa de comunhão e hóstias por coeficiente fixo e por regressão linear (`.joblib`)
-- [ ] Agendamento automático com APScheduler *(em desenvolvimento)*
+- [x] Agendamento automático com APScheduler — ver [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md), seção 9
 - [ ] Empacotamento com PyInstaller *(em desenvolvimento)*
 
-`python main.py` já sobe tudo junto: o motor conta, grava no SQLite, e o
-dashboard em `http://127.0.0.1:8000` acompanha a contagem ao vivo e, ao fim
-do vídeo, continua mostrando o resultado da última missa. Ver
+`python main.py` já sobe tudo junto: banco, API e dashboard em
+`http://127.0.0.1:8000`, e a contagem, nos horários da agenda (modo
+agendado) ou na hora (`--agora` / `--fonte`). O motor grava no SQLite
+durante a missa, o dashboard acompanha ao vivo e, ao fim, continua
+mostrando o resultado da última missa, com a estimativa de comunhão
+gravada no Histórico. Ver
 [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md) para a organização do
 código em `api/` e `integracao/`,
 [`DOCUMENTACAO_BANCO.md`](./DOCUMENTACAO_BANCO.md) para o modelo de dados
 e [`../frontend/README.md`](../frontend/README.md) para o dashboard.
 
 A classe `Monitor` é controlada de fora por `executar(ao_atualizar=...)`
-e `parar()`, a mesma interface que o APScheduler vai usar para iniciar e
-encerrar o monitoramento no horário de cada missa.
+e `parar()`, a mesma interface que o agendador (`integracao/agendador.py`)
+usa para iniciar e encerrar o monitoramento no horário de cada missa.
