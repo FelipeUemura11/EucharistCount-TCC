@@ -172,6 +172,31 @@ ou salvo em arquivo.
 Depois de qualquer mudança no frontend, rode `npm run build` na pasta
 `frontend`: o `main.py` serve a versão compilada (`frontend/dist`).
 
+### Por que o programa não fecha sozinho
+
+A API (uvicorn) e o agendador rodam em **threads daemon**. No Python, o
+processo termina assim que a thread principal acaba, e as threads daemon são
+derrubadas junto, sem esperar por elas. Por isso o final do `main.py` mantém
+a thread principal viva:
+
+```python
+while True:
+    time.sleep(1)
+```
+
+- **Sem esse loop**, o `main.py` iniciaria a API e o agendador, chegaria ao
+  fim e encerraria o processo: o dashboard sairia do ar logo após subir.
+- **`time.sleep(1)`, e não `pass`**: a thread fica dormindo quase o tempo
+  todo, sem ocupar 100% de um núcleo da CPU.
+- **Ctrl+C**: no Python, o `KeyboardInterrupt` só chega à thread principal.
+  Com o `sleep` curto ela acorda a cada segundo, recebe o Ctrl+C e entra no
+  `except KeyboardInterrupt`, que fecha a contagem em andamento antes de sair.
+  Um `thread.join()` sem timeout pode não responder ao Ctrl+C, principalmente
+  no Windows.
+- **Por que as threads continuam daemon**: se não fossem, o processo ficaria
+  vivo mesmo depois do Ctrl+C, porque a thread principal terminaria e as outras
+  continuariam rodando. Aí só daria para encerrar matando o processo.
+
 ---
 
 ## Como funciona a contagem
