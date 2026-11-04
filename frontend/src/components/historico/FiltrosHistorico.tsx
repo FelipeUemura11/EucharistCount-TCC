@@ -8,7 +8,11 @@ interface FiltrosHistoricoProps {
   onApplyFilters: () => void;
 }
 
+// value 0 = sem limite de periodo (Historico.tsx trata o 0 como "mostrar tudo").
+export const PERIODO_TUDO = 0;
+
 const periodOptions = [
+  { label: 'Mostrar tudo', value: PERIODO_TUDO },
   { label: 'Últimos 7 dias', value: 7 },
   { label: 'Últimos 30 dias', value: 30 },
   { label: 'Últimos 90 dias', value: 90 },

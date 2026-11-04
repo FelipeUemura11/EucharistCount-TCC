@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import FiltrosHistorico from "../components/historico/FiltrosHistorico";
+import FiltrosHistorico, { PERIODO_TUDO } from "../components/historico/FiltrosHistorico";
 import TabelaHistorico from "../components/historico/TabelaHistorico";
 import { useHistorico } from "../hooks/useHistorico";
 import type { RegistroHistorico } from "../types/history";
@@ -65,11 +65,13 @@ export default function Historico() {
             const matchesSearchTerm =
                 normalizedSearchTerm.length === 0 ||
                 searchableText.includes(normalizedSearchTerm);
-            const matchesPeriod = isWithinPeriod(
-                parseDateFromHistory(registro.data),
-                referenceDate,
-                appliedFilters.periodInDays,
-            );
+            const matchesPeriod =
+                appliedFilters.periodInDays === PERIODO_TUDO ||
+                isWithinPeriod(
+                    parseDateFromHistory(registro.data),
+                    referenceDate,
+                    appliedFilters.periodInDays,
+                );
 
             return matchesSearchTerm && matchesPeriod;
         });
