@@ -101,6 +101,8 @@ export default function Historico() {
             />
 
             <TabelaHistorico
+                // Novo filtro aplicado = key nova = tabela recomeça na página 1.
+                key={`${appliedFilters.searchTerm}|${appliedFilters.periodInDays}`}
                 registros={filteredRecords}
                 onExport={handleExportRecords}
             />
