@@ -3,6 +3,7 @@ import FiltrosHistorico from "../components/historico/FiltrosHistorico";
 import TabelaHistorico from "../components/historico/TabelaHistorico";
 import { useHistorico } from "../hooks/useHistorico";
 import type { RegistroHistorico } from "../types/history";
+import { exportarCsv } from "../utils/exportarCsv";
 
 interface HistoryFilterState {
     searchTerm: string;
@@ -83,7 +84,8 @@ export default function Historico() {
 
     // Exportar ainda nao gera arquivo, so loga no console.
     const handleExportRecords = () => {
-        console.log("Exportando registros de histórico...");
+        if (filteredRecords.length === 0) return;
+        exportarCsv(filteredRecords);
     };
 
     return (
