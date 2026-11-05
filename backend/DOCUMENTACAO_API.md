@@ -229,6 +229,8 @@ De onde vem cada campo:
 | `entradas` / `saidas` | `sessao_monitoramento.total_entradas` / `total_saidas` | A cada passagem pela linha |
 | `estimativaComunhao` | `calcular_estimativa(db, ocupação, celebracao=celebracao).comungantes` (seção 8) | Junto com a ocupação |
 | `hostiasSugeridas` | `calcular_estimativa(db, ocupação, celebracao=celebracao).hostias` (com `margem_hostias` do banco) | Junto com a ocupação |
+| `margemHostias` | `calcular_estimativa(...).margem`: a folga já incluída em `hostiasSugeridas` (`0.15` = 15%). A tela a mostra ao lado das hóstias | Junto com a ocupação |
+| `contagemHabitual` | `contagem_abaixo_do_habitual()`: a mediana do histórico do mesmo dia e horário quando a contagem está abaixo de 70% dela; `null` no resto. A tela mostra o aviso "contagem abaixo do habitual" (`DOCUMENTACAO_BANCO.md`, seção 9.4) | Junto com a ocupação |
 | `contagemAtiva` | `sessao["status"] == "em_andamento"` | `false` quando mostra a última missa encerrada |
 | `graficoOcupacao[]` | `instantaneo_ocupacao`: `hora` = `hora_de_timestamp(registrado_em)`, `ocupacao` = `ocupacao_atual` | A cada 5 s de vídeo |
 | `resumoCelebracao` | Título e janela de monitoramento da celebração | — |
@@ -543,7 +545,7 @@ Se o dashboard e o histórico tivessem cada um a sua cópia da conta, bastaria a
 
 A regra opera em duas fases conforme a linha vigente de `configuracao_estimativa` (`DOCUMENTACAO_BANCO.md`, seções 9.1 e 9.2):
 
-1. **Modo `regressao`:** quando `metodo == 'regressao'` e `modelo_path` aponta para um artefato `.joblib` válido (salvo na pasta do banco, `CAMINHO_BANCO.parent / "modelos_estimativa"`), o pipeline scikit-learn é carregado com cache em memória (`_CACHE_MODELO`) e prevê a quantidade de comungantes a partir de `ocupacao_final`, `minutos_missa`, `dia_semana` e `tipo` da celebração (limitada ao intervalo `[0, ocupacao]`).
+1. **Modo `regressao`:** quando `metodo == 'regressao'` e `modelo_path` aponta para um artefato `.joblib` válido (salvo na pasta do banco, `CAMINHO_BANCO.parent / "modelos_estimativa"`), o pipeline scikit-learn é carregado com cache em memória (`_CACHE_MODELO`) e prevê a quantidade de comungantes a partir de `ocupacao_final`, `minutos_missa`, `dia_semana` e `tipo` da celebração (só não pode ser negativa: a contagem da câmera é um piso do total presente, não um teto).
 2. **Modo `coeficiente_fixo` (ou fallback):** enquanto não há modelo de regressão (ou caso o arquivo `.joblib` não possa ser carregado), aplica a proporção direta:
 
 ```python
@@ -551,9 +553,9 @@ comungantes = int(max(ocupacao, 0) * coeficiente)
 hostias     = math.ceil(comungantes * (1 + margem))
 ```
 
-- **`COEFICIENTE_PADRAO = 0.78`** é a média das 3 celebrações reais do `counting_people.csv` (17/22, 177/214, 250/340). Ele só vale enquanto não houver uma linha em `configuracao_estimativa`; na instalação, rodar `db/calcular_coeficiente_inicial.py` grava o valor real no banco. O padrão anterior era `0.4`, que estimava metade do observado: um número plausível e errado.
+- **`COEFICIENTE_PADRAO = 0.89`** é a média de `comungantes ÷ contagem da câmera` nas missas boas do `counting_people.csv` (`DOCUMENTACAO_BANCO.md`, seção 9.1). Ele só vale enquanto não houver uma linha em `configuracao_estimativa`, e vale de verdade no `.exe`, que começa com o banco vazio. A margem de hóstias padrão é de 15% (`MARGEM_HOSTIAS_PADRAO`). Rodar `db/calcular_coeficiente_inicial.py` grava os valores calculados no banco.
 - **`max(ocupacao, 0)`** protege o começo de um vídeo, quando `dentro` pode ficar negativo (uma saída antes de qualquer entrada).
-- O resultado é um objeto `Estimativa` (`comungantes`, `hostias`, `coeficiente`, `configuracao_id`), para quem usa escrever `est.hostias` em vez de `resultado[1]`.
+- O resultado é um objeto `Estimativa` (`comungantes`, `hostias`, `coeficiente`, `configuracao_id`, `margem`), para quem usa escrever `est.hostias` em vez de `resultado[1]`.
 
 **Por que a estimativa precisa ser gravada:** o Histórico lê as colunas de `estimativa_comunhao` pela `vw_historico`. Uma estimativa que só é calculada na hora de exibir o dashboard nunca chega ao banco, e o Histórico mostra estimativa e hóstias zeradas. `registrar_estimativa_da_sessao()` grava `estimativa_calculada`, `hostias_calculadas`, `coeficiente_utilizado` e `configuracao_estimativa_id` para a sessão.
 

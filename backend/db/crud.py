@@ -184,6 +184,27 @@ def limpar_celebracoes_vencidas(conexao: sqlite3.Connection, limite: str) -> int
     return cursor.rowcount
 
 
+def listar_contagens_do_horario(
+    conexao: sqlite3.Connection, dia_semana: int, horario_missa: str, antes_de: str, limite: int = 8
+) -> list[int]:
+    """Contagens finais das ultimas missas concluidas naquele dia da semana (0 = domingo) e horario, anteriores a `antes_de`."""
+    linhas = conexao.execute(
+        """
+        SELECT s.ocupacao_final
+        FROM sessao_monitoramento s
+        JOIN celebracao c ON c.id = s.celebracao_id
+        WHERE s.status = 'concluida' AND s.ocupacao_final > 0
+          AND c.horario_missa = ?
+          AND CAST(strftime('%w', c.data) AS INTEGER) = ?
+          AND c.data < ?
+        ORDER BY c.data DESC
+        LIMIT ?
+        """,
+        (horario_missa, dia_semana, antes_de, limite),
+    ).fetchall()
+    return [linha["ocupacao_final"] for linha in linhas]
+
+
 def listar_proximas_celebracoes(conexao: sqlite3.Connection, a_partir_de: str, limite: int = 20) -> list[sqlite3.Row]:
     """`a_partir_de` no formato 'YYYY-MM-DD' — normalmente a data de hoje."""
     return conexao.execute(
@@ -403,7 +424,7 @@ def obter_configuracao_estimativa_vigente(conexao: sqlite3.Connection) -> sqlite
 
 
 def definir_configuracao_estimativa(conexao: sqlite3.Connection, coeficiente_comunhao: float,
-                                     margem_hostias: float = 0.10, metodo: str = "coeficiente_fixo",
+                                     margem_hostias: float = 0.15, metodo: str = "coeficiente_fixo",
                                      modelo_path: str | None = None,
                                      observacoes: str | None = None) -> int:
     """

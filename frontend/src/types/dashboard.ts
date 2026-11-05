@@ -17,6 +17,8 @@ export interface MetricasDashboard {
   entradas: number;
   saidas: number;
   contagemAtiva: boolean;
+  margemHostias: number; // folga ja incluida em hostiasSugeridas (0.15 = +15%)
+  contagemHabitual: number | null; // so vem preenchida quando a contagem esta bem abaixo do habitual
 }
 
 export interface DadosDashboard {

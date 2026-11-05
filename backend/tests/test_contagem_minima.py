@@ -118,13 +118,15 @@ class TesteDatasetDaRegressao(TesteComBanco):
         self.montar_dataset = preparar_dataset.montar_dataset
         self.dia = 0
 
-    def sessao(self, status, ocupacao, comungantes):
+    def sessao(self, status, ocupacao, comungantes, sistema="igual"):
+        """ocupacao = contagem manual; sistema = contagem da camera (igual a manual por padrao)."""
         self.dia += 1
         celebracao = crud.criar_celebracao(self.db, "Missa", f"2026-10-{self.dia:02d}", "18:00")
         sessao = crud.iniciar_sessao(self.db, celebracao, origem_contagem="manual")
         crud.finalizar_sessao(
             self.db, sessao, total_entradas=max(ocupacao, 0), total_saidas=0,
-            ocupacao_final=ocupacao, status=status,
+            ocupacao_final=ocupacao, contagem_sistema=ocupacao if sistema == "igual" else sistema,
+            status=status,
         )
         crud.registrar_estimativa(self.db, sessao, comungantes_reais=comungantes)
 
@@ -143,6 +145,20 @@ class TesteDatasetDaRegressao(TesteComBanco):
     def test_comungantes_maior_que_presentes_fica_de_fora(self):
         # Contagem com oclusao: 8 contados, 150 comungaram.
         self.sessao("concluida", ocupacao=8, comungantes=150)
+        self.assertEqual(len(self.montar_dataset()), 0)
+
+    def test_a_variavel_de_treino_e_a_contagem_da_camera(self):
+        # A regressao e usada com a contagem da camera, entao treina com ela.
+        self.sessao("concluida", ocupacao=100, comungantes=80, sistema=88)
+        self.assertEqual(list(self.montar_dataset()["ocupacao_final"]), [88])
+
+    def test_dia_em_que_a_camera_perdeu_gente_fica_de_fora(self):
+        # Camera com 60% da contagem manual: falha de medicao, nao serve de exemplo.
+        self.sessao("concluida", ocupacao=100, comungantes=80, sistema=60)
+        self.assertEqual(len(self.montar_dataset()), 0)
+
+    def test_sem_contagem_da_camera_fica_de_fora(self):
+        self.sessao("concluida", ocupacao=100, comungantes=80, sistema=None)
         self.assertEqual(len(self.montar_dataset()), 0)
 
     def test_ocupacao_zero_ou_negativa_fica_de_fora(self):

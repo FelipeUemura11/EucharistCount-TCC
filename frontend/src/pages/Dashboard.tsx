@@ -2,6 +2,7 @@ import ResumoDaCelebracao from "../components/dashboard/ResumoDaCelebracao";
 import EstimativaComunhao from "../components/dashboard/EstimativaComunhao";
 import EstatisticasDashboard from "../components/dashboard/EstatisticasDashboard";
 import GraficoOcupacao from "../components/dashboard/GraficoOcupacao";
+import AvisoContagemBaixa from "../components/dashboard/AvisoContagemBaixa";
 import { useDashboard } from "../hooks/useDashboard";
 
 export default function Dashboard() {
@@ -11,7 +12,10 @@ export default function Dashboard() {
 
     return (
         <div className="flex flex-col gap-6">
-            {/* Cards no topo; grafico e resumo lado a lado; estimativa de comunhao por ultimo. */}
+            {/* Aviso (se houver), cards no topo, grafico e resumo lado a lado e a estimativa por ultimo. */}
+            {metricas.contagemHabitual !== null && (
+                <AvisoContagemBaixa habitual={metricas.contagemHabitual} />
+            )}
             <EstatisticasDashboard metricas={metricas} />
             <section>
                 <div className="grid grid-cols-[1fr_380px] gap-6 max-[1400px]:grid-cols-[1fr_340px] max-[1024px]:grid-cols-1">

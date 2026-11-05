@@ -11,6 +11,7 @@ export default function EstimativaComunhao({ metricas }: EstimativaComunhaoProps
         ? Math.round((metricas.estimativaComunhao / metricas.ocupacaoAtual) * 100)
         : 0;
     const suggestedHosts = metricas.hostiasSugeridas;
+    const margemPercent = Math.round(metricas.margemHostias * 100);
 
     const communionStats = [
         {
@@ -22,7 +23,7 @@ export default function EstimativaComunhao({ metricas }: EstimativaComunhaoProps
         {
             label: 'Hóstias sugeridas',
             value: suggestedHosts,
-            suffix: 'unidades',
+            suffix: margemPercent > 0 ? `unidades (com ${margemPercent}% de margem)` : 'unidades',
             icon: HandPlatter,
         },
         {

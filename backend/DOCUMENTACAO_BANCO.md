@@ -112,7 +112,7 @@ erDiagram
         INTEGER id PK
         TEXT metodo "coeficiente_fixo ou regressao"
         REAL coeficiente_comunhao
-        REAL margem_hostias "0.10 = +10%"
+        REAL margem_hostias "0.15 = +15%"
         TEXT modelo_path ".joblib"
         TEXT vigente_desde
         TEXT observacoes
@@ -232,7 +232,7 @@ Os parâmetros que convertem ocupação em estimativa de comungantes e de hósti
 |---|---|
 | `metodo` | `'coeficiente_fixo'` (fase inicial) ou `'regressao'` (quando houver dados suficientes, seção 9) |
 | `coeficiente_comunhao` | Fração dos presentes que costuma comungar. **Obrigatório mesmo no modo regressão**, onde serve de reserva se o modelo não puder prever |
-| `margem_hostias` | Folga sobre a estimativa. `0.10` = consagrar 10% a mais |
+| `margem_hostias` | Folga sobre a estimativa. `0.15` = consagrar 15% a mais |
 | `modelo_path` | Caminho do modelo treinado (`.joblib`), relativo à pasta onde vive o banco (`CAMINHO_BANCO.parent`) |
 | `vigente_desde` | Quando essa versão passou a valer |
 
@@ -582,34 +582,36 @@ flowchart LR
 ### 9.1 Fase 1 — coeficiente fixo (atual)
 
 ```
-coeficiente = média de (comungantes_reais ÷ ocupacao_final), entre as sessões que têm os dois valores
+coeficiente = média de (comungantes_reais ÷ contagem_sistema), entre as sessões que têm os dois valores
 estimativa  = ocupação × coeficiente
 hóstias     = ⌈ estimativa × (1 + margem_hostias) ⌉
 ```
 
-O padrão do código, `COEFICIENTE_PADRAO = 0.78`, é a média das 3 primeiras missas registradas (11/09, 13/09 e 20/09: 0,773, 0,827 e 0,735). Com o `counting_people.csv` atual, que tem 10 missas com comungantes, o `calcular_coeficiente_inicial.py` grava:
+O divisor é a contagem da **câmera**, e não a manual, porque é a da câmera que a estimativa recebe em produção. Assim a subcontagem típica dela (de 3% a 17% nos dias bons) já entra no coeficiente, sem um "mais 15%" avulso. Ficam de fora as missas em que a câmera contou menos de 75% da contagem manual (`LIMITE_SUBCONTAGEM`): são falha de medição, não o comportamento normal, e puxariam o coeficiente para cima. Com o `counting_people.csv` atual, o `calcular_coeficiente_inicial.py` grava:
 
-| Data | Pessoas (manual) | Câmera | Comungaram | Razão (÷ manual) | Observação |
-|---|---|---|---|---|---|
-| 11/09/2026 | 22 | — | 17 | 0,773 | camera_mal_posicionada |
-| 12/09/2026 | 95 | — | 74 | 0,779 | superficial |
-| 13/09/2026 | 214 | — | 177 | 0,827 | camera_mal_posicionada |
-| 20/09/2026 | 340 | 282 | 250 | 0,735 | |
-| 27/09/2026 | 155 | 143 | 140 | 0,903 | |
-| 11/10/2026 | 181 | 176 | 148 | 0,818 | |
-| 17/10/2026 | 95 | 52 | 74 | 0,779 | superficial |
-| 18/10/2026 | 240 | 162 | 184 | 0,767 | |
-| 24/10/2026 | 108 | — | 84 | 0,778 | superficial |
-| 25/10/2026 | 140 | 127 | 108 | 0,771 | superficial |
-| **Média** | | | | **≈ 0,793** | |
+| Data | Pessoas (manual) | Câmera | Comungaram | Câmera ÷ manual | Comungaram ÷ câmera | Situação |
+|---|---|---|---|---|---|---|
+| 11/09/2026 | 22 | — | 17 | — | — | sem contagem da câmera (camera_mal_posicionada) |
+| 12/09/2026 | 95 | — | 74 | — | — | sem contagem da câmera (superficial) |
+| 13/09/2026 | 214 | — | 177 | — | — | sem contagem da câmera (camera_mal_posicionada) |
+| 20/09/2026 | 340 | 282 | 250 | 83% | 0,887 | usada |
+| 27/09/2026 | 155 | 143 | 140 | 92% | 0,979 | usada |
+| 11/10/2026 | 181 | 176 | 148 | 97% | 0,841 | usada |
+| 17/10/2026 | 95 | 52 | 74 | 55% | 1,423 | descartada (câmera perdeu gente) (superficial) |
+| 18/10/2026 | 240 | 162 | 184 | 68% | 1,136 | descartada (câmera perdeu gente) |
+| 24/10/2026 | 103 | 53 | 80 | 51% | 1,509 | descartada (câmera perdeu gente) (superficial) |
+| 25/10/2026 | 140 | 127 | 108 | 91% | 0,850 | usada (superficial) |
+| **Média das usadas** | | | | | **≈ 0,889** | 4 missas |
 
-A razão é calculada sobre a contagem **manual** (`ocupacao_final`), e não sobre a da câmera (seção 12).
+Os dias descartados têm razão acima de 1 (mais gente comungou do que a câmera contou), o que mostra que a câmera perdeu gente na entrada. Nos dias bons, comungam cerca de 89% do que a câmera conta, e é esse o `COEFICIENTE_PADRAO` do código.
+
+**A margem de hóstias é de 15%** (`margem_hostias`, antes 10%), por decisão da paróquia: faltar hóstia obriga a buscar mais no meio da celebração, e sobrar um pouco é aceitável. Nos dias bons, `⌈estimativa × 1,15⌉` cobriu os comungantes com sobra de 1% a 22%. A tela mostra a margem junto das hóstias sugeridas.
 
 A média é **das razões**, e não "total de comungantes ÷ total de pessoas". Assim, cada missa pesa igual, e uma missa muito cheia não domina o coeficiente.
 
 **No código**, a fórmula está em `integracao/estimativa.py` → `calcular_estimativa()`, a única implementação usada pelo sistema (detalhes em `DOCUMENTACAO_API.md`, seção 8):
 
-- **Coeficiente e margem:** lidos da configuração vigente (`crud.obter_configuracao_estimativa_vigente`). Enquanto `calcular_coeficiente_inicial.py` não tiver rodado e a tabela estiver vazia, valem os padrões do código: `COEFICIENTE_PADRAO = 0.78` (a média acima) e margem de 10%.
+- **Coeficiente e margem:** lidos da configuração vigente (`crud.obter_configuracao_estimativa_vigente`). Enquanto `calcular_coeficiente_inicial.py` não tiver rodado e a tabela estiver vazia, valem os padrões do código: `COEFICIENTE_PADRAO = 0.89` (a média acima) e margem de 15%.
 - **Gravação:** `registrar_estimativa_da_sessao()` grava o resultado em `estimativa_comunhao` (`estimativa_calculada`, `hostias_calculadas`, `coeficiente_utilizado`, `configuracao_estimativa_id`). É dessa tabela que a `vw_historico` lê.
 - **Sessões pendentes:** `preencher_estimativas_pendentes()` grava a estimativa de todas as sessões concluídas que ainda não têm uma (seção 10).
 
@@ -617,12 +619,12 @@ A média é **das razões**, e não "total de comungantes ÷ total de pessoas". 
 
 `treinar_regressao.py` treina uma regressão linear que usa, além da ocupação, o dia da semana, o horário (em minutos desde meia-noite) e o tipo de celebração. A hipótese é que a fração que comunga varia com o tipo de missa: domingo de manhã é diferente de uma quarta à noite.
 
-- **Só contagem válida entra no treino.** `preparar_dataset.py` (e `calcular_coeficiente_inicial.py`, com o mesmo filtro) aceita apenas sessões `concluida`, com `ocupacao_final > 0` e `comungantes_reais <= ocupacao_final`: não se comunga mais gente do que há na igreja, então uma contagem com obstrução (8 contados e 150 comungantes) fica de fora sem precisar de um número fixo.
+- **Só contagem válida entra no treino.** `preparar_dataset.py` (e `calcular_coeficiente_inicial.py`, com o mesmo filtro) aceita apenas sessões `concluida`, com contagem da câmera preenchida, `ocupacao_final > 0` e `comungantes_reais <= ocupacao_final`, e usa a **contagem da câmera** (`contagem_sistema`) como variável de treino, a mesma que a estimativa recebe em produção. Dias em que a câmera contou menos de 75% da manual também ficam de fora. O filtro `comungantes_reais <= ocupacao_final` vem do fato de que não se comunga mais gente do que há na igreja: uma contagem com obstrução (8 contados e 150 comungantes) cai fora sem precisar de um número fixo.
 - **Mínimo de 15 celebrações.** Com menos que isso, uma regressão com várias variáveis só "decora" os pontos que viu. O script avisa e não treina nada.
 - **Validação *leave-one-out*.** Com poucos dados, separar treino e teste fixos desperdiçaria amostras. O script treina com todas as missas menos uma, testa nessa, repete para cada missa, e reporta o erro médio (MAE) e o R².
 - **Variáveis categóricas** (dia da semana, tipo) passam por *one-hot encoding*, com `handle_unknown="ignore"`: um tipo de missa novo, nunca visto no treino, não derruba a previsão.
 - **Armazenamento compatível com PyInstaller:** o modelo final é salvo em `CAMINHO_BANCO.parent / "modelos_estimativa" / "regressao_comunhao_<data>.joblib"`, garantindo que quando o banco for direcionado para `%APPDATA%\EucharistCount` no executável empacotado, o `.joblib` também fique salvo em disco persistente e nunca na pasta temporária `_MEI...`.
-- **Inferência em `integracao/estimativa.py`:** quando a configuração vigente tem `metodo = 'regressao'`, `calcular_estimativa()` carrega o modelo com cache em memória (`_CACHE_MODELO`), prevê os comungantes usando o contexto da celebração e limita o valor ao intervalo físico `[0, ocupacao]`. Caso o arquivo não seja encontrado ou falhe, cai automaticamente para o `coeficiente_comunhao` de reserva.
+- **Inferência em `integracao/estimativa.py`:** quando a configuração vigente tem `metodo = 'regressao'`, `calcular_estimativa()` carrega o modelo com cache em memória (`_CACHE_MODELO`), prevê os comungantes usando o contexto da celebração e só impede o valor de ficar negativo: a contagem da câmera é um piso do total presente, não um teto (em 18/10 comungaram 184 e a câmera contou 162). Caso o arquivo não seja encontrado ou falhe, cai automaticamente para o `coeficiente_comunhao` de reserva.
 
 ### 9.3 Importação do CSV manual
 
@@ -637,6 +639,19 @@ A média é **das razões**, e não "total de comungantes ÷ total de pessoas". 
 | `hosts_consecrated` | `estimativa_comunhao.hostias_reais` |
 
 Cada linha precisa ter exatamente as 9 colunas do cabeçalho (formato completo em [`db/README.md`](./db/README.md)). Cada linha vira uma celebração (reaproveitada se já existir a mesma data e horário), uma sessão `manual` já `concluida` (também reaproveitada e atualizada em caso de reimportação do mesmo CSV, evitando duplicar pontos no treino da regressão) e, se houver dado de comunhão, uma estimativa.
+
+### 9.4 Aviso de contagem abaixo do habitual
+
+Os dias em que a câmera perde gente na entrada (32% a 49% a menos nos dados de outubro) não têm correção multiplicativa que resolva: são falha de medição, não um viés constante. O que se faz é **avisar**, para o responsável conferir a igreja e separar mais hóstias.
+
+`integracao/estimativa.py` → `contagem_abaixo_do_habitual()` compara a contagem com a **mediana** das últimas 8 missas concluídas do mesmo dia da semana e horário (`crud.listar_contagens_do_horario`). Se a contagem for menor que 70% dela, `GET /api/dashboard` devolve `metricas.contagemHabitual` e a tela mostra o aviso.
+
+| Regra | Motivo |
+|---|---|
+| Precisa de pelo menos 3 missas no histórico daquele dia e horário | Com menos, a mediana não é confiável |
+| Só missas `concluida` e anteriores à data da atual | A atual e as que falharam não entram na comparação |
+| Ao vivo, só depois do horário da missa | Antes disso a contagem ainda está subindo e o aviso dispararia toda missa |
+| Mediana, não média | Um dia ruim no histórico não puxa a referência |
 
 ---
 
@@ -677,8 +692,8 @@ O banco **não tem nenhuma coluna capaz de guardar imagem, vídeo ou dado biomé
 
 | Onde | Limitação | Efeito |
 |---|---|---|
-| `db/calcular_coeficiente_inicial.py`, `db/preparar_dataset.py` | O coeficiente e a regressão são calculados com a contagem **manual** (`ocupacao_final` das sessões importadas), mas aplicados na contagem da **câmera** | Nas missas com as duas contagens, a câmera contou de 3% a 45% menos que a contagem manual (tabela da seção 9.1). A estimativa sai baixa na mesma proporção. Calibrar com `contagem_sistema` corrigiria a parte sistemática desse erro |
-| `integracao/estimativa.py` | A previsão da regressão é limitada a `[0, ocupacao]` | Se a calibração passar a usar a contagem da câmera, a trava precisa mudar: em 18/10 comungaram 184 pessoas e a câmera contou 162 |
+| `db/calcular_coeficiente_inicial.py` | Só 4 missas entram no coeficiente (as de câmera boa) | O valor de 0,89 muda a cada missa nova. Nos dias de obstrução (câmera abaixo de 75% da manual) a estimativa sai baixa; o aviso de contagem abaixo do habitual cobre esse caso (seção 9.4) |
+| `integracao/estimativa.py` | O aviso de contagem baixa só aparece com 3 ou mais missas do mesmo dia e horário no histórico | No começo, ou num horário novo, a subcontagem não é sinalizada |
 | `db/database.py` | O banco fica em `backend/db/`; as linhas para `%APPDATA%` estão comentadas (e o `import os` que elas usam ainda não existe no arquivo) | Precisa ser ativado no empacotamento (PyInstaller) |
 | `db/database.py` | `inicializar_banco()` não migra bancos já criados (seção 6.1) | Coluna nova no `schema.sql` exige recriar o `.db` ou `ALTER TABLE` manual |
 
