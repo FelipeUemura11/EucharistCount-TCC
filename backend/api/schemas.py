@@ -29,8 +29,6 @@ class MetricasDashboard(BaseModel):
     entradas: int
     saidas: int
     contagemAtiva: bool
-    # Folga ja incluida em hostiasSugeridas (0.15 = +15%).
-    margemHostias: float = 0.0
     # Preenchido so quando a contagem esta bem abaixo do habitual do horario (provavel obstrucao).
     contagemHabitual: int | None = None
 

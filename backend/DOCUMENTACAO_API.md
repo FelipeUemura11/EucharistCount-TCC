@@ -229,7 +229,6 @@ De onde vem cada campo:
 | `entradas` / `saidas` | `sessao_monitoramento.total_entradas` / `total_saidas` | A cada passagem pela linha |
 | `estimativaComunhao` | `calcular_estimativa(db, ocupação, celebracao=celebracao).comungantes` (seção 8) | Junto com a ocupação |
 | `hostiasSugeridas` | `calcular_estimativa(db, ocupação, celebracao=celebracao).hostias` (com `margem_hostias` do banco) | Junto com a ocupação |
-| `margemHostias` | `calcular_estimativa(...).margem`: a folga já incluída em `hostiasSugeridas` (`0.15` = 15%). A tela a mostra ao lado das hóstias | Junto com a ocupação |
 | `contagemHabitual` | `contagem_abaixo_do_habitual()`: a mediana do histórico do mesmo dia e horário quando a contagem está abaixo de 70% dela; `null` no resto. A tela mostra o aviso "contagem abaixo do habitual" (`DOCUMENTACAO_BANCO.md`, seção 9.4) | Junto com a ocupação |
 | `contagemAtiva` | `sessao["status"] == "em_andamento"` | `false` quando mostra a última missa encerrada |
 | `graficoOcupacao[]` | `instantaneo_ocupacao`: `hora` = `hora_de_timestamp(registrado_em)`, `ocupacao` = `ocupacao_atual` | A cada 5 s de vídeo |

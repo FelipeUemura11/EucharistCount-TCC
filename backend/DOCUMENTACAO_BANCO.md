@@ -605,7 +605,7 @@ O divisor é a contagem da **câmera**, e não a manual, porque é a da câmera 
 
 Os dias descartados têm razão acima de 1 (mais gente comungou do que a câmera contou), o que mostra que a câmera perdeu gente na entrada. Nos dias bons, comungam cerca de 89% do que a câmera conta, e é esse o `COEFICIENTE_PADRAO` do código.
 
-**A margem de hóstias é de 15%** (`margem_hostias`, antes 10%), por decisão da paróquia: faltar hóstia obriga a buscar mais no meio da celebração, e sobrar um pouco é aceitável. Nos dias bons, `⌈estimativa × 1,15⌉` cobriu os comungantes com sobra de 1% a 22%. A tela mostra a margem junto das hóstias sugeridas.
+**A margem de hóstias é de 15%** (`margem_hostias`, antes 10%), por decisão da paróquia: faltar hóstia obriga a buscar mais no meio da celebração, e sobrar um pouco é aceitável. Nos dias bons, `⌈estimativa × 1,15⌉` cobriu os comungantes com sobra de 1% a 22%. A tela mostra só o número final, sem falar da margem.
 
 A média é **das razões**, e não "total de comungantes ÷ total de pessoas". Assim, cada missa pesa igual, e uma missa muito cheia não domina o coeficiente.
 

@@ -161,13 +161,12 @@ class TesteAvisoDeContagemBaixa(TesteComBanco):
     def test_sem_celebracao_nao_avisa(self):
         self.assertIsNone(contagem_abaixo_do_habitual(self.db, 10, None, ao_vivo=False, agora=datetime.now()))
 
-    def test_dashboard_devolve_margem_e_aviso(self):
+    def test_dashboard_devolve_o_aviso_e_hostias_suficientes(self):
         self.historico(95, 100, 105)
         self.missa("2026-10-31", "18:00", 52)
 
         metricas = get_dashboard(self.db).metricas
 
-        self.assertEqual(metricas.margemHostias, MARGEM_HOSTIAS_PADRAO)
         self.assertEqual(metricas.contagemHabitual, 100)
         self.assertGreaterEqual(metricas.hostiasSugeridas, metricas.estimativaComunhao)
 

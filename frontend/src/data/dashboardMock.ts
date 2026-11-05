@@ -10,7 +10,6 @@ export const dashboardMock: DadosDashboard = {
     entradas: 0,
     saidas: 0,
     contagemAtiva: false,
-    margemHostias: 0,
     contagemHabitual: null,
   },
   graficoOcupacao: [],
