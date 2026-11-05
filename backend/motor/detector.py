@@ -77,33 +77,8 @@ class DetectorPessoas:
         if not self.caminho_tracker.exists():
             self.caminho_tracker = Path(config_rastreio.algoritmo)
 
-        self._limitar_threads()
         self.modelo = YOLO(str(caminho), task="detect") # Carrega a rede neural convolucional (CNN) - ja treinada
         self.caminho_modelo = caminho
-
-    def _limitar_threads(self) -> None:
-        """
-        Restringe o uso de CPU.
-
-        Sem isso, o ONNX Runtime toma todos os nucleos e a maquina da
-        igreja fica inutilizavel para qualquer outra tarefa.
-        """
-        n = self.config.threads
-        if n <= 0:
-            return
-
-        import os
-
-        for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS",
-                    "OPENBLAS_NUM_THREADS"):
-            os.environ[var] = str(n)
-
-        try:
-            import torch
-
-            torch.set_num_threads(n)
-        except ImportError:
-            pass
 
     # ---------- Inferencia ----------
 

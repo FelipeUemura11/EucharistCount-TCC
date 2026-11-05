@@ -165,8 +165,8 @@ python main.py --fonte "rtsp://usuario:senha@192.168.1.50:554/stream1"
 # ajustar a linha do portao (x1,y1,x2,y2 em fracoes do frame)
 python main.py --linha 0.25,0.0,0.25,1.0
 
-# maquina fraca: menor resolucao, menos threads, sem janela
-python main.py --imgsz 480 --threads 2 --sem-janela
+# maquina fraca: menor resolucao, menos fps, sem janela
+python main.py --imgsz 480 --fps 7.5 --sem-janela
 ```
 
 **Teclas (janela do vídeo, só no modo manual):** `ESC`/`Q` encerra a contagem · `ESPAÇO` pausa · `A`/`D` volta/avança 10s (somente em arquivo de vídeo; ao voltar, o trecho já contado roda em modo `REPLAY` sem duplicar contagens)
@@ -274,7 +274,6 @@ Em ordem de impacto:
 | `fps_processamento` | maior ganho, menor perda. Pessoas não andam rápido o bastante para poucos fps ser insuficiente |
 | `imgsz: 480` | mais rápido que 640/960, mas perde pessoas ao fundo |
 | `modelo: yolo11n.onnx` | o mais leve que ainda detecta bem |
-| `threads` | limita o uso de CPU e mantém a máquina utilizável |
 | `mostrar_janela: false` | desenhar e exibir consome CPU à toa em produção |
 
 Se as pessoas do fundo não forem detectadas, o problema quase sempre é o
@@ -295,7 +294,6 @@ Se as pessoas do fundo não forem detectadas, o problema quase sempre é o
 - `confianca` — limiar (0–1); mais baixo detecta mais e erra mais
 - `iou` — limiar do NMS; baixo demais funde pessoas próximas numa caixa só
 - `max_deteccoes` — teto de pessoas por frame (padrão `300`)
-- `threads` — limite de núcleos; `0` = automático
 
 **rastreio**
 - `algoritmo` — arquivo do tracker. O padrão é o

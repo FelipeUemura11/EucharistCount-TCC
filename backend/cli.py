@@ -12,7 +12,6 @@ def montar_argumentos() -> argparse.ArgumentParser:
     p.add_argument("--imgsz", type=int, help="resolucao de inferencia")
     p.add_argument("--conf", type=float, help="limiar de confianca (0-1)")
     p.add_argument("--fps", type=float, help="frames por segundo a processar")
-    p.add_argument("--threads", type=int, help="limite de threads de CPU")
     p.add_argument("--sem-janela", action="store_true", help="roda sem interface grafica")
     p.add_argument("--linha", type=str, help="linha de contagem: x1,y1,x2,y2 em fracoes (0-1)")
     p.add_argument("--agora", action="store_true", help="conta imediatamente, sem esperar a agenda (passar --fonte tambem faz isso)")
@@ -32,7 +31,6 @@ def aplicar_argumentos(config: Config, args: argparse.Namespace) -> Config:
     if args.fps is not None: config.camera.fps_processamento = args.fps
     if args.imgsz is not None: config.deteccao.imgsz = args.imgsz
     if args.conf is not None: config.deteccao.confianca = args.conf
-    if args.threads is not None: config.deteccao.threads = args.threads
     if args.sem_janela: config.visual.mostrar_janela = False
     # Linha vem como texto "x1,y1,x2,y2" e e convertida em tupla de 4 floats.
     if args.linha:

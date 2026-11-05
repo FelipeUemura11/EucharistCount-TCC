@@ -8,8 +8,7 @@
     "imgsz": 480,
     "confianca": 0.15,
     "iou": 0.7,
-    "max_deteccoes": 300,
-    "threads": 0
+    "max_deteccoes": 300
   },
   "rastreio": {
     "algoritmo": "bytetrack_ajustado.yaml"

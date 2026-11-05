@@ -518,14 +518,13 @@ Quem decide é `Config.resolver_fonte_camera()`: dígitos e URLs (`rtsp://`, `ht
 
 ---
 
-## 10. Limitação de threads de CPU
+## 10. Uso de CPU: por que não há limite de threads
 
-```python
-for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
-    os.environ[var] = str(n)
-```
+A inferência roda no ONNX Runtime, que por padrão usa **todos os núcleos disponíveis** da CPU. O projeto deixa assim de propósito: é o que dá o maior FPS na máquina da igreja.
 
-Por padrão, bibliotecas de computação numérica (como as usadas internamente pelo ONNX Runtime) tentam usar **todos os núcleos disponíveis** da CPU. Numa máquina dedicada de servidor isso é desejável; numa máquina de igreja que também precisa rodar outras coisas (o próprio sistema operacional, talvez outros programas), monopolizar todos os núcleos deixaria a máquina praticamente travada para qualquer outro uso. O parâmetro `threads` (atualmente `0`, ou seja, sem limite explícito) existe para poder restringir esse consumo quando necessário — por exemplo, `threads: 2` numa máquina de poucos núcleos.
+Houve uma opção `deteccao.threads` para limitar esse uso, mas ela foi removida porque não funcionava. Ela definia `OMP_NUM_THREADS` e chamava `torch.set_num_threads()`, e o ONNX Runtime ignora os dois: ele tem um pool de threads próprio, e a Ultralytics cria a sessão sem repassar um limite. Só o pré e o pós-processamento (em PyTorch) eram afetados.
+
+Para aliviar a CPU numa máquina fraca, os parâmetros que realmente fazem efeito são `camera.fps_processamento` (o de maior ganho), `deteccao.imgsz` e o próprio modelo (`yolo11n`).
 
 ---
 

@@ -116,12 +116,11 @@ Se o modelo não existir (`FileNotFoundError`) ou a fonte de vídeo não estiver
 | `--imgsz` | `deteccao.imgsz` | `--imgsz 640` |
 | `--conf` | `deteccao.confianca` | `--conf 0.25` |
 | `--fps` | `camera.fps_processamento` | `--fps 5` |
-| `--threads` | `deteccao.threads` | `--threads 2` |
 | `--linha` | `contagem.linha` | `--linha 0.25,0.0,0.25,1.0` |
 | `--sem-janela` | `visual.mostrar_janela = false` | produção, sem interface gráfica |
 | `--agora` | — (escolhe o modo) | conta agora, sem esperar a agenda; `--fonte` também ativa o modo manual (seção 9.1) |
 
-Os argumentos numéricos são testados com `is not None`, e não com `if valor:`. Isso porque em Python `0` é falso: o teste antigo ignorava um `--threads 0` digitado de propósito. O `argparse` usa `None` para "não informado", e é exatamente isso que o teste verifica.
+Os argumentos numéricos são testados com `is not None`, e não com `if valor:`. Isso porque em Python `0` é falso: o teste antigo ignorava um `--fps 0` (processar todos os frames) digitado de propósito. O `argparse` usa `None` para "não informado", e é exatamente isso que o teste verifica.
 
 A configuração efetiva, já com os argumentos aplicados, fica gravada em `sessao_monitoramento.parametros_contagem`.
 
