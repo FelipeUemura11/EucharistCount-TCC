@@ -36,6 +36,15 @@ class Estimativa:
     configuracao_id: int | None   # None quando usou os valores padrao
 
 
+def motivo_contagem_invalida(entradas: int, saidas: int, minimo: int) -> str | None:
+    """Por que a contagem nao deve ser usada, ou None se ela vale."""
+    if saidas > entradas:
+        return "saidas maiores que entradas"
+    if entradas - saidas < minimo:
+        return f"abaixo do minimo de {minimo} pessoas"
+    return None
+
+
 def _dia_semana(data_iso: str) -> int:
     """
     Converte 'YYYY-MM-DD' para a convencao do banco: 0=domingo ... 6=sabado.

@@ -131,6 +131,11 @@ class ConfigContagem:
     # contada, e quem perde o rastro antes disso deixa de ser contado.
     margem: float = 0.035
 
+    # Contagem final abaixo disso (ou com mais saidas que entradas) nao e
+    # usada: a sessao fica como 'interrompida', sem estimativa e fora do
+    # Historico e da regressao. Quase sempre e oclusao na entrada.
+    minimo_pessoas: int = 20
+
     # Apos contar alguem, ignora essa pessoa por este tempo.
     segundos_cooldown: float = 3.0
     # Descarta o rastro de quem sumiu do enquadramento.

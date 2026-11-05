@@ -336,6 +336,9 @@ de perfil e parcialmente oculta pelos bancos.
 - `margem` — meia-largura da zona morta, em fração da largura do frame.
   Maior = mais resistente a tremor, porém exige que a pessoa se afaste
   mais da linha para ser contada
+- `minimo_pessoas` — contagem final abaixo disso, ou com mais saídas que
+  entradas, é descartada (por obstrução na entrada): a sessão fica como
+  `interrompida`, sem estimativa, Histórico nem regressão. Padrão: 20
 - `segundos_cooldown` / `segundos_esquecer` — tempo mínimo entre duas
   contagens da mesma pessoa e tempo até esquecer quem sumiu do
   enquadramento, contados no tempo do vídeo (não da CPU)

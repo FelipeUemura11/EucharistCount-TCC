@@ -38,7 +38,8 @@ def _minutos(horario: str) -> int:
 def montar_dataset() -> pd.DataFrame:
     conexao = obter_conexao()
 
-    # Mesmo filtro do coeficiente inicial: ocupacao > 0 e comunhao real preenchida.
+    # Mesmo filtro do coeficiente inicial: so contagem concluida e coerente
+    # (ninguem comunga mais do que ha na igreja; isso barra contagem com oclusao).
     linhas = conexao.execute(
         """
         SELECT c.data, c.horario_missa, c.tipo,
@@ -47,7 +48,10 @@ def montar_dataset() -> pd.DataFrame:
         FROM sessao_monitoramento s
         JOIN celebracao c ON c.id = s.celebracao_id
         JOIN estimativa_comunhao e ON e.sessao_id = s.id
-        WHERE s.ocupacao_final > 0 AND e.comungantes_reais IS NOT NULL
+        WHERE s.status = 'concluida'
+          AND s.ocupacao_final > 0
+          AND e.comungantes_reais IS NOT NULL
+          AND e.comungantes_reais <= s.ocupacao_final
         """
     ).fetchall()
     conexao.close()

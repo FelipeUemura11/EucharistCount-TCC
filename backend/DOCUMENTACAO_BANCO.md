@@ -357,21 +357,24 @@ stateDiagram-v2
     [*] --> em_andamento : iniciar_sessao()
     em_andamento --> em_andamento : atualizar_totais_sessao()
     em_andamento --> concluida : finalizar_sessao() — fim do vídeo, ESC ou fim da janela da agenda
-    em_andamento --> interrompida : finalizar_sessao(status="interrompida") — erro ou Ctrl+C
+    em_andamento --> interrompida : finalizar_sessao(status="interrompida") — erro, Ctrl+C ou contagem descartada
     em_andamento --> interrompida : interromper_sessoes_orfas() — no próximo início
     concluida --> [*]
     interrompida --> [*]
 ```
 
-Uma sessão pode terminar de três jeitos:
+Uma sessão pode terminar de quatro jeitos:
 
 | Como terminou | Quem fecha | Status |
 |---|---|---|
 | O vídeo acabou, o operador apertou ESC, ou chegou o fim da janela da agenda (o agendador chama `monitor.parar()`) | `finalizar_sessao()`, no `finally` do `sessao_de_monitoramento` | `concluida` |
 | Uma exceção: a fonte não abriu, erro no motor, Ctrl+C (no modo agendado, o agendador lança `_Encerrado` para marcar a contagem cortada) | `finalizar_sessao(status="interrompida")`, no mesmo `finally` | `interrompida` |
+| A contagem terminou normal, mas é impossível (mais saídas que entradas) ou menor que `contagem.minimo_pessoas` (20, no `config.json`) | `sessao_de_monitoramento`, que troca o status antes de `finalizar_sessao()` e anota o motivo em `observacoes` | `interrompida` |
 | O processo morreu de fora: queda de energia, terminal fechado no X | Ninguém na hora. `interromper_sessoes_orfas()`, na **próxima** inicialização | `interrompida` |
 
 **Só sessões `concluida` entram no Histórico** (`vw_historico`). Uma contagem que falhou não aparece lá como resultado válido com zeros.
+
+**Contagem descartada.** Com a câmera obstruída, a entrada pode perder pessoas e a conta fechar baixa demais ou até negativa (saídas contadas sem a entrada correspondente). Nesse caso a sessão fica guardada como `interrompida`, com o motivo em `observacoes`: não gera estimativa, não aparece no Histórico e não entra na regressão. O número contado continua nas colunas da sessão, como evidência da falha. Quem decide é `integracao/estimativa.py` → `motivo_contagem_invalida()`.
 
 O terceiro caso não tem como ser tratado na hora: se o processo é morto, nenhum código Python roda, nem o `finally`. A sessão fica `em_andamento` até o programa iniciar de novo. Aí, como só um processo roda o motor, qualquer sessão `em_andamento` é necessariamente resto de uma execução anterior, e é fechada antes de a API subir. Sem isso, uma sessão presa aparecia no dashboard como "contagem ativa" assim que a contagem real terminava.
 
@@ -614,6 +617,7 @@ A média é **das razões**, e não "total de comungantes ÷ total de pessoas". 
 
 `treinar_regressao.py` treina uma regressão linear que usa, além da ocupação, o dia da semana, o horário (em minutos desde meia-noite) e o tipo de celebração. A hipótese é que a fração que comunga varia com o tipo de missa: domingo de manhã é diferente de uma quarta à noite.
 
+- **Só contagem válida entra no treino.** `preparar_dataset.py` (e `calcular_coeficiente_inicial.py`, com o mesmo filtro) aceita apenas sessões `concluida`, com `ocupacao_final > 0` e `comungantes_reais <= ocupacao_final`: não se comunga mais gente do que há na igreja, então uma contagem com obstrução (8 contados e 150 comungantes) fica de fora sem precisar de um número fixo.
 - **Mínimo de 15 celebrações.** Com menos que isso, uma regressão com várias variáveis só "decora" os pontos que viu. O script avisa e não treina nada.
 - **Validação *leave-one-out*.** Com poucos dados, separar treino e teste fixos desperdiçaria amostras. O script treina com todas as missas menos uma, testa nessa, repete para cada missa, e reporta o erro médio (MAE) e o R².
 - **Variáveis categóricas** (dia da semana, tipo) passam por *one-hot encoding*, com `handle_unknown="ignore"`: um tipo de missa novo, nunca visto no treino, não derruba a previsão.

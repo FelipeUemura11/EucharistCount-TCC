@@ -11,7 +11,8 @@ class TesteComBanco(unittest.TestCase):
     def setUp(self):
         pasta = tempfile.TemporaryDirectory()
         self.addCleanup(pasta.cleanup)
-        caminho = Path(pasta.name) / "teste.db"
+        self.caminho = Path(pasta.name) / "teste.db"
+        caminho = self.caminho
 
         # obter_conexao() fixa o caminho padrao na definicao; so vale trocar durante o teste.
         padrao = database.obter_conexao.__defaults__

@@ -17,14 +17,17 @@ import crud
 def calcular_e_gravar() -> None:
     conexao = obter_conexao()
 
-    # ocupacao_final > 0 evita divisao por zero; so entra missa com comunhao real.
+    # So contagem concluida e coerente (comungantes <= presentes); ocupacao > 0 evita divisao por zero.
     linhas = conexao.execute(
         """
         SELECT c.data, c.horario_missa, s.ocupacao_final, e.comungantes_reais
         FROM sessao_monitoramento s
         JOIN celebracao c ON c.id = s.celebracao_id
         JOIN estimativa_comunhao e ON e.sessao_id = s.id
-        WHERE s.ocupacao_final > 0 AND e.comungantes_reais IS NOT NULL
+        WHERE s.status = 'concluida'
+          AND s.ocupacao_final > 0
+          AND e.comungantes_reais IS NOT NULL
+          AND e.comungantes_reais <= s.ocupacao_final
         """
     ).fetchall()
 
