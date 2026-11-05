@@ -174,10 +174,10 @@ A mesma separação permite que a contagem manual de hoje (o "olhômetro", impor
 
 A agenda semanal fixa (tela Configurações): cada linha é uma missa recorrente num dia da semana, com a janela de gravação associada.
 
-- `dia_semana` segue a convenção **0 = domingo … 6 = sábado**, travada por `CHECK (dia_semana BETWEEN 0 AND 6)`. Atenção: o Python usa segunda = 0; a conversão está em `preparar_dataset._dia_semana()`.
+- `dia_semana` segue a convenção **0 = domingo … 6 = sábado**, travada por `CHECK (dia_semana BETWEEN 0 AND 6)`. Atenção: o Python usa segunda = 0; a conversão está em `preparar_dataset._dia_semana()` e em `agendador.dia_semana_banco()`.
 - Remover um horário não apaga a linha: `crud.remover_horario_padrao()` faz `ativo = 0` (*soft delete*), para que celebrações antigas geradas a partir dele não percam a referência.
 
-A tela de Configurações lê, cria e remove horários por `api/rotas/configuracoes.py` (`GET /api/configuracoes`, `POST /api/configuracoes/agenda` e `DELETE /api/configuracoes/agenda/{id}`). O agendador (`integracao/agendador.py`) lê a agenda e liga a contagem nos horários dela, e refaz as tarefas sempre que ela muda.
+A tela de Configurações lê, cria e remove horários por `api/rotas/configuracoes.py` (`GET /api/configuracoes`, `POST /api/configuracoes/agenda` e `DELETE /api/configuracoes/agenda/{id}`). O agendador (`integracao/agendador.py`) lê essa tabela para ligar e desligar a contagem nos horários cadastrados, e cada celebração que ele cria guarda o `horario_padrao_id` de origem (`DOCUMENTACAO_API.md`, seção 9).
 
 ### 3.2 `celebracao`
 
@@ -209,8 +209,8 @@ Uma data concreta com missa.
 | `status` | ver seção 5 | `em_andamento` enquanto a câmera conta |
 | `total_entradas`, `total_saidas` | padrão 0 | Acumulados. **Atualizados a cada passagem pela linha** durante a missa (seção 7.4) |
 | `ocupacao_maxima` | padrão 0 | Pico de pessoas dentro da igreja durante a sessão |
-| `ocupacao_final` | padrão 0 | **A contagem oficial.** Hoje é o que o motor contou; se a equipe digitar a contagem manual depois, ela prevalece aqui |
-| `contagem_sistema` | opcional | **A contagem automática**, preservada mesmo que `ocupacao_final` seja corrigida. É a comparação entre as duas que mede a acurácia do motor |
+| `ocupacao_final` | padrão 0 | **A contagem oficial.** Nas sessões da câmera, é o que o motor contou; nas importadas do CSV, é a contagem manual (`people`) |
+| `contagem_sistema` | opcional | **A contagem automática**, preservada mesmo que `ocupacao_final` seja corrigida. Nas sessões importadas, vem do `system_count` do CSV. É a comparação entre as duas que mede a acurácia do motor |
 | `parametros_contagem` | JSON | Cópia completa da configuração usada (modelo, `imgsz`, linha, margem…) |
 | `observacoes` | texto livre | Ex.: "chuva forte", "câmera reiniciada" |
 
@@ -244,9 +244,9 @@ Uma linha por sessão (`sessao_id` é `UNIQUE`), com **três fontes de valor lad
 
 | Fonte | Colunas | Quem preenche |
 |---|---|---|
-| **Real** | `comungantes_reais`, `hostias_reais` | A equipe, contando na missa. É a "verdade" contra a qual o sistema é medido. Hoje é a única preenchida nos registros manuais (vem da planilha) |
-| **Calculada** | `estimativa_calculada`, `hostias_calculadas`, `coeficiente_utilizado` | O sistema, pelo coeficiente ou pela regressão |
-| **Ajustada** | `estimativa_ajustada`, `hostias_ajustadas`, `ajustado_por`, `ajustado_em` | O ministro, corrigindo o valor calculado antes da missa |
+| **Real** | `comungantes_reais`, `hostias_reais` | A equipe, contando na missa. É a "verdade" contra a qual o sistema é medido. Hoje vem só do `counting_people.csv`, pelo `import_csv.py` |
+| **Calculada** | `estimativa_calculada`, `hostias_calculadas`, `coeficiente_utilizado` | O sistema, pelo coeficiente ou pela regressão. Gravada ao fechar cada contagem `concluida` (seção 7.2) |
+| **Ajustada** | `estimativa_ajustada`, `hostias_ajustadas`, `ajustado_por`, `ajustado_em` | O ministro, corrigindo o valor calculado antes da missa. Prevista no schema (`crud.ajustar_estimativa`), sem tela que a use ainda |
 
 Guardar as três separadas, em vez de sobrescrever uma com a outra, é o que sustenta o fluxo *human-in-the-loop* descrito no TCC. Permite medir **real × calculado** (a acurácia do modelo) e **real × ajustado** (o quanto a correção humana ainda é necessária). E as correções humanas acumuladas são justamente o dado que alimenta o treino futuro da regressão.
 
@@ -348,7 +348,7 @@ stateDiagram-v2
     finalizada --> [*]
 ```
 
-`iniciar_sessao()` e `finalizar_sessao()` mudam o status da celebração **na mesma transação** em que abrem e fecham a sessão, então as duas tabelas nunca ficam em estados contraditórios. O `import_csv.py` cria celebrações já como `finalizada`, porque importa missas que já aconteceram.
+`iniciar_sessao()` e `finalizar_sessao()` mudam o status da celebração **na mesma transação** em que abrem e fecham a sessão, então as duas tabelas nunca ficam em estados contraditórios. O `import_csv.py` cria celebrações já como `finalizada`, porque importa missas que já aconteceram. Nenhuma tela marca uma celebração como `cancelada` ainda (`atualizar_status_celebracao` não é chamada pela API), mas o agendador respeita esse status: uma celebração `cancelada` não é contada.
 
 ### 5.2 Sessão de monitoramento
 
@@ -356,7 +356,7 @@ stateDiagram-v2
 stateDiagram-v2
     [*] --> em_andamento : iniciar_sessao()
     em_andamento --> em_andamento : atualizar_totais_sessao()
-    em_andamento --> concluida : finalizar_sessao() — fim do vídeo ou ESC
+    em_andamento --> concluida : finalizar_sessao() — fim do vídeo, ESC ou fim da janela da agenda
     em_andamento --> interrompida : finalizar_sessao(status="interrompida") — erro ou Ctrl+C
     em_andamento --> interrompida : interromper_sessoes_orfas() — no próximo início
     concluida --> [*]
@@ -367,8 +367,8 @@ Uma sessão pode terminar de três jeitos:
 
 | Como terminou | Quem fecha | Status |
 |---|---|---|
-| O vídeo acabou, ou o operador apertou ESC | `finalizar_sessao()`, no `finally` do `sessao_de_monitoramento` | `concluida` |
-| Uma exceção: a fonte não abriu, erro no motor, Ctrl+C | `finalizar_sessao(status="interrompida")`, no mesmo `finally` | `interrompida` |
+| O vídeo acabou, o operador apertou ESC, ou chegou o fim da janela da agenda (o agendador chama `monitor.parar()`) | `finalizar_sessao()`, no `finally` do `sessao_de_monitoramento` | `concluida` |
+| Uma exceção: a fonte não abriu, erro no motor, Ctrl+C (no modo agendado, o agendador lança `_Encerrado` para marcar a contagem cortada) | `finalizar_sessao(status="interrompida")`, no mesmo `finally` | `interrompida` |
 | O processo morreu de fora: queda de energia, terminal fechado no X | Ninguém na hora. `interromper_sessoes_orfas()`, na **próxima** inicialização | `interrompida` |
 
 **Só sessões `concluida` entram no Histórico** (`vw_historico`). Uma contagem que falhou não aparece lá como resultado válido com zeros.
@@ -396,10 +396,12 @@ Toda função recebe a conexão como primeiro argumento (não abre nem fecha con
 
 | Grupo | Função | Quem usa hoje |
 |---|---|---|
-| Agenda | `criar_horario_padrao`, `listar_horarios_padrao`, `remover_horario_padrao` | `api/rotas/configuracoes.py` |
-| Celebração | `criar_celebracao`, `obter_ou_criar_celebracao` | `integracao/sessao.py` |
-| | `obter_celebracao` | `api/rotas/dashboard.py`, `integracao/estimativa.py` |
-| | `listar_celebracoes_do_mes`, `listar_celebracoes_do_dia`, `obter_celebracao_do_horario`, `remover_celebracao_cancelada`, `atualizar_status_celebracao` | `api/rotas/celebracoes.py` |
+| Agenda | `criar_horario_padrao`, `remover_horario_padrao` | `api/rotas/configuracoes.py`, `api/rotas/celebracoes.py` (opção "repetir toda semana") |
+| | `listar_horarios_padrao` | `api/rotas/configuracoes.py`, `api/rotas/celebracoes.py`, `integracao/agendador.py` |
+| Celebração | `obter_ou_criar_celebracao` (que chama `criar_celebracao`) | `integracao/sessao.py` (modo manual), `integracao/agendador.py` (celebração da agenda) |
+| | `criar_celebracao`, `atualizar_status_celebracao` | `api/rotas/celebracoes.py` (criar e cancelar celebração avulsa) |
+| | `obter_celebracao` | `api/rotas/dashboard.py`, `integracao/estimativa.py`, `integracao/agendador.py` (confere se foi cancelada) |
+| | `listar_celebracoes_do_mes`, `listar_celebracoes_do_dia`, `obter_celebracao_do_horario`, `remover_celebracao_cancelada` | `api/rotas/celebracoes.py` |
 | | `listar_celebracoes_avulsas_agendadas`, `limpar_celebracoes_vencidas` | `integracao/agendador.py` |
 | | `listar_proximas_celebracoes` | — |
 | Sessão | `iniciar_sessao`, `atualizar_totais_sessao`, `registrar_instantaneo`, `finalizar_sessao` | `integracao/sessao.py` |
@@ -410,7 +412,7 @@ Toda função recebe a conexão como primeiro argumento (não abre nem fecha con
 | | `obter_sessao` | `integracao/estimativa.py` |
 | Estimativa | `obter_configuracao_estimativa_vigente` | `integracao/estimativa.py` |
 | | `definir_configuracao_estimativa` | Scripts de coeficiente e regressão |
-| | `registrar_estimativa` | `integracao/estimativa.py` |
+| | `registrar_estimativa` | `integracao/estimativa.py` (`registrar_estimativa_da_sessao`, chamada ao fechar a sessão e pelo `main.py` ao iniciar) |
 | | `ajustar_estimativa` | — |
 | Histórico | `obter_historico` | `api/rotas/historico.py` |
 | Saúde | `registrar_evento_sistema`, `ultimo_evento_por_componente` | — |
@@ -459,6 +461,7 @@ sequenceDiagram
 
     M->>DB: finalizar_sessao() — concluida ou interrompida (no finally)
     Note over DB: celebracao passa a finalizada
+    M->>DB: registrar_estimativa_da_sessao() — só se concluida
     Note over API: sem sessão ativa, o dashboard mostra<br/>a última concluída (obter_ultima_sessao_concluida)
 ```
 
@@ -471,6 +474,7 @@ sequenceDiagram
 | `atualizar_totais_sessao()` | **Só quando entradas ou saídas mudam** | Os cartões do dashboard precisam reagir a cada pessoa (seção 7.4) |
 | `registrar_instantaneo()` | **A cada 5 segundos de vídeo** | O gráfico precisa de uma curva, não de cada frame (seção 7.3) |
 | `finalizar_sessao()` | Uma vez, no fim, dentro de um `finally` | Fecha a sessão mesmo se o usuário apertar ESC, der erro ou Ctrl+C, com `concluida` ou `interrompida` conforme o caso |
+| `registrar_estimativa()` | Logo depois, **só se a sessão for `concluida`** | Grava comungantes e hóstias calculados para o Histórico (seção 9). Se falhar, a sessão já está salva, e a estimativa é refeita na próxima inicialização (`preencher_estimativas_pendentes`) |
 
 O `finalizar_sessao()` no `finally` e o `interromper_sessoes_orfas()` no início são duas camadas contra **sessões órfãs**. Uma sessão que ficasse para sempre `em_andamento` faria a API responder, a qualquer momento futuro, que há uma contagem ativa, e o dashboard mostraria os números dela.
 
@@ -544,7 +548,7 @@ No fim, `ocupacao_final` e `contagem_sistema` recebem o mesmo valor. A diferenç
 Há dois tipos de data e hora no banco, com regras diferentes:
 
 | Tipo | Colunas | Fuso | Motivo |
-|---|---|---|
+|---|---|---|---|
 | **Carimbos de tempo** (quando algo foi gravado) | `iniciado_em`, `finalizado_em`, `registrado_em`, `criado_em`, `atualizado_em`, `vigente_desde`, `ajustado_em` | **UTC** | Nunca são ambíguos (sem horário de verão) e sempre comparáveis entre si |
 | **Data civil** (quando a missa acontece) | `celebracao.data`, `horario_missa`, `horario_*_monitoramento` | **Hora local** | "Missa das 18h" é 18h no relógio da paróquia |
 
@@ -567,7 +571,7 @@ O objetivo final do sistema é sugerir quantas hóstias consagrar a partir de qu
 
 ```mermaid
 flowchart LR
-    CSV["counting_people.csv<br/>(contagem manual)"] -->|import_csv.py| DB[("banco")]
+    CSV["counting_people.csv<br/>(manual, câmera e comungantes)"] -->|import_csv.py| DB[("banco")]
     DB -->|calcular_coeficiente_inicial.py| F["configuracao_estimativa<br/>metodo = coeficiente_fixo"]
     DB -->|"treinar_regressao.py<br/>(só com 15+ missas)"| R["configuracao_estimativa<br/>metodo = regressao<br/>+ arquivo .joblib"]
 ```
@@ -580,14 +584,23 @@ estimativa  = ocupação × coeficiente
 hóstias     = ⌈ estimativa × (1 + margem_hostias) ⌉
 ```
 
-Com os dados iniciais (3 celebrações no `counting_people.csv`):
+O padrão do código, `COEFICIENTE_PADRAO = 0.78`, é a média das 3 primeiras missas registradas (11/09, 13/09 e 20/09: 0,773, 0,827 e 0,735). Com o `counting_people.csv` atual, que tem 10 missas com comungantes, o `calcular_coeficiente_inicial.py` grava:
 
-| Data | Pessoas | Comungaram | Razão |
-|---|---|---|---|
-| 11/09/2026 | 22 | 17 | 0,773 |
-| 13/09/2026 | 214 | 177 | 0,827 |
-| 20/09/2026 | 340 | 250 | 0,735 |
-| **Média** | | | **≈ 0,778** |
+| Data | Pessoas (manual) | Câmera | Comungaram | Razão (÷ manual) | Observação |
+|---|---|---|---|---|---|
+| 11/09/2026 | 22 | — | 17 | 0,773 | camera_mal_posicionada |
+| 12/09/2026 | 95 | — | 74 | 0,779 | superficial |
+| 13/09/2026 | 214 | — | 177 | 0,827 | camera_mal_posicionada |
+| 20/09/2026 | 340 | 282 | 250 | 0,735 | |
+| 27/09/2026 | 155 | 143 | 140 | 0,903 | |
+| 11/10/2026 | 181 | 176 | 148 | 0,818 | |
+| 17/10/2026 | 95 | 52 | 74 | 0,779 | superficial |
+| 18/10/2026 | 240 | 162 | 184 | 0,767 | |
+| 24/10/2026 | 108 | — | 84 | 0,778 | superficial |
+| 25/10/2026 | 140 | 127 | 108 | 0,771 | superficial |
+| **Média** | | | | **≈ 0,793** | |
+
+A razão é calculada sobre a contagem **manual** (`ocupacao_final`), e não sobre a da câmera (seção 12).
 
 A média é **das razões**, e não "total de comungantes ÷ total de pessoas". Assim, cada missa pesa igual, e uma missa muito cheia não domina o coeficiente.
 
@@ -619,7 +632,7 @@ A média é **das razões**, e não "total de comungantes ÷ total de pessoas". 
 | `communed` | `estimativa_comunhao.comungantes_reais` |
 | `hosts_consecrated` | `estimativa_comunhao.hostias_reais` |
 
-Cada linha vira uma celebração (reaproveitada se já existir a mesma data e horário), uma sessão `manual` já `concluida` (também reaproveitada e atualizada em caso de reimportação do mesmo CSV, evitando duplicar pontos no treino da regressão) e, se houver dado de comunhão, uma estimativa.
+Cada linha precisa ter exatamente as 9 colunas do cabeçalho (formato completo em [`db/README.md`](./db/README.md)). Cada linha vira uma celebração (reaproveitada se já existir a mesma data e horário), uma sessão `manual` já `concluida` (também reaproveitada e atualizada em caso de reimportação do mesmo CSV, evitando duplicar pontos no treino da regressão) e, se houver dado de comunhão, uma estimativa.
 
 ---
 
@@ -658,6 +671,11 @@ O banco **não tem nenhuma coluna capaz de guardar imagem, vídeo ou dado biomé
 
 ## 12. Limitações conhecidas
 
-Nenhuma no momento.
+| Onde | Limitação | Efeito |
+|---|---|---|
+| `db/calcular_coeficiente_inicial.py`, `db/preparar_dataset.py` | O coeficiente e a regressão são calculados com a contagem **manual** (`ocupacao_final` das sessões importadas), mas aplicados na contagem da **câmera** | Nas missas com as duas contagens, a câmera contou de 3% a 45% menos que a contagem manual (tabela da seção 9.1). A estimativa sai baixa na mesma proporção. Calibrar com `contagem_sistema` corrigiria a parte sistemática desse erro |
+| `integracao/estimativa.py` | A previsão da regressão é limitada a `[0, ocupacao]` | Se a calibração passar a usar a contagem da câmera, a trava precisa mudar: em 18/10 comungaram 184 pessoas e a câmera contou 162 |
+| `db/database.py` | O banco fica em `backend/db/`; as linhas para `%APPDATA%` estão comentadas (e o `import os` que elas usam ainda não existe no arquivo) | Precisa ser ativado no empacotamento (PyInstaller) |
+| `db/database.py` | `inicializar_banco()` não migra bancos já criados (seção 6.1) | Coluna nova no `schema.sql` exige recriar o `.db` ou `ALTER TABLE` manual |
 
 Corrigido: o fechamento da sessão não gravava a estimativa, e toda contagem nova entrava no Histórico com estimativa e hóstias 0. Agora `sessao_de_monitoramento` chama `registrar_estimativa_da_sessao` ao fechar uma sessão `concluida`, e o `main.py` roda `preencher_estimativas_pendentes` ao iniciar, para as sessões que ficaram sem.

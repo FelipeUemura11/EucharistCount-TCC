@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import FiltrosHistorico from "../components/historico/FiltrosHistorico";
+import FiltrosHistorico, { PERIODO_TUDO } from "../components/historico/FiltrosHistorico";
 import TabelaHistorico from "../components/historico/TabelaHistorico";
 import { useHistorico } from "../hooks/useHistorico";
 import type { RegistroHistorico } from "../types/history";
+import { exportarCsv } from "../utils/exportarCsv";
 
 interface HistoryFilterState {
     searchTerm: string;
@@ -66,11 +67,13 @@ export default function Historico() {
             const matchesSearchTerm =
                 normalizedSearchTerm.length === 0 ||
                 searchableText.includes(normalizedSearchTerm);
-            const matchesPeriod = isWithinPeriod(
-                parseDateFromHistory(registro.data),
-                referenceDate,
-                appliedFilters.periodInDays,
-            );
+            const matchesPeriod =
+                appliedFilters.periodInDays === PERIODO_TUDO ||
+                isWithinPeriod(
+                    parseDateFromHistory(registro.data),
+                    referenceDate,
+                    appliedFilters.periodInDays,
+                );
 
             return matchesSearchTerm && matchesPeriod;
         });
@@ -85,7 +88,8 @@ export default function Historico() {
 
     // Exportar ainda nao gera arquivo, so loga no console.
     const handleExportRecords = () => {
-        console.log("Exportando registros de histórico...");
+        if (filteredRecords.length === 0) return;
+        exportarCsv(filteredRecords);
     };
 
     return (
@@ -99,6 +103,8 @@ export default function Historico() {
             />
 
             <TabelaHistorico
+                // Novo filtro aplicado = key nova = tabela recomeça na página 1.
+                key={`${appliedFilters.searchTerm}|${appliedFilters.periodInDays}`}
                 registros={filteredRecords}
                 onExport={handleExportRecords}
             />

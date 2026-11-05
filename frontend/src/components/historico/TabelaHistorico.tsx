@@ -1,5 +1,9 @@
-import { Download } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import type { RegistroHistorico } from '../../types/history';
+
+// Quantos registros cabem em cada pagina do "carrossel".
+const REGISTROS_POR_PAGINA = 8;
 
 interface TabelaHistoricoProps {
   registros: RegistroHistorico[];
@@ -7,6 +11,17 @@ interface TabelaHistoricoProps {
 }
 
 export default function TabelaHistorico({ registros, onExport }: TabelaHistoricoProps) {
+  const [pagina, setPagina] = useState(1);
+
+  const totalPaginas = Math.max(1, Math.ceil(registros.length / REGISTROS_POR_PAGINA));
+  // Se a lista encolher (novo filtro), nao deixa a pagina apontar para alem do fim.
+  const paginaAtual = Math.min(pagina, totalPaginas);
+
+  const inicio = (paginaAtual - 1) * REGISTROS_POR_PAGINA;
+  const registrosDaPagina = registros.slice(inicio, inicio + REGISTROS_POR_PAGINA);
+  // Linhas vazias completam a ultima pagina para a tabela manter a mesma altura.
+  const linhasVazias = registros.length === 0 ? 0 : REGISTROS_POR_PAGINA - registrosDaPagina.length;
+
   return (
     <section className="min-w-0">
       <div className="min-w-0 rounded-lg border border-border bg-white p-6 shadow-sm">
@@ -56,7 +71,7 @@ export default function TabelaHistorico({ registros, onExport }: TabelaHistorico
                   </td>
                 </tr>
               ) : (
-                registros.map((registro) => (
+                registrosDaPagina.map((registro) => (
                   <tr
                     key={registro.id}
                     className="border-b border-border-light transition last:border-0 hover:bg-app-bg"
@@ -74,9 +89,52 @@ export default function TabelaHistorico({ registros, onExport }: TabelaHistorico
                   </tr>
                 ))
               )}
+              {Array.from({ length: linhasVazias }, (_, i) => (
+                // Mesma estrutura (duas linhas de texto + py-4) de uma linha real, mas invisivel.
+                <tr key={`vazia-${i}`} aria-hidden="true">
+                  <td colSpan={7} className="px-4 py-4">
+                    <p className="m-0 text-sm">&nbsp;</p>
+                    <p className="m-0 mt-0.5 text-xs">&nbsp;</p>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
+
+        {registros.length > 0 && (
+          <div className="mt-4 flex items-center justify-between gap-4 max-[640px]:flex-col">
+            <p className="m-0 text-sm text-text-muted">
+              Mostrando {inicio + 1}–{inicio + registrosDaPagina.length} de {registros.length} registros
+            </p>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPagina(paginaAtual - 1)}
+                disabled={paginaAtual === 1}
+                aria-label="Página anterior"
+                className="flex items-center justify-center rounded-lg border border-border p-2 text-text-dark hover:bg-app-bg disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft size={18} />
+              </button>
+
+              <span className="min-w-28 text-center text-sm font-semibold text-text-dark">
+                Página {paginaAtual} de {totalPaginas}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setPagina(paginaAtual + 1)}
+                disabled={paginaAtual === totalPaginas}
+                aria-label="Próxima página"
+                className="flex items-center justify-center rounded-lg border border-border p-2 text-text-dark hover:bg-app-bg disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );

@@ -70,10 +70,6 @@ class ConfigDeteccao:
     # Teto de pessoas por frame.
     max_deteccoes: int = 300
 
-    # Threads de CPU para a inferencia. 0 = a biblioteca decide.
-    # Numa maquina fraca, limitar a 2-4 evita travar o resto do sistema.
-    threads: int = 0
-
 
 @dataclass
 class ConfigRastreio:

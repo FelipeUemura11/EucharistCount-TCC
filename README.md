@@ -37,7 +37,7 @@ Máquina Local da Igreja
 │  Frontend (React + TypeScript)          │
 │              ↕ HTTP localhost           │
 │  API (FastAPI)                          │
-│              ↕ registra jobs (planej.)  │
+│              ↕ registra jobs            │
 │  Automação (APScheduler)                │
 │              ↕ aciona/finaliza          │
 │  Motor IA (OpenCV + YOLO + ByteTrack)   │
@@ -76,7 +76,7 @@ Conforme especificado no documento do TCC:
 
 ## Estado atual do projeto
 
-Este é um TCC em duas etapas. **O que está implementado até aqui:** a visão computacional conta de ponta a ponta, grava cada missa no SQLite durante a contagem, e a API serve o dashboard, que acompanha a contagem ao vivo e mostra o histórico das missas encerradas. Tudo sobe com um único `python main.py`.
+Este é um TCC em duas etapas. **O que está implementado até aqui:** a visão computacional conta de ponta a ponta, grava cada missa no SQLite durante a contagem, e a API serve o dashboard, que acompanha a contagem ao vivo e mostra o histórico das missas encerradas. A contagem liga e desliga sozinha nos horários da agenda (APScheduler). Tudo sobe com um único `python main.py`.
 
 | Componente | Status |
 |---|---|
@@ -103,13 +103,13 @@ EucharistCount-TCC/
 ├── README.md                    # este arquivo
 │
 ├── backend/
-│   ├── main.py                  # ponto de entrada: sobe banco, API e motor
+│   ├── main.py                  # ponto de entrada: sobe banco, API e motor (agora ou pela agenda)
 │   ├── cli.py                   # argumentos de linha de comando
 │   ├── gerar_dados.py           # popula o banco com dados de demonstração
 │   ├── config.json              # parâmetros ajustáveis (câmera, modelo, contagem)
 │   ├── .env.example             # modelo de variáveis locais (CAMERA_FONTE)
 │   ├── bytetrack_ajustado.yaml  # tracker ajustado para esta cena
-│   ├── counting_people.csv      # contagem manual de referência (validação)
+│   ├── counting_people.csv      # contagem manual × câmera × comungantes, por missa (validação e estimativa)
 │   ├── requirements.txt
 │   ├── README.md                # documentação detalhada do backend
 │   ├── DOCUMENTACAO_MOTOR.md    # o porquê de cada decisão do motor de visão
@@ -125,7 +125,7 @@ EucharistCount-TCC/
 │   │   └── monitor.py           # orquestra o ciclo completo
 │   │
 │   ├── api/                     # servidor FastAPI: uma rota por tela + frontend compilado
-│   ├── integracao/              # ponte motor ↔ banco: sessão, sessões presas, estimativa
+│   ├── integracao/              # ponte motor ↔ banco: sessão, sessões presas, estimativa, agendador
 │   │
 │   ├── db/                      # camada de persistência SQLite (TCC II)
 │   │   ├── schema.sql           # tabelas, índices e a view do histórico
@@ -161,7 +161,15 @@ cd ../frontend && npm install && npm run build && cd ../backend
 python main.py
 ```
 
-O dashboard fica em `http://127.0.0.1:8000`. Quando o vídeo termina (ou caso a câmera não esteja conectada), ele continua no ar mostrando o resultado da última missa e permitindo consultar Histórico e Configurações; `Ctrl+C` no terminal encerra o programa.
+O dashboard fica em `http://127.0.0.1:8000`. O programa tem dois modos:
+
+| Comando | Modo | O que faz |
+|---|---|---|
+| `python main.py` | **Agendado** (uso na igreja) | Sobe o dashboard e espera: a contagem liga e desliga sozinha nos horários cadastrados em **Configurações**, sem janela de vídeo. Mudanças na agenda valem na hora, sem reiniciar |
+| `python main.py --agora` | **Manual** | Conta imediatamente, com a janela do vídeo, usando a fonte do `.env` |
+| `python main.py --fonte videos/x.mp4` | **Manual** | Conta imediatamente o vídeo informado |
+
+No modo manual, quando o vídeo termina (ou caso a câmera não esteja conectada), o dashboard continua no ar mostrando o resultado da última missa e permitindo consultar Histórico e Configurações. Nos dois modos, `Ctrl+C` no terminal encerra o programa; uma contagem em andamento é fechada como interrompida e não entra no Histórico.
 
 Instruções completas — calibração de modelo, ajuste da linha de contagem e parâmetros de `config.json` — estão em [`backend/README.md`](./backend/README.md).
 
@@ -212,6 +220,8 @@ Conforme o objetivo específico *e*, a validação do sistema em campo (igreja c
 - Desempenho em CPU, sem GPU, na máquina real da paróquia;
 - Desempenho com câmera em posição diagonal;
 - Usabilidade do painel pela equipe litúrgica.
+
+Os dados de campo coletados até agora estão em [`backend/counting_people.csv`](./backend/counting_people.csv): para cada missa, a contagem manual (`people`), a contagem da câmera (`system_count`, quando a câmera estava ligada) e o número de comungantes (`communed`). O formato do arquivo está em [`backend/db/README.md`](./backend/db/README.md).
 
 ---
 

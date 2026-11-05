@@ -19,11 +19,12 @@ O código deste documento está dividido por responsabilidade: cada arquivo reso
 
 ```
 backend/
-├── main.py                 # orquestra: argumentos → banco → API → motor
+├── main.py                 # orquestra: argumentos → banco → API → motor (agora ou pela agenda)
 ├── cli.py                  # argumentos de linha de comando → Config
 ├── integracao/             # ponte motor ↔ banco (não é API nem motor)
 │   ├── sessao.py           # GravadorSessao, abrir/fechar sessão, sessões presas
-│   └── estimativa.py       # estimativa de comunhão e hóstias
+│   ├── estimativa.py       # estimativa de comunhão e hóstias
+│   └── agendador.py        # APScheduler: liga e desliga a contagem nos horários da agenda
 └── api/                    # servidor web
     ├── app.py              # criar_app(): monta o FastAPI
     ├── servidor.py         # sobe o uvicorn numa thread
@@ -46,7 +47,7 @@ backend/
 | `motor/` | Visão computacional | Nada do resto: não sabe que banco e API existem (`DOCUMENTACAO_MOTOR.md`, seção 13) |
 | `db/` | Acesso ao SQLite | Nada do resto |
 
-**Por que `integracao/` fica fora de `api/`:** o `GravadorSessao` não responde requisições; ele liga o motor ao banco. Separado, ele continua útil mesmo sem servidor web, que é o caso do agendamento automático previsto (seção 9), contando sem dashboard aberto.
+**Por que `integracao/` fica fora de `api/`:** o `GravadorSessao` não responde requisições; ele liga o motor ao banco. Separado, ele continua útil mesmo sem servidor web, que é o caso do agendamento automático (seção 9): o agendador abre a sessão e roda o motor sozinho, no horário da missa.
 
 ---
 
@@ -71,6 +72,8 @@ flowchart LR
 Um único comando, `python main.py`, sobe tudo: o motor que conta, o banco que guarda e o servidor que mostra. Na máquina da paróquia, ninguém deveria precisar abrir três terminais, e o empacotamento futuro com PyInstaller gera **um único executável**.
 
 As duas partes precisam de threads separadas porque **as duas ficam presas num laço**: o `Monitor` lendo frames, o uvicorn esperando requisições. Numa thread só, uma bloquearia a outra.
+
+O diagrama mostra o modo manual. No modo agendado (seção 9), o motor roda numa thread do APScheduler, e a thread principal só espera o `Ctrl+C`.
 
 Elas **não compartilham memória** para trocar dados: o motor escreve no banco e a API lê do banco. O banco é a única interface entre as duas. Isso mantém a porta aberta para rodar motor e API em processos, ou até máquinas, diferentes, sem mudar nenhum dos dois lados.
 
@@ -98,12 +101,12 @@ O que `main()` faz, em ordem:
 | 3 | `inicializar_banco()` | `db/database.py` | Cria as tabelas que ainda não existirem (`DOCUMENTACAO_BANCO.md`, seção 6.1) |
 | 4 | `fechar_sessoes_presas()` | `integracao/sessao.py` | Fecha como `interrompida` sessões de execuções anteriores que não terminaram (seção 6.6) |
 | 5 | `iniciar_em_background(criar_app())` | `api/` | O dashboard fica no ar antes do motor começar |
-| 6 | `Monitor(config, RAIZ)` | `motor/` | Valida a fonte e carrega o modelo YOLO. **Vem antes de abrir a sessão** (seção 6.5) |
-| 7 | `with sessao_de_monitoramento(...)` + `monitor.executar(...)` | `integracao/sessao.py` | Abre a sessão, conta até o vídeo acabar e fecha a sessão, aconteça o que acontecer |
-| 8 | Imprime o resumo | `main.py` | Entradas, saídas, dentro e FPS médio no terminal, quando o vídeo acaba |
-| 9 | `while True: time.sleep(1)` | `main.py` | Mantém o dashboard no ar até o Ctrl+C (seção 2.1) |
+| 6 | `modo_manual(args)` | `cli.py` | Com `--agora` ou `--fonte`, conta agora; sem eles, segue a agenda (seção 9) |
+| 7 | **Manual:** `executar_manual(config)` | `main.py` | `Monitor(config, RAIZ)` valida a fonte e carrega o YOLO **antes de abrir a sessão** (seção 6.5); depois `with sessao_de_monitoramento(...)` + `monitor.executar(...)` e o resumo no terminal |
+| 7 | **Agendado:** `iniciar_agendado(config)` | `main.py` | Carrega o `Monitor` uma vez, sem janela, liga o `Agendador` e mostra as próximas contagens (seção 9) |
+| 8 | `while True: time.sleep(1)` | `main.py` | Mantém o dashboard (e o agendador) no ar até o Ctrl+C (seção 2.1) |
 
-Se o modelo não existir (`FileNotFoundError`) ou a fonte de vídeo não estiver configurada / não abrir (`RuntimeError`), o `main.py` captura a exceção, exibe um aviso no terminal e **mantém o dashboard ativo** no laço final para consultas ao histórico e configurações. O Ctrl+C, a qualquer momento, encerra com código 0.
+Se o modelo não existir (`FileNotFoundError`) ou a fonte de vídeo não estiver configurada / não abrir (`RuntimeError`), o `main.py` captura a exceção, exibe um aviso no terminal e **mantém o dashboard ativo** no laço final para consultas ao histórico e configurações. O Ctrl+C, a qualquer momento, encerra com código 0. No modo agendado, antes de sair, ele chama `agendador.encerrar()`: uma contagem em andamento é fechada como `interrompida`.
 
 ### 3.1 Argumentos de linha de comando (`cli.py`)
 
@@ -114,12 +117,12 @@ Se o modelo não existir (`FileNotFoundError`) ou a fonte de vídeo não estiver
 | `--imgsz` | `deteccao.imgsz` | `--imgsz 640` |
 | `--conf` | `deteccao.confianca` | `--conf 0.25` |
 | `--fps` | `camera.fps_processamento` | `--fps 5` |
-| `--threads` | `deteccao.threads` | `--threads 2` |
 | `--linha` | `contagem.linha` | `--linha 0.25,0.0,0.25,1.0` |
 | `--sem-janela` | `visual.mostrar_janela = false` | produção, sem interface gráfica |
+| `--agora` | — (escolhe o modo) | conta agora, sem esperar a agenda; `--fonte` também ativa o modo manual (seção 9.1) |
 | `--boot` | não abre o navegador | usado pela entrada de início do Windows (`DOCUMENTACAO_DISTRIBUICAO.md`, seção 3.1) |
 
-Os argumentos numéricos são testados com `is not None`, e não com `if valor:`. Isso porque em Python `0` é falso: o teste antigo ignorava um `--threads 0` digitado de propósito. O `argparse` usa `None` para "não informado", e é exatamente isso que o teste verifica.
+Os argumentos numéricos são testados com `is not None`, e não com `if valor:`. Isso porque em Python `0` é falso: o teste antigo ignorava um `--fps 0` (processar todos os frames) digitado de propósito. O `argparse` usa `None` para "não informado", e é exatamente isso que o teste verifica.
 
 A configuração efetiva, já com os argumentos aplicados, fica gravada em `sessao_monitoramento.parametros_contagem`.
 
@@ -193,7 +196,7 @@ Se `obter_sessao_ativa` devolve `None`, o `or` passa para a segunda consulta. O 
 
 `obter_ultima_sessao_concluida` só considera contagens da câmera (`origem_contagem = 'visao_computacional'`). As sessões manuais, importadas da planilha, não têm gráfico nem entradas e saídas.
 
-Exemplo, com uma contagem em andamento:
+Exemplo, com uma contagem manual em andamento (no modo agendado, o título é o da agenda, como "Missa das 10:00", e `inicioMonitoramento`/`fimMonitoramento` vêm preenchidos):
 
 ```json
 {
@@ -271,7 +274,7 @@ Campos devolvidos pelo `GET` e pelo `POST`:
 
 Uma celebração **cancelada** no mesmo dia e horário não bloqueia: ela é apagada para dar lugar à nova (só se nunca foi contada).
 
-**`repetirSemanalmente`:** além da celebração, grava um horário em `horario_padrao` (mesmo dia da semana e horário da missa), de modo que a missa passa a se repetir toda semana pela agenda existente, sem tabela nova. Se a agenda já tem esse dia e horário, ele é reaproveitado, sem duplicar. A celebração criada fica ligada a esse horário (`horario_padrao_id`), então o disparo semanal a reaproveita, com o título e o tipo escolhidos (seção 6.7).
+**`repetirSemanalmente`:** além da celebração, grava um horário em `horario_padrao` (mesmo dia da semana e horário da missa), de modo que a missa passa a se repetir toda semana pela agenda existente, sem tabela nova. Se a agenda já tem esse dia e horário, ele é reaproveitado, sem duplicar. A celebração criada fica ligada a esse horário (`horario_padrao_id`), então o disparo semanal a reaproveita, com o título e o tipo escolhidos (seção 9.6).
 
 Depois de salvar ou cancelar, a rota chama `recarregar_agenda()`, e a mudança vale na hora, sem reiniciar o programa.
 
@@ -299,7 +302,7 @@ A agenda semanal padrão fica na tabela `horario_padrao` (`DOCUMENTACAO_BANCO.md
 | `POST /api/configuracoes/agenda` | Recebe `diaSemana` (0 = domingo a 6), `horarioMissa`, `inicioGravacao` e `fimGravacao` (`HH:MM`). Fora do formato, ou com o fim antes do início, responde **422** |
 | `DELETE /api/configuracoes/agenda/{id}` | *Soft delete* (`ativo = 0`): celebrações geradas pelo horário mantêm a referência. **404** se não houver horário ativo com o `id` |
 
-Criar ou remover um horário chama `recarregar_agenda()`: o agendador refaz as tarefas e a mudança vale na hora (seção 6.7).
+Depois de criar ou remover um horário, as duas rotas chamam `recarregar_agenda()` (`integracao/agendador.py`): a mudança vale na hora, sem reiniciar o programa (seção 9.4). Sem agendador ligado (modo manual), a chamada não faz nada.
 
 ### 4.7 Uma conexão por requisição (`api/dependencias.py`)
 
@@ -450,7 +453,7 @@ def sessao_de_monitoramento(monitor, config):
 - **Concluída ou interrompida.** Se o bloco termina normalmente (fim do vídeo, ESC), a sessão fecha como `concluida`. Se termina por exceção (a fonte não abriu, um erro no motor, Ctrl+C), o `except` anota `interrompida` e relança a exceção, para o `main.py` ainda mostrar a mensagem. O `BaseException` é necessário porque o `KeyboardInterrupt` do Ctrl+C não herda de `Exception`. Só sessões `concluida` entram no Histórico, então uma contagem que falhou não aparece lá como resultado válido com zeros.
 - **Uma conexão para a missa inteira.** O gravador usa a mesma conexão durante toda a sessão, ao contrário da API, que abre uma por requisição (`DOCUMENTACAO_BANCO.md`, seção 7.5).
 
-**Qual celebração é usada:** no modo manual (`--fonte` ou `--agora`), a celebração é criada na hora, com a data e o horário em que o programa foi iniciado e o título "Missa (monitoramento automatico)". Reiniciar no mesmo minuto reaproveita a celebração (`obter_ou_criar_celebracao`) e cria uma segunda sessão nela.
+**Qual celebração é usada:** no modo agendado, o agendador passa `celebracao_id` com a celebração da agenda, por exemplo "Missa das 10:00", ligada ao `horario_padrao` e com início e fim de monitoramento (seção 9). No modo manual, sem `celebracao_id`, a celebração é criada na hora, com a data e o horário em que a contagem começou e o título "Missa (monitoramento automatico)". Reiniciar no mesmo minuto reaproveita a celebração (`obter_ou_criar_celebracao`) e cria uma segunda sessão nela.
 
 ### 6.6 Sessões presas: `fechar_sessoes_presas()`
 
@@ -465,38 +468,6 @@ presas = fechar_sessoes_presas()   # crud.interromper_sessoes_orfas()
 Toda sessão ainda `em_andamento` é marcada como `interrompida`, com `finalizado_em`, e a celebração dela como `finalizada`. O programa avisa no terminal quantas fechou.
 
 É seguro porque **só um processo roda o motor**. No instante em que o programa está começando, nenhuma contagem pode estar legitimamente em andamento: qualquer sessão nesse estado é de uma execução anterior que não terminou.
-
-### 6.7 O agendador e as celebrações avulsas (`integracao/agendador.py`)
-
-No modo agendado, o `Agendador` (APScheduler) liga e desliga a contagem sozinho. Ele tem **duas fontes** de disparos:
-
-| Fonte | Disparo | Quando existe |
-|---|---|---|
-| Agenda semanal (`horario_padrao`) | `CronTrigger` semanal no horário de início da gravação | Um por horário ativo |
-| Celebração avulsa (`celebracao` com `horario_padrao_id` nulo e `status = 'agendada'`) | `DateTrigger` de data única no início da gravação | Uma por celebração, de hoje em diante |
-
-Antes só a primeira fonte existia, e uma missa fora da rotina só era contada com `python main.py --agora`, entrando como "Missa (monitoramento automatico)". Agora `recarregar()` lê as duas e registra os disparos; as rotas de `/api/celebracoes` e `/api/configuracoes` chamam `recarregar_agenda()` depois de cada mudança.
-
-**O que as duas fontes compartilham:**
-
-- A contagem em si (`_contar`) e a trava de uma contagem por vez. Se duas janelas se sobrepõem, a segunda é ignorada, com aviso no terminal.
-- `_reservar()` pega a trava e marca a janela como feita no dia. A chave é `(origem, id, dia)`, e a origem (`"agenda"` ou `"celebracao"`) evita colisão entre ids de tabelas diferentes.
-- Computador ligado no meio da janela: o disparo de data única já venceu, mas o `misfire_grace_time` é a duração da janela, então ele roda na hora. Depois do fim, não começa mais.
-- Celebração `cancelada` não é contada, e cancelar tira o disparo da agenda.
-
-**`repetirSemanalmente`:** a celebração criada fica ligada ao horário da agenda (`horario_padrao_id`). Por isso o agendador **não** cria um disparo avulso para ela, e quem a conta é o disparo semanal, que encontra a celebração pela chave `(data, horario_missa)` e a reaproveita (`obter_ou_criar_celebracao`), preservando título e tipo.
-
-**Limpeza (`limpar_celebracoes_vencidas`):**
-
-Celebração avulsa que passou e **nunca foi contada** é apagada 24 horas depois do fim da gravação. Roda na inicialização (`main.py`) e todo dia às 03:00 no próprio agendador, porque o computador pode ficar ligado por dias.
-
-| Regra | Motivo |
-|---|---|
-| Só `origem = 'personalizada'` e sem `horario_padrao_id` | Celebrações ligadas à agenda semanal não são avulsas |
-| Só `agendada` ou `cancelada` | Em andamento e finalizada têm contagem |
-| Só sem nenhuma sessão | `sessao_monitoramento` tem `ON DELETE CASCADE`: apagar a celebração apagaria a contagem, e o Histórico lê a celebração |
-
-Missa contada **nunca** é apagada: ela fica como `finalizada` e é o que alimenta o Histórico.
 
 ---
 
@@ -530,7 +501,7 @@ O atraso entre a pessoa ser contada e o número mudar na tela é de **no máximo
 ```mermaid
 stateDiagram-v2
     [*] --> Zerado : nenhuma sessão no banco
-    Zerado --> AoVivo : main.py abre a sessão
+    Zerado --> AoVivo : uma contagem começa (--agora ou agenda)
     AoVivo --> AoVivo : alguém cruza a linha / a cada 5 s de vídeo
     AoVivo --> UltimaMissa : fim do vídeo ou ESC (concluida)
     UltimaMissa --> AoVivo : nova contagem começa
@@ -597,11 +568,108 @@ python -c "from db.database import obter_conexao; from integracao.estimativa imp
 
 ---
 
-## 9. Próximos passos previstos (em desenvolvimento)
+## 9. Agendamento automático (`integracao/agendador.py`)
 
-- **Agendamento automático (APScheduler).** Implementado: seção 6.7.
-- **Empacotamento (PyInstaller + Inno Setup).** O `.exe` único, o banco em `%APPDATA%`, o início com o Windows e a abertura automática do dashboard já estão no código e estão descritos em [`DOCUMENTACAO_DISTRIBUICAO.md`](./DOCUMENTACAO_DISTRIBUICAO.md). Falta validar o build numa máquina Windows e criar o instalador (Inno Setup).
-- **Controle manual da contagem.** Hoje não há botões no dashboard nem rotas na API para iniciar ou encerrar o motor: ele começa com o `main.py` e termina no fim do vídeo, por ESC/Q na janela ou por Ctrl+C.
+Sem `--agora` nem `--fonte`, o `python main.py` não conta na hora: ele sobe o dashboard e **espera os horários da agenda** (`horario_padrao`, tela Configurações). Em cada horário, liga a contagem sozinho e desliga no fim da janela de gravação. É o modo de uso na igreja: ninguém precisa abrir nem fechar nada no dia da missa.
+
+### 9.1 Os dois modos
+
+| Comando | Modo | O que faz |
+|---|---|---|
+| `python main.py` | **Agendado** | Carrega o `Monitor` uma vez (sem janela), liga o `Agendador` e espera. Mostra no terminal as próximas contagens |
+| `python main.py --agora` | **Manual** | Conta imediatamente, com a janela, como antes do agendador (testes e demonstração) |
+| `python main.py --fonte videos/x.mp4` | **Manual** | Idem, com outra fonte. Quem aponta um vídeo quer contá-lo agora |
+
+A regra fica numa função só, `cli.modo_manual(args)`: `args.agora or args.fonte is not None`. Assim, os comandos que já existiam (`--fonte ...`) continuam funcionando do mesmo jeito.
+
+No modo agendado, a contagem roda numa thread do APScheduler, e não na thread principal (seção 2). Por isso o `main.py` desliga a janela do OpenCV (`visual.mostrar_janela = False`): no Windows, a janela não funciona direito fora da thread principal. O acompanhamento é pelo dashboard.
+
+### 9.2 Do horário cadastrado até o Histórico
+
+```mermaid
+sequenceDiagram
+    participant S as APScheduler
+    participant A as Agendador
+    participant DB as SQLite
+    participant V as Vigia (thread)
+    participant M as Monitor
+
+    S->>A: domingo 09:45 → _executar_janela(horario_id)
+    A->>DB: obter_ou_criar_celebracao("Missa das 10:00", horario_padrao_id, 09:45–11:15)
+    A->>DB: sessao_de_monitoramento(..., celebracao_id) abre a sessão
+    A->>V: inicia o vigia
+    A->>M: executar(ao_atualizar=gravador)
+    loop a cada 1 s
+        V->>V: já são 11:15?
+    end
+    V->>M: parar()
+    M-->>A: devolve as métricas
+    A->>DB: sessão concluída + estimativa gravada (seção 8)
+```
+
+1. **Registro.** Ao iniciar (`Agendador.iniciar()`), o `recarregar()` lê os horários ativos e cria, para cada um, uma tarefa semanal no APScheduler (`CronTrigger`), com o id `agenda-{id do horário}`: "todo domingo às 09:45".
+2. **Disparo.** No horário de início, o APScheduler chama `_executar_janela(horario_id)`, que confere se a contagem deve mesmo acontecer (seção 9.3) e cria (ou reaproveita) a celebração do dia: título "Missa das 10:00", ligada ao horário pelo `horario_padrao_id` e com o início e o fim de monitoramento. É isso que preenche "Início do monitor" e "Fim do monitor" no Dashboard.
+3. **Contagem.** `_contar()` usa exatamente o mesmo `with sessao_de_monitoramento(...)` + `monitor.executar(...)` do modo manual (seção 6), passando o `celebracao_id`. O agendador não reimplementa a contagem: ele só decide **quando** ligar e desligar.
+4. **Fim.** Uma segunda thread, o **vigia** (`_parar_no_fim`), confere o relógio a cada segundo e chama `monitor.parar()` no horário de fim. O `executar()` retorna normalmente, a sessão fecha como `concluida` e a estimativa é gravada (seção 8). Se o vídeo acabar antes, a contagem termina antes e o vigia é dispensado.
+
+O `Monitor` é criado **uma vez só**, no `main.py`, e reaproveitado em todas as missas: carregar o modelo YOLO a cada missa seria lento à toa. O `executar()` zera as métricas e o rastreio a cada chamada (`DOCUMENTACAO_MOTOR.md`, seção 14).
+
+### 9.3 Regras que evitam contagem errada
+
+| Situação | O que acontece | Como |
+|---|---|---|
+| Dia da semana | A missa de domingo dispara no domingo | O banco usa 0 = domingo; o APScheduler, 0 = segunda. O agendador passa o **nome** do dia (`DIAS_CRON = ("sun", "mon", ...)`), e nunca o número |
+| Programa ligado **no meio** de uma janela | Começa a contar na hora, atrasado | O cron só dispararia na semana seguinte; o `recarregar()` agenda uma execução imediata (`agora-{id}`) |
+| Computador em suspensão no horário de início | Conta ao acordar, se ainda estiver dentro da janela | `misfire_grace_time` igual à duração da janela; o `_executar_janela` confere o fim de novo antes de abrir a câmera |
+| Programa ligado **depois** do fim | Não conta | Conferência `inicio <= agora < fim` |
+| Janelas sobrepostas | Só a primeira conta; a segunda é ignorada com aviso no terminal | Trava `_ocupado` (`threading.Lock`), tentada com `acquire(blocking=False)` |
+| Mesma janela disparada duas vezes no dia (agenda recarregada no meio) | Conta uma vez só | Conjunto `_feitas` de trios `(origem, id, dia)` |
+| Celebração marcada como `cancelada` | Não liga a câmera | Conferido antes de contar |
+| Erro no motor ou câmera que não volta | Sessão `interrompida`; as próximas missas continuam funcionando | O erro é capturado em `_contar()` e a trava é sempre solta num `finally` |
+| `Ctrl+C` no meio da contagem | Sessão `interrompida` (não entra no Histórico) | `encerrar()` marca `_encerrando`, para o motor e espera a sessão ser gravada (`shutdown(wait=True)`); `_contar()` lança `_Encerrado` dentro do `with` |
+
+**Por que o vigia chama `parar()` repetidas vezes.** O `Monitor.executar()` zera o pedido de parada ao começar (`DOCUMENTACAO_MOTOR.md`, seção 14): um `parar()` chamado um instante antes se perderia, e a contagem não pararia mais. Com câmera RTSP fora do ar, o motor fica tentando reconectar e só desiste quando `parar()` é chamado. Repetindo a chamada a cada segundo até a contagem terminar, os dois casos ficam cobertos.
+
+**Por que a trava é solta num lugar só.** Se alguma saída de `_executar_janela` esquecesse de soltar `_ocupado`, nenhuma outra missa seria contada até reiniciar o programa. Depois que a trava é pega, todo caminho (celebração cancelada, contagem normal, erro) passa por um único `finally`.
+
+### 9.4 Agenda alterada pela tela
+
+O `main.py` registra o agendador ligado com `agendador.registrar(...)`. As rotas `POST` e `DELETE /api/configuracoes/agenda` chamam `recarregar_agenda()` depois de gravar no banco (seção 4.6): o `recarregar()` remove as tarefas `agenda-*` e cria de novo a partir da tabela. Um horário cadastrado para agora começa a contar na hora, sem reiniciar o programa.
+
+- **Sem agendador** (modo manual), `recarregar_agenda()` não faz nada.
+- **Uma contagem em andamento não é interrompida**: a mudança vale para as próximas.
+- **Falhar ao recarregar não vira erro 500**: o horário já foi salvo, e a falha só aparece no terminal.
+
+O `agendador.py` não importa o motor no topo do arquivo: a rota de Configurações importa `recarregar_agenda`, e carregar OpenCV e YOLO só para isso deixaria a API mais pesada. O `sessao_de_monitoramento` é importado dentro de `_contar()`, quando uma contagem de fato começa.
+
+### 9.5 Como foi testado
+
+Com um motor falso (que "conta" sozinho), um relógio falso (para simular "domingo 10:05" a qualquer hora) e um banco temporário, foram verificados: dia da semana certo; ligar no meio da janela, contar e parar sozinho no fim, com a missa no Histórico e a estimativa gravada; a mesma janela não rodar duas vezes; acordar depois do fim; janelas sobrepostas; celebração cancelada; câmera sem nenhum frame; erro no motor; `Ctrl+C` no meio; recarga da agenda; e o modo manual sem mudanças.
+
+Com o vídeo de teste e o programa real: uma janela cadastrada com início já passado começou a contar ao abrir o programa, parou sozinha no horário de fim e entrou no Histórico como "Missa das …" com a estimativa; e um horário cadastrado pela tela, com o programa aberto, começou a contar sem reiniciar.
+
+### 9.6 Celebrações avulsas
+
+Além da agenda semanal, o agendador conta as celebrações cadastradas na tela Celebrações (Natal, Páscoa, casamento, missa de última hora). Antes, uma missa fora da rotina só era contada com `python main.py --agora`, entrando como "Missa (monitoramento automatico)".
+
+| Fonte | Disparo | Quando existe |
+|---|---|---|
+| Agenda semanal (`horario_padrao`) | `CronTrigger` semanal no horário de início da gravação | Um por horário ativo |
+| Celebração avulsa (`celebracao` com `horario_padrao_id` nulo e `status = 'agendada'`) | `DateTrigger` de data única no início da gravação | Uma por celebração, de hoje em diante |
+
+O `recarregar()` lê as duas fontes, e as rotas `/api/celebracoes` e `/api/configuracoes` o chamam depois de cada mudança. A contagem (`_contar`) e a trava de uma contagem por vez são as mesmas. A diferença está em `_executar_celebracao`, que lê a janela da própria celebração, e em `_reservar()`, que marca a janela como feita com a chave `(origem, id, dia)`: a origem (`"agenda"` ou `"celebracao"`) evita colisão entre ids de tabelas diferentes. Se o computador ligar no meio da janela, o disparo já venceu, mas o `misfire_grace_time` é a duração da janela, então ele roda na hora.
+
+**`repetirSemanalmente`:** a celebração criada fica ligada ao horário da agenda (`horario_padrao_id`). Por isso o agendador **não** cria um disparo avulso para ela: quem a conta é o disparo semanal, que encontra a celebração pela chave `(data, horario_missa)` e a reaproveita (`obter_ou_criar_celebracao`), preservando título e tipo.
+
+**Limpeza (`limpar_celebracoes_vencidas`).** Avulsa que passou e **nunca foi contada** é apagada 24 horas depois do fim da gravação, na inicialização (`main.py`) e todo dia às 03:00 no próprio agendador, porque o computador pode ficar ligado por dias.
+
+| Regra | Motivo |
+|---|---|
+| Só `origem = 'personalizada'` e sem `horario_padrao_id` | As ligadas à agenda semanal não são avulsas |
+| Só `agendada` ou `cancelada` | Em andamento e finalizada têm contagem |
+| Só sem nenhuma sessão | `sessao_monitoramento` tem `ON DELETE CASCADE`: apagar a celebração apagaria a contagem, e o Histórico lê a celebração |
+
+Missa contada **nunca** é apagada: fica como `finalizada` e alimenta o Histórico.
 
 ---
 
@@ -609,6 +677,16 @@ python -c "from db.database import obter_conexao; from integracao.estimativa imp
 
 | Onde | Limitação | Efeito |
 |---|---|---|
+| `integracao/agendador.py` | Janela de gravação que passa da meia-noite não é suportada | A tela já recusa: o fim precisa ser depois do início no mesmo dia |
+| `integracao/agendador.py` | O agendador só funciona com o programa aberto | O `.exe` se registra para iniciar com o Windows (`DOCUMENTACAO_DISTRIBUICAO.md`), mas com o computador desligado na hora da missa ela não é contada |
+| `integracao/agendador.py` | O controle de "uma vez por dia" fica em memória | Reiniciar o programa dentro de uma janela que já foi contada (vídeo que acabou antes do fim) conta de novo, numa segunda sessão da mesma celebração. O Histórico mostra a mais recente |
 | `Celebracoes.tsx` | O calendário lista só o que está na tabela `celebracao` | As missas da agenda semanal aparecem ali quando a contagem delas começa (é nesse momento que a celebração é criada); as futuras ainda não são mostradas. Celebrações avulsas aparecem desde o cadastro |
 
 Corrigido: `EstimativaComunhao.tsx` antes calculava as hóstias sugeridas no próprio frontend multiplicando por `1.1` fixo. Agora `GET /api/dashboard` devolve `hostiasSugeridas` diretamente de `calcular_estimativa(db, ocupacao, celebracao).hostias`, garantindo que o Dashboard e o Histórico usem sempre a mesma `margem_hostias` configurada no banco.
+
+---
+
+## 11. Próximos passos previstos
+
+- **Empacotamento (PyInstaller + Inno Setup).** O `.exe` único, o banco em `%APPDATA%`, o início com o Windows e a abertura automática do dashboard já estão no código e estão descritos em [`DOCUMENTACAO_DISTRIBUICAO.md`](./DOCUMENTACAO_DISTRIBUICAO.md). Falta validar o build numa máquina Windows e criar o instalador (Inno Setup).
+- **Controle manual da contagem.** Hoje não há botões no dashboard nem rotas na API para iniciar ou encerrar o motor: ele começa pelo `main.py` (na hora, com `--agora`, ou pela agenda) e termina no fim do vídeo ou da janela, por ESC/Q na janela ou por Ctrl+C.
