@@ -638,7 +638,7 @@ A média é **das razões**, e não "total de comungantes ÷ total de pessoas". 
 | `communed` | `estimativa_comunhao.comungantes_reais` |
 | `hosts_consecrated` | `estimativa_comunhao.hostias_reais` |
 
-Cada linha precisa ter exatamente as 9 colunas do cabeçalho (formato completo em [`db/README.md`](./db/README.md)). Cada linha vira uma celebração (reaproveitada se já existir a mesma data e horário), uma sessão `manual` já `concluida` (também reaproveitada e atualizada em caso de reimportação do mesmo CSV, evitando duplicar pontos no treino da regressão) e, se houver dado de comunhão, uma estimativa.
+Cada linha precisa ter exatamente as 9 colunas do cabeçalho (formato completo em [`db/README.md`](./db/README.md)); uma coluna a mais ou a menos faz o `import_csv.py` avisar, porque as notas e os números caem no campo errado. Reimportar corrige também o `tipo` de uma celebração que já existia (por exemplo, marcar a procissão como `especial`). Cada linha vira uma celebração (reaproveitada se já existir a mesma data e horário), uma sessão `manual` já `concluida` (também reaproveitada e atualizada em caso de reimportação do mesmo CSV, evitando duplicar pontos no treino da regressão) e, se houver dado de comunhão, uma estimativa.
 
 ### 9.4 Aviso de contagem abaixo do habitual
 
