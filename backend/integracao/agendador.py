@@ -326,7 +326,8 @@ class Agendador:
                 metricas = self.monitor.executar(ao_atualizar=gravador)
                 if self._encerrando:
                     raise _Encerrado()
-            print(f"[agenda] Missa das {rotulo}: contagem encerrada. "
+            resultado = "contagem descartada (" + gravador.motivo_descarte + ")" if gravador.motivo_descarte else "contagem encerrada"
+            print(f"[agenda] Missa das {rotulo}: {resultado}. "
                   f"Entradas {metricas.entradas}, saidas {metricas.saidas}, dentro {metricas.dentro}.")
         except _Encerrado:
             print(f"[agenda] Missa das {rotulo}: programa encerrado no meio da contagem (sessao interrompida).")

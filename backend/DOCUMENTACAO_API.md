@@ -229,6 +229,7 @@ De onde vem cada campo:
 | `entradas` / `saidas` | `sessao_monitoramento.total_entradas` / `total_saidas` | A cada passagem pela linha |
 | `estimativaComunhao` | `calcular_estimativa(db, ocupação, celebracao=celebracao).comungantes` (seção 8) | Junto com a ocupação |
 | `hostiasSugeridas` | `calcular_estimativa(db, ocupação, celebracao=celebracao).hostias` (com `margem_hostias` do banco) | Junto com a ocupação |
+| `contagemDescartada` | `true` quando a última contagem terminou descartada (`sessao.status = 'interrompida'` com "Contagem descartada" nas observações, ver `DOCUMENTACAO_BANCO.md`, seção 5.2). Nesse caso `estimativaComunhao` e `hostiasSugeridas` vêm `0` e a tela mostra uma faixa de aviso e "—" nos três cards de estimativa, em vez de uma tela zerada sem explicação. As sessões interrompidas por erro ou queda de energia não entram: a tela continua mostrando a última contagem válida | Junto com a ocupação |
 | `possivelSubcontagem` | `contagem_abaixo_do_habitual()`: `true` quando a contagem está abaixo de 70% da mediana do histórico do mesmo dia e horário. A tela mostra "Possível subcontagem" (`DOCUMENTACAO_BANCO.md`, seção 9.4) | Junto com a ocupação |
 | `contagemAtiva` | `sessao["status"] == "em_andamento"` | `false` quando mostra a última missa encerrada |
 | `graficoOcupacao[]` | `instantaneo_ocupacao`: `hora` = `hora_de_timestamp(registrado_em)`, `ocupacao` = `ocupacao_atual` | A cada 5 s de vídeo |

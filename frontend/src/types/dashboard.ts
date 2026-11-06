@@ -18,6 +18,7 @@ export interface MetricasDashboard {
   saidas: number;
   contagemAtiva: boolean;
   possivelSubcontagem: boolean; // contagem bem abaixo do habitual do horario
+  contagemDescartada: boolean; // ultima contagem descartada: estimativa e hostias nao valem
 }
 
 export interface DadosDashboard {

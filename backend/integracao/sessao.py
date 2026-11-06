@@ -34,6 +34,8 @@ class GravadorSessao:
         self._ultimo = -math.inf
         self.pico = 0
         self._totais = (0, 0) # entradas e saidas finais
+        # Preenchido ao fechar a sessao quando a contagem e descartada (quem chamou le depois do with).
+        self.motivo_descarte: str | None = None
 
     def __call__(self, metricas: Metricas, instante: float) -> None:
         self.pico = max(self.pico, metricas.dentro)
@@ -120,6 +122,7 @@ def sessao_de_monitoramento(
             motivo = motivo_contagem_invalida(m.entradas, m.saidas, config.contagem.minimo_pessoas)
             if motivo:
                 status = "interrompida"
+                gravador.motivo_descarte = motivo
                 print(f"[AVISO] Contagem descartada: {motivo} (entradas {m.entradas}, saidas {m.saidas}).")
 
         crud.finalizar_sessao(

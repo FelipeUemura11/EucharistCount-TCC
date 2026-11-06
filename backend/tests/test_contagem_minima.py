@@ -83,6 +83,18 @@ class TesteFechamentoDaSessao(TesteComBanco):
         self.assertEqual(sessao["status"], "interrompida")
         self.assertIn("saidas", sessao["observacoes"])
 
+    def test_o_gravador_informa_o_motivo_do_descarte(self):
+        monitor = SimpleNamespace(metricas=SimpleNamespace(entradas=9, saidas=0, dentro=9))
+        with sessao_de_monitoramento(monitor, Config()) as gravador:
+            pass
+        self.assertIn("minimo", gravador.motivo_descarte)
+
+    def test_contagem_valida_nao_tem_motivo_de_descarte(self):
+        monitor = SimpleNamespace(metricas=SimpleNamespace(entradas=90, saidas=10, dentro=80))
+        with sessao_de_monitoramento(monitor, Config()) as gravador:
+            pass
+        self.assertIsNone(gravador.motivo_descarte)
+
     def test_o_numero_contado_continua_guardado(self):
         # A falha fica registrada, entre outras coisas, para medir a acuracia do sistema.
         sessao = self.fechar(entradas=25, saidas=10)

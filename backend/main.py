@@ -43,7 +43,9 @@ def executar_manual(config: Config) -> None:
             metricas = monitor.executar(ao_atualizar=gravador)
 
         print("\n" + "=" * 52)
-        print(" >>> Sessão Concluída ")
+        print(" >>> Contagem descartada " if gravador.motivo_descarte else " >>> Sessão Concluída ")
+        if gravador.motivo_descarte:
+            print(f"Motivo             : {gravador.motivo_descarte}")
         print(f"Entradas           : {metricas.entradas}")
         print(f"Saídas             : {metricas.saidas}")
         print(f"Dentro da igreja   : {metricas.dentro}")

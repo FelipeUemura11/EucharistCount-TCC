@@ -24,9 +24,8 @@ router = APIRouter()
 
 @router.get("/dashboard", response_model=DadosDashboard)
 def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
-    # Caso gravacao ao vivo Contagem ativa: obter_sessao_ativa(db)
-    # Caso gravacao finalizada Contagem inativa: obtter_ultima_sessao_concluida(db)
-    sessao = crud.obter_sessao_ativa(db) or crud.obter_ultima_sessao_concluida(db)
+    # Contagem ativa: a sessao ao vivo. Inativa: a ultima que terminou, valida ou descartada.
+    sessao = crud.obter_sessao_ativa(db) or crud.obter_ultima_sessao_encerrada(db)
 
     # Sem nenhuma sessao: zera tudo em vez de dar erro, para o frontend receber sempre o mesmo formato.
     if not sessao:
@@ -38,8 +37,10 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
             graficoOcupacao=[], resumoCelebracao=None,
         )
 
-    # em_andamento = contagem ao vivo; senao e a ultima sessao concluida.
+    # em_andamento = contagem ao vivo; senao e a ultima sessao encerrada.
     ativa = sessao["status"] == "em_andamento"
+    # Encerrada como interrompida aqui so pode ser contagem descartada (ver obter_ultima_sessao_encerrada).
+    descartada = sessao["status"] == "interrompida"
     ocupacao = sessao["ocupacao_final"]
 
     # Serie do grafico: um ponto por instantaneo gravado, com a hora no fuso local.
@@ -65,6 +66,10 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
     estimativa = calcular_estimativa(db, ocupacao, celebracao=celebracao)
     habitual = contagem_abaixo_do_habitual(db, ocupacao, celebracao, ao_vivo=ativa, agora=datetime.now())
 
+    # Contagem descartada: estimativa e hostias nao valem, entao nao vao para a tela.
+    if descartada:
+        estimativa.comungantes, estimativa.hostias, habitual = 0, 0, None
+
     return DadosDashboard(
         metricas=MetricasDashboard(
             ocupacaoAtual=ocupacao,
@@ -74,6 +79,7 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
             saidas=sessao["total_saidas"],
             contagemAtiva=ativa,
             possivelSubcontagem=habitual is not None,
+            contagemDescartada=descartada,
         ),
         graficoOcupacao=grafico,
         resumoCelebracao=resumo,

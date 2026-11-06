@@ -11,23 +11,25 @@ export default function EstimativaComunhao({ metricas }: EstimativaComunhaoProps
         ? Math.round((metricas.estimativaComunhao / metricas.ocupacaoAtual) * 100)
         : 0;
     const suggestedHosts = metricas.hostiasSugeridas;
+    // Contagem descartada: os numeros nao valem, entao a tela mostra "—" em vez de 0.
+    const semValor = metricas.contagemDescartada;
 
     const communionStats = [
         {
             label: 'Estimativa para comunhão',
-            value: metricas.estimativaComunhao,
+            value: semValor ? '—' : metricas.estimativaComunhao,
             suffix: 'pessoas',
             icon: HandHeart,
         },
         {
             label: 'Hóstias sugeridas',
-            value: suggestedHosts,
+            value: semValor ? '—' : suggestedHosts,
             suffix: 'unidades',
             icon: HandPlatter,
         },
         {
             label: 'Porcentagem que irá comungar',
-            value: communionPercent,
+            value: semValor ? '—' : communionPercent,
             suffix: '% dos presentes',
             icon: Percent,
         },

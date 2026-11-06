@@ -411,6 +411,23 @@ def obter_ultima_sessao_concluida(conexao: sqlite3.Connection) -> sqlite3.Row | 
         """
     ).fetchone()
 
+def obter_ultima_sessao_encerrada(conexao: sqlite3.Connection) -> sqlite3.Row | None:
+    """
+    A ultima contagem da camera que terminou, valida ou descartada pela regra do
+    minimo (sessao_de_monitoramento): e o que o Dashboard mostra sem contagem ativa.
+    Uma sessao interrompida por erro ou queda de energia nao entra.
+    """
+    return conexao.execute(
+        """
+        SELECT * FROM sessao_monitoramento
+        WHERE origem_contagem = 'visao_computacional'
+          AND (status = 'concluida'
+               OR (status = 'interrompida' AND observacoes LIKE 'Contagem descartada%'))
+        ORDER BY finalizado_em DESC, id DESC
+        LIMIT 1
+        """
+    ).fetchone()
+
 def obter_sessao(conexao: sqlite3.Connection, sessao_id: int) -> sqlite3.Row | None:
     return conexao.execute("SELECT * FROM sessao_monitoramento WHERE id = ?", (sessao_id,)).fetchone()
 

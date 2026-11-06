@@ -31,6 +31,9 @@ class MetricasDashboard(BaseModel):
     contagemAtiva: bool
     # True quando a contagem esta bem abaixo do habitual do horario (provavel obstrucao).
     possivelSubcontagem: bool = False
+    # True quando a ultima contagem foi descartada (menos que o minimo, ou mais saidas que entradas):
+    # os numeros de estimativa e hostias nao valem.
+    contagemDescartada: bool = False
 
 
 class DadosDashboard(BaseModel):
