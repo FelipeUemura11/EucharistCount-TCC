@@ -650,6 +650,7 @@ Os dias em que a câmera perde gente na entrada (32% a 49% a menos nos dados de 
 |---|---|
 | Precisa de pelo menos 3 missas no histórico daquele dia e horário | Com menos, a mediana não é confiável |
 | Só missas `concluida` e anteriores à data da atual | A atual e as que falharam não entram na comparação |
+| Só missas comuns entram na referência, e celebração especial (`especial`, `natal`, `pascoa`, `casamento`, `exequias`) nem recebe o aviso | Procissão e festas fogem do normal e subiriam a referência, gerando aviso falso numa missa comum. Para a procissão não distorcer, o `celebration_type` dela no CSV deve ser `especial` |
 | Ao vivo, só depois do horário da missa | Antes disso a contagem ainda está subindo e o aviso dispararia toda missa |
 | Mediana, não média | Um dia ruim no histórico não puxa a referência |
 

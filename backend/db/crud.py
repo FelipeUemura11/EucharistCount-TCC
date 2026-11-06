@@ -184,23 +184,33 @@ def limpar_celebracoes_vencidas(conexao: sqlite3.Connection, limite: str) -> int
     return cursor.rowcount
 
 
+# Celebracoes fora do normal (procissao, Natal...): nao servem de referencia do que e habitual.
+# Mesma lista de api/schemas.CelebracaoCriar, menos "comum".
+TIPOS_ESPECIAIS = ("especial", "natal", "pascoa", "casamento", "exequias")
+
+
 def listar_contagens_do_horario(
     conexao: sqlite3.Connection, dia_semana: int, horario_missa: str, antes_de: str, limite: int = 8
 ) -> list[int]:
-    """Contagens finais das ultimas missas concluidas naquele dia da semana (0 = domingo) e horario, anteriores a `antes_de`."""
+    """
+    Contagens finais das ultimas missas comuns concluidas naquele dia da semana
+    (0 = domingo) e horario, anteriores a `antes_de`.
+    """
+    especiais = ", ".join("?" for _ in TIPOS_ESPECIAIS)
     linhas = conexao.execute(
-        """
+        f"""
         SELECT s.ocupacao_final
         FROM sessao_monitoramento s
         JOIN celebracao c ON c.id = s.celebracao_id
         WHERE s.status = 'concluida' AND s.ocupacao_final > 0
+          AND c.tipo NOT IN ({especiais})
           AND c.horario_missa = ?
           AND CAST(strftime('%w', c.data) AS INTEGER) = ?
           AND c.data < ?
         ORDER BY c.data DESC
         LIMIT ?
         """,
-        (horario_missa, dia_semana, antes_de, limite),
+        (*TIPOS_ESPECIAIS, horario_missa, dia_semana, antes_de, limite),
     ).fetchall()
     return [linha["ocupacao_final"] for linha in linhas]
 

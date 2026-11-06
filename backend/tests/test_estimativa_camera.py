@@ -93,11 +93,11 @@ class TesteHostias(TesteComBanco):
 
 class TesteAvisoDeContagemBaixa(TesteComBanco):
     # Sabados as 18h anteriores, e uma missa de sabado atual.
-    ATUAL = {"data": "2026-10-31", "horario_missa": "18:00"}
+    ATUAL = {"data": "2026-10-31", "horario_missa": "18:00", "tipo": "comum"}
     DEPOIS_DA_MISSA_COMECAR = datetime(2026, 10, 31, 19, 0)
 
-    def missa(self, data, horario, ocupacao, status="concluida"):
-        celebracao = crud.criar_celebracao(self.db, "Missa", data, horario)
+    def missa(self, data, horario, ocupacao, status="concluida", tipo="comum"):
+        celebracao = crud.criar_celebracao(self.db, "Missa", data, horario, tipo=tipo)
         sessao = crud.iniciar_sessao(self.db, celebracao, origem_contagem="visao_computacional")
         crud.finalizar_sessao(self.db, sessao, total_entradas=max(ocupacao, 0), total_saidas=0,
                               ocupacao_final=ocupacao, status=status)
@@ -143,6 +143,27 @@ class TesteAvisoDeContagemBaixa(TesteComBanco):
         for dia in ("2026-10-03", "2026-10-10", "2026-10-17"):
             self.missa(dia, "18:00", 100, status="interrompida")
         self.assertIsNone(self.aviso(10))
+
+    def test_missa_especial_nao_entra_na_referencia(self):
+        # Tres missas comuns (90 a 110) e tres especiais (300): com elas, a referencia iria
+        # a 205 e uma missa comum de 95 pessoas dispararia aviso a toa.
+        self.historico(90, 100, 110)
+        for dia in ("2026-09-05", "2026-09-12", "2026-09-19"):
+            self.missa(dia, "18:00", 300, tipo="especial")
+        self.assertIsNone(self.aviso(95))
+
+    def test_o_tipo_que_veio_do_csv_conta_como_comum(self):
+        # O counting_people.csv usa "common" em vez de "comum".
+        for dia, ocupacao in (("2026-10-03", 95), ("2026-10-10", 100), ("2026-10-17", 105)):
+            self.missa(dia, "18:00", ocupacao, tipo="common")
+        self.assertEqual(self.aviso(52), 100)
+
+    def test_celebracao_especial_nao_recebe_aviso(self):
+        self.historico(100, 100, 100)
+        especial = {**self.ATUAL, "tipo": "natal"}
+        self.assertIsNone(contagem_abaixo_do_habitual(
+            self.db, 10, especial, ao_vivo=False, agora=self.DEPOIS_DA_MISSA_COMECAR
+        ))
 
     def test_ignora_missa_posterior(self):
         self.historico(100, 100, 100)

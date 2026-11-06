@@ -62,8 +62,11 @@ def contagem_abaixo_do_habitual(
     """
     Devolve a contagem habitual daquele dia da semana e horario se a atual estiver
     bem abaixo dela (provavel obstrucao na entrada); senao, None.
+    Celebracao especial (procissao, Natal...) nao tem referencia comum para comparar.
     """
     if not celebracao or not celebracao["data"] or not celebracao["horario_missa"]:
+        return None
+    if celebracao["tipo"] in crud.TIPOS_ESPECIAIS:
         return None
 
     # Ao vivo, antes da missa comecar a contagem ainda esta subindo: nao serve de comparacao.
