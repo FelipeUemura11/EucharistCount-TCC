@@ -3,6 +3,7 @@ import { PlusCircle, Trash2, Camera } from "lucide-react";
 import type { ConfiguracoesGlobais, AgendaDiaCriar } from "../types/configuracoes";
 import { getConfiguracoesGlobais, criarAgendaPadrao, removerAgendaPadrao } from "../services/configuracoes";
 
+// Indice = dia_semana do banco (0 = domingo).
 const DIAS_SEMANA = [
     "Domingo",
     "Segunda-feira",
@@ -79,6 +80,7 @@ export default function Configuracoes() {
         }
     };
 
+    // Carregando e falha de leitura tem tela propria antes do conteudo.
     if (loading) return <div className="p-8 text-center text-text-muted">Carregando configurações...</div>;
     if (!configuracoes) return <div className="p-8 text-center text-text-muted">Erro ao carregar configurações.</div>;
 

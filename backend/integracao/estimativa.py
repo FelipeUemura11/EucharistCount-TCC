@@ -8,6 +8,7 @@ Formula: DOCUMENTACAO_BANCO.md, secao 9.1 e 9.2.
 
 import math
 import sqlite3
+import statistics
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -17,11 +18,16 @@ from db import crud
 from db.database import CAMINHO_BANCO, RAIZ as RAIZ_DB
 
 # Usados so enquanto nao houver linha em configuracao_estimativa.
-# Media das 3 celebracoes reais do counting_people.csv
-# (17/22, 177/214, 250/340 -> ~0.78). Na instalacao, rode
-# db/calcular_coeficiente_inicial.py para gravar o valor real no banco.
-COEFICIENTE_PADRAO = 0.78
-MARGEM_HOSTIAS_PADRAO = 0.10
+# Coeficiente = comungantes / contagem da camera nas missas boas do
+# counting_people.csv (media ~0.89); ja embute a subcontagem tipica da camera.
+# A margem de 12% existe porque faltar hostia e pior que sobrar.
+# db/calcular_coeficiente_inicial.py grava os valores reais no banco.
+COEFICIENTE_PADRAO = 0.89
+MARGEM_HOSTIAS_PADRAO = 0.12
+
+# Aviso de subcontagem: precisa de historico do mesmo dia e horario.
+MIN_MISSAS_HISTORICO = 3
+FRACAO_DO_HABITUAL = 0.70
 
 # Cache do modelo carregado em memoria: (caminho_resolvido, pipeline).
 # Evita reler o arquivo .joblib do disco a cada polling (2s) do dashboard.
@@ -34,6 +40,48 @@ class Estimativa:
     hostias: int
     coeficiente: float
     configuracao_id: int | None   # None quando usou os valores padrao
+    margem: float = MARGEM_HOSTIAS_PADRAO
+
+
+def motivo_contagem_invalida(entradas: int, saidas: int, minimo: int) -> str | None:
+    """Por que a contagem nao deve ser usada, ou None se ela vale."""
+    if saidas > entradas:
+        return "saidas maiores que entradas"
+    if entradas - saidas < minimo:
+        return f"abaixo do minimo de {minimo} pessoas"
+    return None
+
+
+def contagem_abaixo_do_habitual(
+    conexao: sqlite3.Connection,
+    ocupacao: int,
+    celebracao: sqlite3.Row | dict[str, Any] | None,
+    ao_vivo: bool,
+    agora: datetime,
+) -> int | None:
+    """
+    Devolve a contagem habitual daquele dia da semana e horario se a atual estiver
+    bem abaixo dela (provavel obstrucao na entrada); senao, None.
+    Celebracao especial (procissao, Natal...) nao tem referencia comum para comparar.
+    """
+    if not celebracao or not celebracao["data"] or not celebracao["horario_missa"]:
+        return None
+    if celebracao["tipo"] in crud.TIPOS_ESPECIAIS:
+        return None
+
+    # Ao vivo, antes da missa comecar a contagem ainda esta subindo: nao serve de comparacao.
+    inicio = datetime.strptime(f"{celebracao['data']} {celebracao['horario_missa']}", "%Y-%m-%d %H:%M")
+    if ao_vivo and agora < inicio:
+        return None
+
+    historico = crud.listar_contagens_do_horario(
+        conexao, _dia_semana(celebracao["data"]), celebracao["horario_missa"], antes_de=celebracao["data"]
+    )
+    if len(historico) < MIN_MISSAS_HISTORICO:
+        return None
+
+    habitual = statistics.median(historico)
+    return round(habitual) if ocupacao < habitual * FRACAO_DO_HABITUAL else None
 
 
 def _dia_semana(data_iso: str) -> int:
@@ -112,8 +160,9 @@ def _prever_por_regressao(
         }])
 
         predicao = float(modelo.predict(X)[0])
-        # Trava fisica: comungantes nao pode ser negativo nem maior que o total presente
-        return max(0, min(int(round(predicao)), ocupacao))
+        # So nao pode ser negativo. A contagem da camera e um piso do total presente,
+        # nao um teto: em 18/10 comungaram 184 e a camera contou 162.
+        return max(0, int(round(predicao)))
     except Exception:
         return None
 
@@ -129,6 +178,7 @@ def calcular_estimativa(
       1. 'regressao': usa o modelo .joblib se disponivel (e deriva o coeficiente efetivo).
       2. 'coeficiente_fixo' (ou fallback): multiplica ocupacao pelo coeficiente_comunhao.
     """
+    # Parametros vindos da configuracao vigente; sem ela, valem os padroes do modulo.
     config = crud.obter_configuracao_estimativa_vigente(conexao)
     if config:
         coeficiente = config["coeficiente_comunhao"]
@@ -162,7 +212,7 @@ def calcular_estimativa(
 
     # ceil para nao faltar hostia; a margem vem da configuracao vigente.
     hostias = math.ceil(comungantes * (1 + margem))
-    return Estimativa(comungantes, hostias, coeficiente, configuracao_id)
+    return Estimativa(comungantes, hostias, coeficiente, configuracao_id, margem)
 
 
 def registrar_estimativa_da_sessao(conexao: sqlite3.Connection, sessao_id: int, ocupacao: int) -> None:
@@ -181,6 +231,7 @@ def registrar_estimativa_da_sessao(conexao: sqlite3.Connection, sessao_id: int, 
 
 def preencher_estimativas_pendentes(conexao: sqlite3.Connection) -> int:
     """Grava a estimativa das sessoes concluidas que ainda nao tem uma. Devolve quantas."""
+    # Pendente = sessao concluida sem linha em estimativa_comunhao.
     pendentes = conexao.execute(
         """
         SELECT id, ocupacao_final FROM sessao_monitoramento

@@ -12,7 +12,7 @@ exigido pela LGPD no TCC.
 | `database.py` | `inicializar_banco()` roda o schema; `obter_conexao()` abre uma conexão (com FKs ligadas). |
 | `crud.py` | **Use isto na API.** Uma função por operação (criar celebração, iniciar sessão, registrar instantâneo, etc.). Não escreva SQL novo nas rotas — se faltar uma operação, adicione a função aqui. |
 | `import_csv.py` | Importa o `counting_people.csv` (contagem manual, contagem da câmera e comungantes) para o schema normalizado. Formato na seção "O arquivo `counting_people.csv`". |
-| `calcular_coeficiente_inicial.py` | Calcula a média `comungantes_reais / ocupacao_final` dos dados já importados e grava em `configuracao_estimativa` (modo `coeficiente_fixo`). Rodar de novo sempre que importar dado novo. |
+| `calcular_coeficiente_inicial.py` | Calcula a média `comungantes_reais / contagem_sistema` (a contagem da câmera, a mesma que a estimativa recebe em produção) dos dados já importados e grava em `configuracao_estimativa` (modo `coeficiente_fixo`, margem de hóstias de 12%). Descarta os dias em que a câmera contou menos de 75% da contagem manual. Rodar de novo sempre que importar dado novo. |
 | `preparar_dataset.py` | Monta o dataset de treino (ocupação, dia da semana, horário, tipo → comungantes reais) a partir do banco. Usado pelo script de treino, mas também roda sozinho pra inspecionar o dataset (`python3 preparar_dataset.py`). |
 | `treinar_regressao.py` | Treina a regressão (modo `regressao`), valida com leave-one-out, salva o modelo em `modelos_estimativa/*.joblib` (na mesma pasta onde vive o banco, `CAMINHO_BANCO.parent`) e registra a versão em `configuracao_estimativa`. **Só treina com 15+ celebrações no banco** — com menos que isso, ele avisa e não faz nada (ver seção "Estimativa de comunhão" abaixo). |
 | `requirements.txt` | Dependências só deste módulo (`pandas`, `scikit-learn`, `joblib`), nas mesmas versões do `backend/requirements.txt`, que já as inclui. Serve para quem quer rodar só os scripts do banco sem instalar o motor de visão. |
@@ -84,7 +84,7 @@ O sistema opera em duas fases, sem precisar trocar de schema entre elas
    hóstias enquanto não há modelo de regressão treinado.
 2. **`regressao`** — assim que houver **15+ celebrações** com
    `comungantes_reais` preenchido no banco, `treinar_regressao.py` treina
-   um modelo (ocupação + dia da semana + horário + tipo → comungantes) e
+   um modelo (contagem da câmera + dia da semana + horário + tipo → comungantes) e
    grava o caminho do artefato em `configuracao_estimativa.modelo_path`
    (salvo em `CAMINHO_BANCO.parent / "modelos_estimativa"`, ou seja, sempre
    ao lado do banco). Hoje o banco fica em `backend/db/`; o `database.py` já
@@ -107,7 +107,7 @@ A estimativa usada pelo sistema é centralizada em
   `minutos_missa`, `dia_semana` e `tipo` da celebração.
 - Caso contrário (modo `coeficiente_fixo`, tabela vazia ou falha ao carregar o
   modelo), multiplica a ocupação pelo `coeficiente_comunhao` (ou pelo padrão
-  `0.78` se o banco estiver vazio).
+  `0.89` se o banco estiver vazio).
 
 Assim, tanto o dashboard ao vivo quanto o histórico usam exatamente a mesma
 regra e transicionam automaticamente do coeficiente fixo para a regressão

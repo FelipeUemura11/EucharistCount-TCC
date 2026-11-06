@@ -8,7 +8,16 @@ export async function buscarDashboard(): Promise<DadosDashboard> {
         }
         // O JSON da API e tipado como DadosDashboard (espelha DadosDashboard em schemas.py).
         const dados: DadosDashboard = await response.json();
-        return dados;
+
+        // Saidas contadas sem entrada (oclusao) podem dar ocupacao negativa; a tela mostra 0.
+        return {
+            ...dados,
+            metricas: { ...dados.metricas, ocupacaoAtual: Math.max(0, dados.metricas.ocupacaoAtual) },
+            graficoOcupacao: dados.graficoOcupacao.map((ponto) => ({
+                ...ponto,
+                ocupacao: Math.max(0, ponto.ocupacao),
+            })),
+        };
     } catch (error) {
         console.error("Falha ao consultar a API FastAPI:", error);
         throw error;

@@ -4,6 +4,7 @@ sem contagem ativa, da ultima missa encerrada.
 """
 
 import sqlite3
+from datetime import datetime
 
 from fastapi import APIRouter, Depends
 
@@ -16,7 +17,7 @@ from api.schemas import (
     ResumoCelebracao,
 )
 from db import crud
-from integracao.estimativa import calcular_estimativa
+from integracao.estimativa import calcular_estimativa, contagem_abaixo_do_habitual
 
 router = APIRouter()
 
@@ -41,6 +42,7 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
     ativa = sessao["status"] == "em_andamento"
     ocupacao = sessao["ocupacao_final"]
 
+    # Serie do grafico: um ponto por instantaneo gravado, com a hora no fuso local.
     grafico = [
         PontoOcupacao(hora=hora_de_timestamp(inst["registrado_em"]),
                       ocupacao=inst["ocupacao_atual"])
@@ -61,6 +63,7 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
     # As hostias vem do backend (com a margem_hostias do banco), para o
     # Dashboard mostrar o mesmo numero que o Historico.
     estimativa = calcular_estimativa(db, ocupacao, celebracao=celebracao)
+    habitual = contagem_abaixo_do_habitual(db, ocupacao, celebracao, ao_vivo=ativa, agora=datetime.now())
 
     return DadosDashboard(
         metricas=MetricasDashboard(
@@ -70,6 +73,7 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
             entradas=sessao["total_entradas"],
             saidas=sessao["total_saidas"],
             contagemAtiva=ativa,
+            possivelSubcontagem=habitual is not None,
         ),
         graficoOcupacao=grafico,
         resumoCelebracao=resumo,

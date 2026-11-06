@@ -25,8 +25,10 @@ export default function GraficoOcupacao({
   inicioMonitoramento,
   fimMonitoramento
 }: GraficoOcupacaoProps) {
+  // Cinco marcas do eixo Y, de 0 ate a capacidade.
   const capacityTicks = Array.from({ length: 5 }, (_, index) => Math.round((maxCapacity / 4) * index));
   const ultimoIndice = pontos.length - 1;
+  // Eixo X rotula so o primeiro e o ultimo ponto, com o inicio e o fim do monitoramento.
   const formatarHora = (hora: string, index: number) => {
     if (index === 0) return inicioMonitoramento || hora;
     if (index === ultimoIndice) return fimMonitoramento || hora;

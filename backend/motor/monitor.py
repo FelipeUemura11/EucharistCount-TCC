@@ -259,6 +259,7 @@ class Monitor:
 
     def _tratar_teclado(self, frame) -> bool:
         """Processa teclas. Retorna False quando o usuario pede para sair."""
+        # Mostra o frame reduzido e le a tecla (1 ms de espera por frame).
         exibir = redimensionar(frame, self.config.visual.escala_janela)
         cv2.imshow(self.JANELA, exibir)
 
@@ -272,6 +273,7 @@ class Monitor:
         elif tecla in (ord("a"), ord("A"), ord("d"), ord("D")):
             self._saltar(tecla)
 
+        # Pausa: segura o loop ate ESPACO, sair ou saltar no video.
         while self._pausado:
             t = cv2.waitKey(30) & 0xFF
             if t == ord(" "):

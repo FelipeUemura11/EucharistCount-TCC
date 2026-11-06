@@ -15,7 +15,11 @@ from typing import Iterator
 
 from db import crud
 from db.database import obter_conexao
-from integracao.estimativa import preencher_estimativas_pendentes, registrar_estimativa_da_sessao
+from integracao.estimativa import (
+    motivo_contagem_invalida,
+    preencher_estimativas_pendentes,
+    registrar_estimativa_da_sessao,
+)
 from motor.config import Config, mascarar_senha
 from motor.monitor import Metricas, Monitor
 
@@ -96,6 +100,7 @@ def sessao_de_monitoramento(
 
     gravador = GravadorSessao(conexao, sessao_id)
 
+    # Status final: 'concluida' ate que algum erro ou interrupcao mude para 'interrompida'.
     status = "concluida"
     try:
         yield gravador
@@ -107,6 +112,16 @@ def sessao_de_monitoramento(
     # Sempre fecha a sessao, com os totais das ultimas metricas do monitor.
     finally:
         m = monitor.metricas
+
+        # Contagem impossivel ou baixa demais (oclusao): a sessao fica guardada
+        # como interrompida, sem estimativa, Historico nem regressao.
+        motivo = None
+        if status == "concluida" and config.contagem.ativo:
+            motivo = motivo_contagem_invalida(m.entradas, m.saidas, config.contagem.minimo_pessoas)
+            if motivo:
+                status = "interrompida"
+                print(f"[AVISO] Contagem descartada: {motivo} (entradas {m.entradas}, saidas {m.saidas}).")
+
         crud.finalizar_sessao(
             conexao, sessao_id,
             total_entradas=m.entradas,
@@ -114,6 +129,7 @@ def sessao_de_monitoramento(
             ocupacao_final=m.dentro,
             ocupacao_maxima=gravador.pico,
             contagem_sistema=m.dentro,
+            observacoes=f"Contagem descartada: {motivo}" if motivo else None,
             status=status,
         )
         # So contagem concluida entra no Historico, entao so ela precisa de estimativa.

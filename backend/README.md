@@ -23,6 +23,9 @@ backend/
 ├── DOCUMENTACAO_MOTOR.md    # o porquê de cada decisão do motor
 ├── DOCUMENTACAO_BANCO.md    # modelo de dados, com diagramas das tabelas
 ├── DOCUMENTACAO_API.md      # API, ligação motor → banco, dashboard ao vivo
+├── DOCUMENTACAO_DISTRIBUICAO.md  # empacotamento em .exe, caminhos, início com o Windows
+├── eucharist_count.spec     # receita do PyInstaller (um único .exe)
+├── inicializacao.py         # comportamento do .exe: log, instância única, início com o Windows
 │
 ├── motor/                   # Motor de Visão Computacional (OpenCV + YOLO + ByteTrack)
 │   ├── config.py            # carrega o config.json e o .env
@@ -48,6 +51,7 @@ backend/
 │
 ├── db/                      # persistência SQLite — ver db/README.md
 │
+├── tests/                   # testes automatizados (unittest)
 ├── scripts/
 │   ├── preparar_modelo.py   # baixa e exporta o modelo para ONNX
 │   ├── calibrar.py          # descobre a melhor configuração pro seu vídeo
@@ -214,6 +218,16 @@ while True:
 
 ---
 
+## Testes
+
+```bash
+python -m unittest discover -s tests -t .
+```
+
+Cobrem as celebrações avulsas (validação, rotas, agendador e limpeza). Cada teste usa um banco SQLite temporário, então o `eucharist_count.db` não é tocado, e nenhum disparo real do agendador acontece. Não precisam de câmera, modelo nem dependência extra além do `requirements.txt`.
+
+---
+
 ## Como funciona a contagem
 
 Uma **linha virtual** é posicionada sobre o portão de acesso, definida
@@ -322,6 +336,9 @@ de perfil e parcialmente oculta pelos bancos.
 - `margem` — meia-largura da zona morta, em fração da largura do frame.
   Maior = mais resistente a tremor, porém exige que a pessoa se afaste
   mais da linha para ser contada
+- `minimo_pessoas` — contagem final abaixo disso, ou com mais saídas que
+  entradas, é descartada (por obstrução na entrada): a sessão fica como
+  `interrompida`, sem estimativa, Histórico nem regressão. Padrão: 20
 - `segundos_cooldown` / `segundos_esquecer` — tempo mínimo entre duas
   contagens da mesma pessoa e tempo até esquecer quem sumiu do
   enquadramento, contados no tempo do vídeo (não da CPU)
@@ -358,8 +375,9 @@ versionados no Git — o `.gitignore` do projeto já bloqueia isso.
 - [x] Motor gravando no banco durante a missa, com dashboard ao vivo
 - [x] Telas de Configurações (cadastro da agenda padrão) e Ajuda
 - [x] Estimativa de comunhão e hóstias por coeficiente fixo e por regressão linear (`.joblib`)
-- [x] Agendamento automático com APScheduler — ver [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md), seção 9
-- [ ] Empacotamento com PyInstaller *(em desenvolvimento)*
+- [x] Agendamento automático com APScheduler — agenda semanal e celebrações avulsas (`POST /api/celebracoes`), ver [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md), seções 9 e 9.6
+- [x] Empacotamento com PyInstaller — receita em `eucharist_count.spec`, ver [`DOCUMENTACAO_DISTRIBUICAO.md`](./DOCUMENTACAO_DISTRIBUICAO.md) *(build ainda não validado em Windows)*
+- [ ] Instalador (Inno Setup)
 
 `python main.py` já sobe tudo junto: banco, API e dashboard em
 `http://127.0.0.1:8000`, e a contagem, nos horários da agenda (modo

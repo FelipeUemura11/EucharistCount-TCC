@@ -1,3 +1,4 @@
+// Espelham AgendaDia, InfoCamera e ConfiguracoesGlobais de backend/api/schemas.py.
 export interface AgendaDiaCriar {
     diaSemana: number; // 0 (Domingo) a 6 (Sábado)
     horarioMissa: string; // "HH:MM"

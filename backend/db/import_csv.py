@@ -30,6 +30,7 @@ from database import CAMINHO_BANCO, inicializar_banco, obter_conexao
 
 
 def _vazio_para_none(valor: str):
+    # Campo vazio do CSV vira None (NULL no banco).
     valor = (valor or "").strip()
     return valor if valor else None
 
@@ -50,7 +51,13 @@ def importar(caminho_csv: Path, caminho_banco: Path = CAMINHO_BANCO) -> None:
         with open(caminho_csv, newline="", encoding="utf-8") as arquivo:
             leitor = csv.DictReader(arquivo)
 
+            # Cada linha vira celebracao + sessao manual + estimativa de comunhao.
             for linha in leitor:
+                # Coluna a mais cai na chave None e a que falta vira None: em qualquer dos
+                # casos as notas e os numeros podem ter ido parar no campo errado.
+                if None in linha or None in linha.values():
+                    print(f"[aviso] linha com numero de colunas diferente do cabecalho: {linha}")
+
                 data = _vazio_para_none(linha.get("date"))
                 horario = _vazio_para_none(linha.get("time"))
                 pessoas = _int_ou_none(linha.get("people"))
@@ -77,6 +84,8 @@ def importar(caminho_csv: Path, caminho_banco: Path = CAMINHO_BANCO) -> None:
 
                 if existente:
                     celebracao_id = existente["id"]
+                    # O CSV e a fonte do tipo: reimportar corrige um tipo que mudou (ex.: procissao).
+                    conexao.execute("UPDATE celebracao SET tipo = ? WHERE id = ?", (tipo, celebracao_id))
                 else:
                     cursor = conexao.execute(
                         """

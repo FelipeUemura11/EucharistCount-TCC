@@ -472,6 +472,10 @@ Em arquivos de vídeo, a janela de monitoramento permite voltar (`A`) ou avança
 1. **Limpeza de trilhas e lados:** `Monitor._saltar()` chama `detector.reiniciar_rastreio()` e `contador.esquecer_rastros()` (que limpa os lados mas preserva `entradas` e `saidas`), evitando cruzamentos falsos causados pelo "teletransporte" das caixas entre o frame antigo e o de destino.
 2. **Modo Replay (`_replay`):** `Monitor` guarda em `_frame_max_contado` o maior índice de frame já avaliado pelo contador. Quando o usuário volta o vídeo com `A`, enquanto `fonte.indice_atual <= _frame_max_contado`, o sistema entra em modo `REPLAY (sem contar)`: continua detectando e desenhando na tela para inspeção visual, mas não chama `contador.atualizar()`. A contagem só retoma automaticamente quando o vídeo ultrapassa o ponto onde estava antes do salto, impedindo contar a mesma pessoa duas vezes.
 
+### 8.10 Contagem baixa demais ou impossível
+
+Quando algo tapa a entrada (gente na frente da câmera, por exemplo), o contador pode perder entradas e ainda contar as saídas de quem já estava dentro. A conta fecha baixa, ou até negativa. Ao fechar a sessão, o `sessao_de_monitoramento` descarta a contagem se houver mais saídas que entradas ou se `entradas - saídas` for menor que `contagem.minimo_pessoas` (20 por padrão, no `config.json`). O número contado fica guardado, mas a sessão não gera estimativa, não vai para o Histórico e não treina a regressão. O piso só pega falhas grosseiras: uma contagem de 30 numa missa de 50 passa, e para isso existe a correção manual da estimativa.
+
 ---
 
 ## 9. Captura de vídeo: ritmo e resiliência
