@@ -93,7 +93,7 @@ O `modelos/*.onnx` e o `frontend/dist` não estão no Git (são regenerados), en
 | `--onefile` | Um arquivo só para entregar. O custo é descompactar a cada abertura, por isso dados persistentes ficam em `%APPDATA%` |
 | `lap==0.5.13` no `requirements.txt` | O ByteTrack do Ultralytics precisa do `lap`. Sem ele, o Ultralytics tenta instalá-lo em tempo de execução, o que não funciona dentro do `.exe` |
 | `copy_metadata` no `.spec` | O Ultralytics confere versões de pacotes pelos metadados e, se não os acha, tenta `pip install`. O APScheduler também localiza seus componentes pelos metadados |
-| Regressão fora do `.exe` | `sklearn` não é importado pelo `main.py`, então não entra no build. O cliente começa com o coeficiente fixo padrão (0,89, calibrado na contagem da câmera) e margem de 15%, e a estimativa funciona; a regressão depende de treino com dados reais (ver `DOCUMENTACAO_BANCO.md`) |
+| Regressão fora do `.exe` | `sklearn` não é importado pelo `main.py`, então não entra no build. O cliente começa com o coeficiente fixo padrão (0,89, calibrado na contagem da câmera) e margem de 12%, e a estimativa funciona; a regressão depende de treino com dados reais (ver `DOCUMENTACAO_BANCO.md`) |
 | Início com o Windows pela chave `Run` | Simples, sem administrador. Alguns antivírus desconfiam de programas que se registram sozinhos; o instalador (Inno Setup) é o caminho mais limpo e fica como evolução |
 | Trava por porta, não por arquivo | Libera sozinha em queda de energia e funciona nos dois sistemas |
 

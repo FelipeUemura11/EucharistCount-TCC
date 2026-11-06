@@ -29,8 +29,8 @@ class MetricasDashboard(BaseModel):
     entradas: int
     saidas: int
     contagemAtiva: bool
-    # Preenchido so quando a contagem esta bem abaixo do habitual do horario (provavel obstrucao).
-    contagemHabitual: int | None = None
+    # True quando a contagem esta bem abaixo do habitual do horario (provavel obstrucao).
+    possivelSubcontagem: bool = False
 
 
 class DadosDashboard(BaseModel):

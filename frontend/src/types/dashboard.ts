@@ -17,7 +17,7 @@ export interface MetricasDashboard {
   entradas: number;
   saidas: number;
   contagemAtiva: boolean;
-  contagemHabitual: number | null; // so vem preenchida quando a contagem esta bem abaixo do habitual
+  possivelSubcontagem: boolean; // contagem bem abaixo do habitual do horario
 }
 
 export interface DadosDashboard {

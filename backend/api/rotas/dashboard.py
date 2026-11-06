@@ -73,7 +73,7 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
             entradas=sessao["total_entradas"],
             saidas=sessao["total_saidas"],
             contagemAtiva=ativa,
-            contagemHabitual=habitual,
+            possivelSubcontagem=habitual is not None,
         ),
         graficoOcupacao=grafico,
         resumoCelebracao=resumo,

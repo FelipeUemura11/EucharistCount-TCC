@@ -21,7 +21,7 @@ import crud
 LIMITE_SUBCONTAGEM = 0.75
 
 # Faltar hostia e pior que sobrar, entao a folga e generosa.
-MARGEM_HOSTIAS = 0.15
+MARGEM_HOSTIAS = 0.12
 
 
 def selecionar_missas(conexao) -> list:

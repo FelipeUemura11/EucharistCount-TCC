@@ -424,7 +424,7 @@ def obter_configuracao_estimativa_vigente(conexao: sqlite3.Connection) -> sqlite
 
 
 def definir_configuracao_estimativa(conexao: sqlite3.Connection, coeficiente_comunhao: float,
-                                     margem_hostias: float = 0.15, metodo: str = "coeficiente_fixo",
+                                     margem_hostias: float = 0.12, metodo: str = "coeficiente_fixo",
                                      modelo_path: str | None = None,
                                      observacoes: str | None = None) -> int:
     """

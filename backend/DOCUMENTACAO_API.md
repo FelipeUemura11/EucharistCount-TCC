@@ -229,7 +229,7 @@ De onde vem cada campo:
 | `entradas` / `saidas` | `sessao_monitoramento.total_entradas` / `total_saidas` | A cada passagem pela linha |
 | `estimativaComunhao` | `calcular_estimativa(db, ocupação, celebracao=celebracao).comungantes` (seção 8) | Junto com a ocupação |
 | `hostiasSugeridas` | `calcular_estimativa(db, ocupação, celebracao=celebracao).hostias` (com `margem_hostias` do banco) | Junto com a ocupação |
-| `contagemHabitual` | `contagem_abaixo_do_habitual()`: a mediana do histórico do mesmo dia e horário quando a contagem está abaixo de 70% dela; `null` no resto. A tela mostra o aviso "contagem abaixo do habitual" (`DOCUMENTACAO_BANCO.md`, seção 9.4) | Junto com a ocupação |
+| `possivelSubcontagem` | `contagem_abaixo_do_habitual()`: `true` quando a contagem está abaixo de 70% da mediana do histórico do mesmo dia e horário. A tela mostra "Possível subcontagem" (`DOCUMENTACAO_BANCO.md`, seção 9.4) | Junto com a ocupação |
 | `contagemAtiva` | `sessao["status"] == "em_andamento"` | `false` quando mostra a última missa encerrada |
 | `graficoOcupacao[]` | `instantaneo_ocupacao`: `hora` = `hora_de_timestamp(registrado_em)`, `ocupacao` = `ocupacao_atual` | A cada 5 s de vídeo |
 | `resumoCelebracao` | Título e janela de monitoramento da celebração | — |
@@ -552,7 +552,7 @@ comungantes = int(max(ocupacao, 0) * coeficiente)
 hostias     = math.ceil(comungantes * (1 + margem))
 ```
 
-- **`COEFICIENTE_PADRAO = 0.89`** é a média de `comungantes ÷ contagem da câmera` nas missas boas do `counting_people.csv` (`DOCUMENTACAO_BANCO.md`, seção 9.1). Ele só vale enquanto não houver uma linha em `configuracao_estimativa`, e vale de verdade no `.exe`, que começa com o banco vazio. A margem de hóstias padrão é de 15% (`MARGEM_HOSTIAS_PADRAO`). Rodar `db/calcular_coeficiente_inicial.py` grava os valores calculados no banco.
+- **`COEFICIENTE_PADRAO = 0.89`** é a média de `comungantes ÷ contagem da câmera` nas missas boas do `counting_people.csv` (`DOCUMENTACAO_BANCO.md`, seção 9.1). Ele só vale enquanto não houver uma linha em `configuracao_estimativa`, e vale de verdade no `.exe`, que começa com o banco vazio. A margem de hóstias padrão é de 12% (`MARGEM_HOSTIAS_PADRAO`). Rodar `db/calcular_coeficiente_inicial.py` grava os valores calculados no banco.
 - **`max(ocupacao, 0)`** protege o começo de um vídeo, quando `dentro` pode ficar negativo (uma saída antes de qualquer entrada).
 - O resultado é um objeto `Estimativa` (`comungantes`, `hostias`, `coeficiente`, `configuracao_id`, `margem`), para quem usa escrever `est.hostias` em vez de `resultado[1]`.
 

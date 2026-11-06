@@ -20,10 +20,10 @@ from db.database import CAMINHO_BANCO, RAIZ as RAIZ_DB
 # Usados so enquanto nao houver linha em configuracao_estimativa.
 # Coeficiente = comungantes / contagem da camera nas missas boas do
 # counting_people.csv (media ~0.89); ja embute a subcontagem tipica da camera.
-# A margem de 15% existe porque faltar hostia e pior que sobrar.
+# A margem de 12% existe porque faltar hostia e pior que sobrar.
 # db/calcular_coeficiente_inicial.py grava os valores reais no banco.
 COEFICIENTE_PADRAO = 0.89
-MARGEM_HOSTIAS_PADRAO = 0.15
+MARGEM_HOSTIAS_PADRAO = 0.12
 
 # Aviso de subcontagem: precisa de historico do mesmo dia e horario.
 MIN_MISSAS_HISTORICO = 3

@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS configuracao_estimativa (
     metodo                  TEXT NOT NULL DEFAULT 'coeficiente_fixo'
                                 CHECK (metodo IN ('coeficiente_fixo', 'regressao')),
     coeficiente_comunhao    REAL NOT NULL,   -- fracao media dos presentes que costuma comungar (fallback mesmo em modo regressao)
-    margem_hostias          REAL NOT NULL DEFAULT 0.15, -- folga aplicada sobre a estimativa, ex.: 0.15 = +15%
+    margem_hostias          REAL NOT NULL DEFAULT 0.12, -- folga aplicada sobre a estimativa, ex.: 0.12 = +12%
     modelo_path             TEXT,             -- caminho do artefato do modelo (.joblib), quando metodo = 'regressao'
     vigente_desde           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now')),
     observacoes             TEXT

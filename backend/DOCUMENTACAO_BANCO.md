@@ -112,7 +112,7 @@ erDiagram
         INTEGER id PK
         TEXT metodo "coeficiente_fixo ou regressao"
         REAL coeficiente_comunhao
-        REAL margem_hostias "0.15 = +15%"
+        REAL margem_hostias "0.12 = +12%"
         TEXT modelo_path ".joblib"
         TEXT vigente_desde
         TEXT observacoes
@@ -232,7 +232,7 @@ Os parâmetros que convertem ocupação em estimativa de comungantes e de hósti
 |---|---|
 | `metodo` | `'coeficiente_fixo'` (fase inicial) ou `'regressao'` (quando houver dados suficientes, seção 9) |
 | `coeficiente_comunhao` | Fração dos presentes que costuma comungar. **Obrigatório mesmo no modo regressão**, onde serve de reserva se o modelo não puder prever |
-| `margem_hostias` | Folga sobre a estimativa. `0.15` = consagrar 15% a mais |
+| `margem_hostias` | Folga sobre a estimativa. `0.12` = consagrar 12% a mais |
 | `modelo_path` | Caminho do modelo treinado (`.joblib`), relativo à pasta onde vive o banco (`CAMINHO_BANCO.parent`) |
 | `vigente_desde` | Quando essa versão passou a valer |
 
@@ -605,13 +605,13 @@ O divisor é a contagem da **câmera**, e não a manual, porque é a da câmera 
 
 Os dias descartados têm razão acima de 1 (mais gente comungou do que a câmera contou), o que mostra que a câmera perdeu gente na entrada. Nos dias bons, comungam cerca de 89% do que a câmera conta, e é esse o `COEFICIENTE_PADRAO` do código.
 
-**A margem de hóstias é de 15%** (`margem_hostias`, antes 10%), por decisão da paróquia: faltar hóstia obriga a buscar mais no meio da celebração, e sobrar um pouco é aceitável. Nos dias bons, `⌈estimativa × 1,15⌉` cobriu os comungantes com sobra de 1% a 22%. A tela mostra só o número final, sem falar da margem.
+**A margem de hóstias é de 12%** (`margem_hostias`, antes 10%), por decisão da paróquia: faltar hóstia obriga a buscar mais no meio da celebração, e sobrar um pouco é aceitável. Ela cobre a variação de uma missa para outra (a fração que comunga vai de 84% a 98% da contagem da câmera). Nos dias bons, `⌈estimativa × 1,12⌉` cobriu os comungantes com sobra de 2% a 18%, em média 12%. Com 10% o pior dia ficava sem folga nenhuma. A tela mostra só o número final, sem falar da margem.
 
 A média é **das razões**, e não "total de comungantes ÷ total de pessoas". Assim, cada missa pesa igual, e uma missa muito cheia não domina o coeficiente.
 
 **No código**, a fórmula está em `integracao/estimativa.py` → `calcular_estimativa()`, a única implementação usada pelo sistema (detalhes em `DOCUMENTACAO_API.md`, seção 8):
 
-- **Coeficiente e margem:** lidos da configuração vigente (`crud.obter_configuracao_estimativa_vigente`). Enquanto `calcular_coeficiente_inicial.py` não tiver rodado e a tabela estiver vazia, valem os padrões do código: `COEFICIENTE_PADRAO = 0.89` (a média acima) e margem de 15%.
+- **Coeficiente e margem:** lidos da configuração vigente (`crud.obter_configuracao_estimativa_vigente`). Enquanto `calcular_coeficiente_inicial.py` não tiver rodado e a tabela estiver vazia, valem os padrões do código: `COEFICIENTE_PADRAO = 0.89` (a média acima) e margem de 12%.
 - **Gravação:** `registrar_estimativa_da_sessao()` grava o resultado em `estimativa_comunhao` (`estimativa_calculada`, `hostias_calculadas`, `coeficiente_utilizado`, `configuracao_estimativa_id`). É dessa tabela que a `vw_historico` lê.
 - **Sessões pendentes:** `preencher_estimativas_pendentes()` grava a estimativa de todas as sessões concluídas que ainda não têm uma (seção 10).
 
@@ -644,7 +644,7 @@ Cada linha precisa ter exatamente as 9 colunas do cabeçalho (formato completo e
 
 Os dias em que a câmera perde gente na entrada (32% a 49% a menos nos dados de outubro) não têm correção multiplicativa que resolva: são falha de medição, não um viés constante. O que se faz é **avisar**, para o responsável conferir a igreja e separar mais hóstias.
 
-`integracao/estimativa.py` → `contagem_abaixo_do_habitual()` compara a contagem com a **mediana** das últimas 8 missas concluídas do mesmo dia da semana e horário (`crud.listar_contagens_do_horario`). Se a contagem for menor que 70% dela, `GET /api/dashboard` devolve `metricas.contagemHabitual` e a tela mostra o aviso.
+`integracao/estimativa.py` → `contagem_abaixo_do_habitual()` compara a contagem com a **mediana** das últimas 8 missas concluídas do mesmo dia da semana e horário (`crud.listar_contagens_do_horario`). Se a contagem for menor que 70% dela, `GET /api/dashboard` devolve `metricas.possivelSubcontagem = true` e a tela mostra só "Possível subcontagem".
 
 | Regra | Motivo |
 |---|---|

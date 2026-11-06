@@ -70,9 +70,9 @@ class TesteHostias(TesteComBanco):
         self.assertEqual(estimativa.margem, MARGEM_HOSTIAS_PADRAO)
         self.assertIsNone(estimativa.configuracao_id)
 
-    def test_margem_padrao_e_de_15_por_cento(self):
+    def test_margem_padrao_e_de_12_por_cento(self):
         # Decisao da paroquia: faltar hostia e pior que sobrar.
-        self.assertEqual(MARGEM_HOSTIAS_PADRAO, 0.15)
+        self.assertEqual(MARGEM_HOSTIAS_PADRAO, 0.12)
 
     def test_nos_dias_bons_nao_falta_hostia(self):
         # O padre prefere sobrar a faltar.
@@ -161,19 +161,19 @@ class TesteAvisoDeContagemBaixa(TesteComBanco):
     def test_sem_celebracao_nao_avisa(self):
         self.assertIsNone(contagem_abaixo_do_habitual(self.db, 10, None, ao_vivo=False, agora=datetime.now()))
 
-    def test_dashboard_devolve_o_aviso_e_hostias_suficientes(self):
+    def test_dashboard_marca_possivel_subcontagem_e_hostias_suficientes(self):
         self.historico(95, 100, 105)
         self.missa("2026-10-31", "18:00", 52)
 
         metricas = get_dashboard(self.db).metricas
 
-        self.assertEqual(metricas.contagemHabitual, 100)
+        self.assertTrue(metricas.possivelSubcontagem)
         self.assertGreaterEqual(metricas.hostiasSugeridas, metricas.estimativaComunhao)
 
     def test_dashboard_sem_aviso_quando_a_contagem_esta_normal(self):
         self.historico(95, 100, 105)
         self.missa("2026-10-31", "18:00", 98)
-        self.assertIsNone(get_dashboard(self.db).metricas.contagemHabitual)
+        self.assertFalse(get_dashboard(self.db).metricas.possivelSubcontagem)
 
 
 if __name__ == "__main__":
