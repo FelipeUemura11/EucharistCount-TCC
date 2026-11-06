@@ -84,7 +84,7 @@ O sistema opera em duas fases, sem precisar trocar de schema entre elas
    hóstias enquanto não há modelo de regressão treinado.
 2. **`regressao`** — assim que houver **15+ celebrações** com
    `comungantes_reais` preenchido no banco, `treinar_regressao.py` treina
-   um modelo (contagem da câmera + dia da semana + horário + tipo → comungantes) e
+   um modelo (contagem na escala da câmera + dia da semana + horário + tipo → comungantes; missas sem contagem da câmera, ou com câmera que falhou, entram com a contagem manual convertida) e
    grava o caminho do artefato em `configuracao_estimativa.modelo_path`
    (salvo em `CAMINHO_BANCO.parent / "modelos_estimativa"`, ou seja, sempre
    ao lado do banco). Hoje o banco fica em `backend/db/`; o `database.py` já

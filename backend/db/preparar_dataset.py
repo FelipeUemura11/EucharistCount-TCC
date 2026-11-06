@@ -3,7 +3,8 @@ Monta o dataset de treino a partir do banco: uma linha por celebracao que
 ja tem contagem real E comungantes reais registrados.
 
 Features (o que se sabe ANTES da missa, ou observado nela):
-    - ocupacao_final   : contagem da CAMERA (contagem_sistema), a mesma que a estimativa recebe em producao
+    - ocupacao_final   : contagem na escala da CAMERA, a mesma que a estimativa recebe em producao
+                         (a da camera quando funcionou; senao, a manual convertida pelo fator da camera)
     - dia_semana       : 0=domingo ... 6=sabado (derivado de celebracao.data)
     - horario_missa    : convertido para minutos desde meia-noite
     - tipo             : celebration_type (comum, especial, ...)
@@ -20,7 +21,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from calcular_coeficiente_inicial import LIMITE_SUBCONTAGEM
+from calcular_coeficiente_inicial import contagem_na_escala_da_camera, fator_da_camera
 from database import obter_conexao
 
 
@@ -39,8 +40,8 @@ def _minutos(horario: str) -> int:
 def montar_dataset() -> pd.DataFrame:
     conexao = obter_conexao()
 
-    # Mesmo filtro do coeficiente inicial: contagem concluida, coerente (ninguem
-    # comunga mais do que ha na igreja) e com a contagem da camera preenchida.
+    # Contagem concluida e coerente (ninguem comunga mais do que ha na igreja).
+    # A contagem da camera pode faltar: nao e motivo para tirar a missa.
     linhas = conexao.execute(
         """
         SELECT c.data, c.horario_missa, c.tipo,
@@ -52,22 +53,20 @@ def montar_dataset() -> pd.DataFrame:
         JOIN estimativa_comunhao e ON e.sessao_id = s.id
         WHERE s.status = 'concluida'
           AND s.ocupacao_final > 0
-          AND s.contagem_sistema > 0
           AND e.comungantes_reais IS NOT NULL
           AND e.comungantes_reais <= s.ocupacao_final
         """
     ).fetchall()
     conexao.close()
 
+    fator = fator_da_camera(linhas)
+
     # Deriva dia_semana e minutos_missa de data/horario, que sao texto no banco.
     registros = []
     for linha in linhas:
-        # Camera que perdeu gente demais e falha de medicao, nao serve de exemplo.
-        if linha["sistema"] / linha["manual"] < LIMITE_SUBCONTAGEM:
-            continue
         registros.append({
             "data": linha["data"],
-            "ocupacao_final": linha["sistema"],
+            "ocupacao_final": contagem_na_escala_da_camera(linha["manual"], linha["sistema"], fator),
             "dia_semana": _dia_semana(linha["data"]),
             "minutos_missa": _minutos(linha["horario_missa"]),
             "tipo": linha["tipo"],

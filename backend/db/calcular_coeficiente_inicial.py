@@ -24,6 +24,29 @@ LIMITE_SUBCONTAGEM = 0.75
 MARGEM_HOSTIAS = 0.12
 
 
+def camera_confiavel(manual: int, sistema: int | None) -> bool:
+    """A contagem da camera existe e nao perdeu gente demais em relacao a manual."""
+    return bool(sistema) and sistema / manual >= LIMITE_SUBCONTAGEM
+
+
+def fator_da_camera(contagens) -> float:
+    """
+    Quanto a camera costuma contar da gente presente (media de sistema / manual nos
+    dias em que ela funcionou). 1.0 se nao houver nenhum dia assim.
+    """
+    razoes = [c["sistema"] / c["manual"] for c in contagens if camera_confiavel(c["manual"], c["sistema"])]
+    return sum(razoes) / len(razoes) if razoes else 1.0
+
+
+def contagem_na_escala_da_camera(manual: int, sistema: int | None, fator: float) -> int:
+    """
+    O que a camera teria contado: a propria contagem dela quando funcionou; senao
+    (falhou ou nao existe) a manual convertida pelo fator. Assim a missa continua
+    servindo de exemplo, so a medicao do dia e descartada.
+    """
+    return sistema if camera_confiavel(manual, sistema) else round(manual * fator)
+
+
 def selecionar_missas(conexao) -> list:
     # Contagem concluida e coerente (comungantes <= presentes), com a contagem da camera preenchida.
     return conexao.execute(

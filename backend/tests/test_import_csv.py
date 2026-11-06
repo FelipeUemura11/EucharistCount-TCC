@@ -78,6 +78,21 @@ class TesteImportCsv(TesteComBanco):
                 ).fetchone()[0]
                 self.assertEqual(guardada, nota)
 
+    def test_dataset_da_regressao_aproveita_todas_as_missas_do_csv(self):
+        # Contou-se tudo fisicamente: nenhuma missa com comungantes pode ficar de fora por falta
+        # da contagem da camera.
+        import database as banco_solto
+        import preparar_dataset
+        padrao = banco_solto.obter_conexao.__defaults__
+        banco_solto.obter_conexao.__defaults__ = (self.caminho,)
+        self.addCleanup(setattr, banco_solto.obter_conexao, "__defaults__", padrao)
+
+        self.importar(CSV_REAL)
+        with open(CSV_REAL, newline="", encoding="utf-8") as arquivo:
+            com_comunhao = [r for r in csv.DictReader(arquivo) if r["communed"]]
+
+        self.assertEqual(len(preparar_dataset.montar_dataset()), len(com_comunhao))
+
     def test_linha_com_coluna_a_mais_gera_aviso(self):
         csv_errado = self.csv_temporario("0,2026-09-11,18:00,common,22,17,,,,camera_mal_posicionada")
         self.assertIn("[aviso]", self.importar(csv_errado))

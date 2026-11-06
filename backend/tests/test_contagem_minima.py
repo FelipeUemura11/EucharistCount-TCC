@@ -152,14 +152,21 @@ class TesteDatasetDaRegressao(TesteComBanco):
         self.sessao("concluida", ocupacao=100, comungantes=80, sistema=88)
         self.assertEqual(list(self.montar_dataset()["ocupacao_final"]), [88])
 
-    def test_dia_em_que_a_camera_perdeu_gente_fica_de_fora(self):
-        # Camera com 60% da contagem manual: falha de medicao, nao serve de exemplo.
-        self.sessao("concluida", ocupacao=100, comungantes=80, sistema=60)
-        self.assertEqual(len(self.montar_dataset()), 0)
+    def test_dia_em_que_a_camera_perdeu_gente_entra_com_a_manual_convertida(self):
+        # Um dia bom (camera = 90% da manual) define o fator; no dia ruim a camera contou
+        # 50%, entao vale a manual x 0.9 (a missa continua servindo de exemplo).
+        self.sessao("concluida", ocupacao=100, comungantes=80, sistema=90)
+        self.sessao("concluida", ocupacao=200, comungantes=150, sistema=100)
+        self.assertEqual(list(self.montar_dataset()["ocupacao_final"]), [90, 180])
 
-    def test_sem_contagem_da_camera_fica_de_fora(self):
+    def test_missa_sem_contagem_da_camera_entra_com_a_manual_convertida(self):
+        self.sessao("concluida", ocupacao=100, comungantes=80, sistema=90)
         self.sessao("concluida", ocupacao=100, comungantes=80, sistema=None)
-        self.assertEqual(len(self.montar_dataset()), 0)
+        self.assertEqual(list(self.montar_dataset()["ocupacao_final"]), [90, 90])
+
+    def test_sem_nenhum_dia_de_camera_boa_usa_a_manual_como_esta(self):
+        self.sessao("concluida", ocupacao=100, comungantes=80, sistema=None)
+        self.assertEqual(list(self.montar_dataset()["ocupacao_final"]), [100])
 
     def test_ocupacao_zero_ou_negativa_fica_de_fora(self):
         self.sessao("concluida", ocupacao=0, comungantes=10)
