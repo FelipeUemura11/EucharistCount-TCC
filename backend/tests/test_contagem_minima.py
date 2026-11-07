@@ -5,12 +5,11 @@ Rodar de dentro de backend/:
     python -m unittest discover -s tests -t .
 """
 
-import sys
 import unittest
-from pathlib import Path
 from types import SimpleNamespace
 
 from db import crud
+from integracao import regressao
 from integracao.estimativa import motivo_contagem_invalida
 from tests.base import TesteComBanco
 
@@ -20,12 +19,7 @@ try:
 except ImportError:  # sem as dependencias do motor (OpenCV, Ultralytics)
     sessao_de_monitoramento = None
 
-try:
-    import pandas  # noqa: F401
-except ImportError:
-    pandas = None
 
-PASTA_DB = Path(__file__).resolve().parent.parent / "db"
 
 
 class TesteRegra(unittest.TestCase):
@@ -114,21 +108,13 @@ class TesteFechamentoDaSessao(TesteComBanco):
         self.assertEqual(self.fechar(entradas=0, saidas=0, config=config)["status"], "concluida")
 
 
-@unittest.skipIf(pandas is None, "pandas nao instalado")
 class TesteDatasetDaRegressao(TesteComBanco):
     def setUp(self):
         super().setUp()
-        # preparar_dataset.py roda solto (import database), entao entra com o proprio nome de modulo.
-        sys.path.insert(0, str(PASTA_DB))
-        self.addCleanup(sys.path.remove, str(PASTA_DB))
-
-        import database as banco_solto
-        import preparar_dataset
-        padrao = banco_solto.obter_conexao.__defaults__
-        banco_solto.obter_conexao.__defaults__ = (self.caminho,)
-        self.addCleanup(setattr, banco_solto.obter_conexao, "__defaults__", padrao)
-        self.montar_dataset = preparar_dataset.montar_dataset
         self.dia = 0
+
+    def montar(self):
+        return [e["ocupacao_final"] for e in regressao.exemplos(self.db)]
 
     def sessao(self, status, ocupacao, comungantes, sistema="igual"):
         """ocupacao = contagem manual; sistema = contagem da camera (igual a manual por padrao)."""
@@ -144,46 +130,46 @@ class TesteDatasetDaRegressao(TesteComBanco):
 
     def test_entra_contagem_concluida_e_coerente(self):
         self.sessao("concluida", ocupacao=100, comungantes=80)
-        self.assertEqual(list(self.montar_dataset()["ocupacao_final"]), [100])
+        self.assertEqual(self.montar(), [100])
 
     def test_comungantes_igual_a_ocupacao_entra(self):
         self.sessao("concluida", ocupacao=50, comungantes=50)
-        self.assertEqual(len(self.montar_dataset()), 1)
+        self.assertEqual(len(self.montar()), 1)
 
     def test_sessao_interrompida_fica_de_fora(self):
         self.sessao("interrompida", ocupacao=100, comungantes=80)
-        self.assertEqual(len(self.montar_dataset()), 0)
+        self.assertEqual(len(self.montar()), 0)
 
     def test_comungantes_maior_que_presentes_fica_de_fora(self):
         # Contagem com oclusao: 8 contados, 150 comungaram.
         self.sessao("concluida", ocupacao=8, comungantes=150)
-        self.assertEqual(len(self.montar_dataset()), 0)
+        self.assertEqual(len(self.montar()), 0)
 
     def test_a_variavel_de_treino_e_a_contagem_da_camera(self):
         # A regressao e usada com a contagem da camera, entao treina com ela.
         self.sessao("concluida", ocupacao=100, comungantes=80, sistema=88)
-        self.assertEqual(list(self.montar_dataset()["ocupacao_final"]), [88])
+        self.assertEqual(self.montar(), [88])
 
     def test_dia_em_que_a_camera_perdeu_gente_entra_com_a_manual_convertida(self):
         # Um dia bom (camera = 90% da manual) define o fator; no dia ruim a camera contou
         # 50%, entao vale a manual x 0.9 (a missa continua servindo de exemplo).
         self.sessao("concluida", ocupacao=100, comungantes=80, sistema=90)
         self.sessao("concluida", ocupacao=200, comungantes=150, sistema=100)
-        self.assertEqual(list(self.montar_dataset()["ocupacao_final"]), [90, 180])
+        self.assertEqual(self.montar(), [90, 180])
 
     def test_missa_sem_contagem_da_camera_entra_com_a_manual_convertida(self):
         self.sessao("concluida", ocupacao=100, comungantes=80, sistema=90)
         self.sessao("concluida", ocupacao=100, comungantes=80, sistema=None)
-        self.assertEqual(list(self.montar_dataset()["ocupacao_final"]), [90, 90])
+        self.assertEqual(self.montar(), [90, 90])
 
     def test_sem_nenhum_dia_de_camera_boa_usa_a_manual_como_esta(self):
         self.sessao("concluida", ocupacao=100, comungantes=80, sistema=None)
-        self.assertEqual(list(self.montar_dataset()["ocupacao_final"]), [100])
+        self.assertEqual(self.montar(), [100])
 
     def test_ocupacao_zero_ou_negativa_fica_de_fora(self):
         self.sessao("concluida", ocupacao=0, comungantes=10)
         self.sessao("concluida", ocupacao=-4, comungantes=10)
-        self.assertEqual(len(self.montar_dataset()), 0)
+        self.assertEqual(len(self.montar()), 0)
 
 
 if __name__ == "__main__":

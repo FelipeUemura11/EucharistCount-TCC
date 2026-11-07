@@ -134,7 +134,9 @@ A configuração efetiva, já com os argumentos aplicados, fica gravada em `sess
 |---|---|---|---|
 | `GET /api/status` | `rotas/status.py` | Se há contagem ativa | Selo "Contagem ativa" no topo das páginas (a cada 5 s) |
 | `GET /api/dashboard` | `rotas/dashboard.py` | Métricas, gráfico e resumo da missa atual ou da última | Página Dashboard (a cada 2 s) |
-| `GET /api/celebracoes` | `rotas/celebracoes.py` | Celebrações do mês corrente | Ainda não usado (a página Celebrações usa dados fixos) |
+| `GET /api/celebracoes` | `rotas/celebracoes.py` | Celebrações de um mês (`?ano=&mes=`) | Página Celebrações (calendário) |
+| `POST /api/celebracoes` / `DELETE /api/celebracoes/{id}` | `rotas/celebracoes.py` | Cria ou cancela uma celebração avulsa (seção 4.4) | Página Celebrações |
+| `POST /api/sessoes/{id}/comungantes` | `rotas/comunhao.py` | Grava quantos comungaram de verdade e recalcula a estimativa (seção 8.1) | Dashboard, no fim da missa |
 | `GET /api/historico` | `rotas/historico.py` | Missas encerradas, com os resultados | Página Histórico (a cada 10 s) |
 | `GET /api/configuracoes` | `rotas/configuracoes.py` | Agenda padrão e dados da câmera (`infoCamera`) | Página Configurações |
 | `POST /api/configuracoes/agenda` | `rotas/configuracoes.py` | O horário criado, com `id` | Página Configurações (botão "Adicionar") |
@@ -230,6 +232,7 @@ De onde vem cada campo:
 | `estimativaComunhao` | `calcular_estimativa(db, ocupação, celebracao=celebracao).comungantes` (seção 8) | Junto com a ocupação |
 | `hostiasSugeridas` | `calcular_estimativa(db, ocupação, celebracao=celebracao).hostias` (com `margem_hostias` do banco) | Junto com a ocupação |
 | `contagemDescartada` | `true` quando a última contagem terminou descartada (`sessao.status = 'interrompida'` com "Contagem descartada" nas observações, ver `DOCUMENTACAO_BANCO.md`, seção 5.2). Nesse caso `estimativaComunhao` e `hostiasSugeridas` vêm `0` e a tela mostra uma faixa de aviso e "—" nos três cards de estimativa, em vez de uma tela zerada sem explicação. As sessões interrompidas por erro ou queda de energia não entram: a tela continua mostrando a última contagem válida | Junto com a ocupação |
+| `sessaoId`, `aguardandoConfirmacao` | A sessão mostrada e se ela ainda espera quantos comungaram: `true` numa contagem encerrada e válida sem `comungantes_reais`. A tela pergunta (seção 8.1) | Junto com a ocupação |
 | `possivelSubcontagem` | `contagem_abaixo_do_habitual()`: `true` quando a contagem está abaixo de 70% da mediana do histórico do mesmo dia e horário. A tela mostra "Possível subcontagem" (`DOCUMENTACAO_BANCO.md`, seção 9.4) | Junto com a ocupação |
 | `contagemAtiva` | `sessao["status"] == "em_andamento"` | `false` quando mostra a última missa encerrada |
 | `graficoOcupacao[]` | `instantaneo_ocupacao`: `hora` = `hora_de_timestamp(registrado_em)`, `ocupacao` = `ocupacao_atual` | A cada 5 s de vídeo |
@@ -567,6 +570,31 @@ python -c "from db.database import obter_conexao; from integracao.estimativa imp
 ```
 
 **Por que em `integracao/`:** é regra de negócio usada pelos dois lados, API e gravação. O arquivo não importa o `motor`, então a API continua rodando sem a `ultralytics`.
+
+---
+
+### 8.1 A estimativa melhora com o tempo (`integracao/regressao.py`)
+
+A câmera sozinha não sabe quantos comungam; quem ensina é a própria paróquia. No fim de cada missa contada, o Dashboard pergunta "Quantas pessoas comungaram?", com a estimativa do sistema já preenchida:
+
+| Resposta | O que é gravado |
+|---|---|
+| "Está certo" | A estimativa vira `estimativa_comunhao.comungantes_reais` |
+| "Corrigir" + um número | O número informado vira `comungantes_reais` |
+| Ninguém responde | Quando a próxima missa começa a ser contada, a estimativa vira `comungantes_reais` (decisão da equipe), e a sessão ganha a nota "Comunhão não confirmada: vale a estimativa do sistema", para dar para separar depois |
+
+A resposta **só alimenta o banco**: a tela continua mostrando, para aquela missa, a estimativa gravada no fechamento (a mesma do Histórico). Uma contagem descartada ou interrompida não é perguntada (`409` se alguém tentar), porque o número de pessoas dela não vale.
+
+Cada confirmação chama `atualizar_estimativa()`:
+
+1. Recalcula o coeficiente (comungantes ÷ contagem da câmera) com todas as missas que têm a comunhão contada.
+2. Com 15 missas ou mais, treina a regressão (dia da semana, horário e tipo, além da contagem) e compara as duas pelo erro médio em *leave-one-out*, nas mesmas missas.
+3. **A regressão só passa a valer se errar menos que o coeficiente.** Se deixar de ser melhor, a estimativa volta para o coeficiente.
+4. Grava uma versão nova em `configuracao_estimativa` só quando algo mudou, mantendo a margem de hóstias vigente.
+
+O `scikit-learn` vai dentro do `.exe` (`DOCUMENTACAO_DISTRIBUICAO.md`), então o treino acontece no próprio computador da paróquia, sem ninguém rodar script. Como o `.exe` não troca de versão sozinho, o modelo salvo em `.joblib` é sempre lido pela mesma versão que o gravou.
+
+**Banco novo.** No primeiro uso, com o banco ainda sem nenhuma sessão, o `main.py` importa o `counting_people.csv` embutido (`semear_banco_novo`), e a estimativa já nasce calculada com as missas de referência.
 
 ---
 

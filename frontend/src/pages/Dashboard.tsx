@@ -4,6 +4,7 @@ import EstatisticasDashboard from "../components/dashboard/EstatisticasDashboard
 import GraficoOcupacao from "../components/dashboard/GraficoOcupacao";
 import AvisoContagemBaixa from "../components/dashboard/AvisoContagemBaixa";
 import AvisoContagemDescartada from "../components/dashboard/AvisoContagemDescartada";
+import ConfirmarComunhao from "../components/dashboard/ConfirmarComunhao";
 import { useDashboard } from "../hooks/useDashboard";
 
 export default function Dashboard() {
@@ -16,6 +17,14 @@ export default function Dashboard() {
             {/* Aviso (se houver), cards no topo, grafico e resumo lado a lado e a estimativa por ultimo. */}
             {metricas.contagemDescartada && <AvisoContagemDescartada />}
             {metricas.possivelSubcontagem && <AvisoContagemBaixa />}
+            {metricas.aguardandoConfirmacao && metricas.sessaoId !== null && (
+                // key: uma missa nova recomeca o formulario.
+                <ConfirmarComunhao
+                    key={metricas.sessaoId}
+                    sessaoId={metricas.sessaoId}
+                    estimativa={metricas.estimativaComunhao}
+                />
+            )}
             <EstatisticasDashboard metricas={metricas} />
             <section>
                 <div className="grid grid-cols-[1fr_380px] gap-6 max-[1400px]:grid-cols-[1fr_340px] max-[1024px]:grid-cols-1">

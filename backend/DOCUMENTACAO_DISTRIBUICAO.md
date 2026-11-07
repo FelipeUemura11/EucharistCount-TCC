@@ -24,6 +24,7 @@ O PyInstaller (`--onefile`) embute o interpretador Python e tudo o que o código
 | `config.json` | Padrão de fábrica da contagem e da linha | `motor/config.py` |
 | `bytetrack_ajustado.yaml` | Configuração do rastreador | `motor/detector.py` |
 | `db/schema.sql` | Criação das tabelas na primeira execução | `db/database.py` |
+| `counting_people.csv` | Missas de referência do banco novo | `main.py` (`regressao.semear_banco_novo`) |
 | Arquivos do Ultralytics | YAMLs internos de configuração e trackers | `collect_data_files("ultralytics")` |
 
 Com o modelo e o `config.json` já calibrados dentro do `.exe`, **o cliente não roda `preparar_modelo.py` nem ajusta a linha**. O `preparar_modelo.py` roda uma vez, na máquina de build.
@@ -93,7 +94,8 @@ O `modelos/*.onnx` e o `frontend/dist` não estão no Git (são regenerados), en
 | `--onefile` | Um arquivo só para entregar. O custo é descompactar a cada abertura, por isso dados persistentes ficam em `%APPDATA%` |
 | `lap==0.5.13` no `requirements.txt` | O ByteTrack do Ultralytics precisa do `lap`. Sem ele, o Ultralytics tenta instalá-lo em tempo de execução, o que não funciona dentro do `.exe` |
 | `copy_metadata` no `.spec` | O Ultralytics confere versões de pacotes pelos metadados e, se não os acha, tenta `pip install`. O APScheduler também localiza seus componentes pelos metadados |
-| Regressão fora do `.exe` | `sklearn` não é importado pelo `main.py`, então não entra no build. O cliente começa com o coeficiente fixo padrão (0,89, calibrado na contagem da câmera) e margem de 12%, e a estimativa funciona; a regressão depende de treino com dados reais (ver `DOCUMENTACAO_BANCO.md`) |
+| `scikit-learn` dentro do `.exe` | A estimativa aprende na própria paróquia: cada missa confirmada no fim retreina a regressão no computador da igreja (`DOCUMENTACAO_API.md`, seção 8.1). O `.exe` não troca de versão sozinho, então o modelo `.joblib` é lido pela mesma versão do `scikit-learn` que o gravou |
+| `counting_people.csv` dentro do `.exe` | O banco do cliente nasce vazio; no primeiro uso o `main.py` importa as missas de referência, e a estimativa já começa calculada com elas |
 | Início com o Windows pela chave `Run` | Simples, sem administrador. Alguns antivírus desconfiam de programas que se registram sozinhos; o instalador (Inno Setup) é o caminho mais limpo e fica como evolução |
 | Trava por porta, não por arquivo | Libera sozinha em queda de energia e funciona nos dois sistemas |
 

@@ -19,6 +19,8 @@ export interface MetricasDashboard {
   contagemAtiva: boolean;
   possivelSubcontagem: boolean; // contagem bem abaixo do habitual do horario
   contagemDescartada: boolean; // ultima contagem descartada: estimativa e hostias nao valem
+  sessaoId: number | null; // sessao mostrada, para confirmar os comungantes
+  aguardandoConfirmacao: boolean; // missa encerrada esperando quantos comungaram de verdade
 }
 
 export interface DadosDashboard {

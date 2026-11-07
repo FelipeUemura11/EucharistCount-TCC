@@ -19,20 +19,23 @@ datas = [
     (str(RAIZ / "config.json"), "."),                            # padrao de fabrica
     (str(RAIZ / "bytetrack_ajustado.yaml"), "."),                # rastreio.algoritmo
     (str(RAIZ / "db" / "schema.sql"), "db"),                     # inicializar_banco()
+    (str(RAIZ / "counting_people.csv"), "."),                    # missas de referencia do banco novo
 ]
 
 # YAMLs internos do Ultralytics (configuracao e trackers).
 datas += collect_data_files("ultralytics")
 
-# Modulos carregados por nome, que o PyInstaller nao enxerga.
-hiddenimports = collect_submodules("uvicorn") + collect_submodules("apscheduler")
+# Modulos carregados por nome, que o PyInstaller nao enxerga. O scikit-learn vai inteiro:
+# a regressao treina no proprio computador da paroquia e o joblib precisa das classes dele.
+hiddenimports = (collect_submodules("uvicorn") + collect_submodules("apscheduler")
+                 + collect_submodules("sklearn"))
 
 # Ultralytics e APScheduler consultam os metadados dos pacotes; sem eles
 # o Ultralytics tenta instalar via pip, o que nao funciona dentro do exe.
 for pacote in (
     "ultralytics", "onnx", "onnxruntime", "lap", "torch", "torchvision",
     "numpy", "opencv-python", "pillow", "pyyaml", "requests", "scipy",
-    "tqdm", "psutil", "apscheduler",
+    "tqdm", "psutil", "apscheduler", "scikit-learn", "joblib", "threadpoolctl", "pandas",
 ):
     try:
         datas += copy_metadata(pacote)

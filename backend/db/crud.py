@@ -511,6 +511,10 @@ def registrar_estimativa(
     conexao.commit()
 
 
+def obter_estimativa_da_sessao(conexao: sqlite3.Connection, sessao_id: int) -> sqlite3.Row | None:
+    return conexao.execute("SELECT * FROM estimativa_comunhao WHERE sessao_id = ?", (sessao_id,)).fetchone()
+
+
 def ajustar_estimativa(conexao: sqlite3.Connection, sessao_id: int,
                         estimativa_ajustada: int | None = None,
                         hostias_ajustadas: int | None = None,

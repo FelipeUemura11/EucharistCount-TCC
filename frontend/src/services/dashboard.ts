@@ -23,3 +23,13 @@ export async function buscarDashboard(): Promise<DadosDashboard> {
         throw error;
     }
 }
+
+// Quantos comungaram de verdade: so alimenta o banco, que recalcula a estimativa.
+export async function confirmarComungantes(sessaoId: number, comungantes: number): Promise<void> {
+    const response = await fetch(`/api/sessoes/${sessaoId}/comungantes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comungantes }),
+    });
+    if (!response.ok) throw new Error("Não foi possível salvar. Tente de novo.");
+}

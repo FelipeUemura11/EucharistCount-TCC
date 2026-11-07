@@ -34,6 +34,9 @@ class MetricasDashboard(BaseModel):
     # True quando a ultima contagem foi descartada (menos que o minimo, ou mais saidas que entradas):
     # os numeros de estimativa e hostias nao valem.
     contagemDescartada: bool = False
+    # Sessao mostrada (para confirmar os comungantes) e se ela ainda espera essa confirmacao.
+    sessaoId: int | None = None
+    aguardandoConfirmacao: bool = False
 
 
 class DadosDashboard(BaseModel):
@@ -92,6 +95,11 @@ class CelebracaoCriar(BaseModel):
         if self.fimGravacao <= self.inicioGravacao:
             raise ValueError("O fim da gravação deve ser depois do início.")
         return self
+
+
+class ConfirmacaoComunhao(BaseModel):
+    """Corpo do POST /api/sessoes/{id}/comungantes: quantos comungaram de verdade."""
+    comungantes: int = Field(ge=0, le=5000)
 
 
 class RegistroHistorico(BaseModel):

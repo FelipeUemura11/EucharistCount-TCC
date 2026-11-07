@@ -6,13 +6,12 @@ Rodar de dentro de backend/:
     python -m unittest discover -s tests -t .
 """
 
-import sys
 import unittest
 from datetime import datetime
-from pathlib import Path
 
 from api.rotas.dashboard import get_dashboard
 from db import crud
+from integracao import regressao
 from integracao.estimativa import (
     COEFICIENTE_PADRAO,
     MARGEM_HOSTIAS_PADRAO,
@@ -21,46 +20,34 @@ from integracao.estimativa import (
 )
 from tests.base import TesteComBanco
 
-PASTA_DB = Path(__file__).resolve().parent.parent / "db"
-
 # (manual, sistema, comungantes) de counting_people.csv. As tres ultimas sao dias
 # em que a camera perdeu de 32% a 49% das pessoas.
 DIAS_BONS = [(340, 282, 250), (155, 143, 140), (181, 176, 148), (140, 127, 108)]
 DIAS_RUINS = [(95, 52, 74), (240, 162, 184), (103, 53, 80)]
 
 
-class TesteCoeficiente(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        # O script roda solto (import database), entao entra com o proprio nome de modulo.
-        sys.path.insert(0, str(PASTA_DB))
-        cls.addClassCleanup(sys.path.remove, str(PASTA_DB))
-        import calcular_coeficiente_inicial
-        cls.calculo = calcular_coeficiente_inicial
-
+class TesteCoeficiente(TesteComBanco):
     def missas(self, dados):
-        return [
-            {"data": f"2026-10-{i + 1:02d}", "horario_missa": "18:00",
-             "manual": manual, "sistema": sistema, "comungantes_reais": comungantes}
-            for i, (manual, sistema, comungantes) in enumerate(dados)
-        ]
+        """Grava missas contadas a mao com a contagem da camera ao lado (como o CSV)."""
+        for i, (manual, sistema, comungantes) in enumerate(dados):
+            celebracao = crud.criar_celebracao(self.db, "Missa", f"2026-10-{i + 1:02d}", "18:00")
+            sessao = crud.iniciar_sessao(self.db, celebracao, origem_contagem="manual")
+            crud.finalizar_sessao(self.db, sessao, total_entradas=manual, total_saidas=0,
+                                  ocupacao_final=manual, contagem_sistema=sistema)
+            crud.registrar_estimativa(self.db, sessao, comungantes_reais=comungantes)
+        return regressao.coeficiente(regressao.exemplos(self.db))
 
     def test_dias_bons_dao_cerca_de_089(self):
-        coeficiente, usadas, descartadas = self.calculo.coeficiente_das_missas(self.missas(DIAS_BONS))
-        self.assertAlmostEqual(coeficiente, 0.889, places=3)
-        self.assertEqual((len(usadas), len(descartadas)), (4, 0))
+        self.assertAlmostEqual(self.missas(DIAS_BONS), 0.889, places=3)
 
-    def test_dias_de_obstrucao_ficam_de_fora(self):
-        coeficiente, usadas, descartadas = self.calculo.coeficiente_das_missas(self.missas(DIAS_BONS + DIAS_RUINS))
-        self.assertAlmostEqual(coeficiente, 0.889, places=3)
-        self.assertEqual((len(usadas), len(descartadas)), (4, 3))
+    def test_dias_de_obstrucao_nao_entram_no_coeficiente(self):
+        self.assertAlmostEqual(self.missas(DIAS_BONS + DIAS_RUINS), 0.889, places=3)
 
     def test_exatamente_no_limite_ainda_vale(self):
-        coeficiente, usadas, _ = self.calculo.coeficiente_das_missas(self.missas([(100, 75, 70)]))
-        self.assertEqual(len(usadas), 1)
+        self.assertAlmostEqual(self.missas([(100, 75, 70)]), 70 / 75, places=3)
 
-    def test_sem_nenhuma_missa_aproveitavel(self):
-        self.assertEqual(self.calculo.coeficiente_das_missas(self.missas(DIAS_RUINS))[0], None)
+    def test_sem_nenhuma_missa_com_a_camera_funcionando(self):
+        self.assertIsNone(self.missas(DIAS_RUINS))
 
 
 class TesteHostias(TesteComBanco):

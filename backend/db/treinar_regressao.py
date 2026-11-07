@@ -1,114 +1,28 @@
 """
-Treina o modelo de regressao para estimar comungantes a partir da ocupacao
-(e outras features disponiveis), e registra a nova versao em
-configuracao_estimativa.
+Recalcula a estimativa de comunhao com as missas do banco: o coeficiente e, a partir
+de 15 missas, a regressao, que so passa a valer se errar menos que o coeficiente.
 
-MINIMO DE DADOS: com poucas celebracoes, o modelo so "decora" os pontos
-que viu e nao generaliza. Este script recusa treinar com menos que
-MINIMO_AMOSTRAS e continua sugerindo o coeficiente fixo/media ate la.
+O programa faz o mesmo sozinho sempre que alguem confirma os comungantes de uma missa;
+este script e para rodar na mao (por exemplo, depois de importar um CSV).
 
-Uso:
+Uso (dentro de backend/db):
     python treinar_regressao.py
 """
 
+import sys
 from pathlib import Path
 
-import joblib
-import pandas as pd
-from sklearn.compose import ColumnTransformer
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error, r2_score
-from sklearn.model_selection import LeaveOneOut, cross_val_predict
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/
 
-from database import CAMINHO_BANCO, obter_conexao
-from preparar_dataset import montar_dataset
-import crud
-
-MINIMO_AMOSTRAS = 15  # abaixo disso, regressao linear nao e confiavel
-
-# Salva os modelos na mesma pasta base do banco (CAMINHO_BANCO.parent).
-# Quando empacotado com PyInstaller/Inno Setup, o banco fica em %APPDATA%\EucharistCount,
-# garantindo que os arquivos .joblib persistam fora da pasta temporaria (_MEI...).
-PASTA_BASE_MODELOS = CAMINHO_BANCO.parent
-CAMINHO_MODELOS = PASTA_BASE_MODELOS / "modelos_estimativa"
-
-FEATURES_NUMERICAS = ["ocupacao_final", "minutos_missa"]
-# dia_semana vai como categoria (one-hot): 0..6 nao e uma escala ordenada.
-FEATURES_CATEGORICAS = ["dia_semana", "tipo"]
-ALVO = "comungantes_reais"
-
-
-def montar_pipeline() -> Pipeline:
-    pre_processador = ColumnTransformer(
-        transformers=[
-            # handle_unknown='ignore': tipo/dia nunca visto no treino nao quebra a predicao.
-            ("categoricas", OneHotEncoder(handle_unknown="ignore"), FEATURES_CATEGORICAS),
-        ],
-        remainder="passthrough",  # mantem as numericas como estao
-    )
-    return Pipeline(steps=[
-        ("preprocessamento", pre_processador),
-        ("regressao", LinearRegression()),
-    ])
-
-
-def treinar() -> None:
-    df = montar_dataset()
-    n = len(df)
-
-    if n < MINIMO_AMOSTRAS:
-        print(
-            f"Apenas {n} celebracao(oes) com dado completo — abaixo do minimo "
-            f"recomendado ({MINIMO_AMOSTRAS}). Continue usando o coeficiente "
-            f"fixo (calcular_coeficiente_inicial.py) ate acumular mais missas."
-        )
-        return
-
-    X = df[FEATURES_NUMERICAS + FEATURES_CATEGORICAS]
-    y = df[ALVO]
-
-    pipeline = montar_pipeline()
-
-    # Com dataset pequeno, validacao "leave-one-out" (treina com todos menos
-    # 1, testa nesse 1, repete para cada linha) aproveita cada ponto ao
-    # maximo em vez de separar train/test fixo.
-    predicoes = cross_val_predict(pipeline, X, y, cv=LeaveOneOut())
-    mae = mean_absolute_error(y, predicoes)
-    r2 = r2_score(y, predicoes)
-
-    print(f"Validacao (leave-one-out, {n} amostras):")
-    print(f"  MAE (erro medio absoluto) : {mae:.1f} comungantes")
-    print(f"  R^2                       : {r2:.3f}")
-
-    # Modelo final: treinado com TODOS os dados (a validacao acima ja mediu
-    # a capacidade de generalizar; agora e so aproveitar tudo que se tem).
-    pipeline.fit(X, y)
-
-    CAMINHO_MODELOS.mkdir(parents=True, exist_ok=True)
-    # Nome com timestamp UTC: cada treino gera um .joblib novo, sem sobrescrever o anterior.
-    versao = pd.Timestamp.now("UTC").strftime("%Y%m%d_%H%M%S")
-    caminho_modelo = CAMINHO_MODELOS / f"regressao_comunhao_{versao}.joblib"
-    joblib.dump(pipeline, caminho_modelo)
-
-    conexao = obter_conexao()
-    # Razao media vira o coeficiente de fallback quando o modelo nao consegue prever.
-    coeficiente_fallback = (df[ALVO] / df["ocupacao_final"]).mean()
-
-    config_id = crud.definir_configuracao_estimativa(
-        conexao,
-        coeficiente_comunhao=round(coeficiente_fallback, 4),
-        metodo="regressao",
-        # Caminho relativo a pasta do banco; estimativa.py resolve ao carregar.
-        modelo_path=str(caminho_modelo.relative_to(PASTA_BASE_MODELOS)),
-        observacoes=f"Regressao linear treinada com {n} celebracoes. MAE={mae:.1f}, R2={r2:.3f}.",
-    )
-    conexao.close()
-
-    print(f"\nModelo salvo em: {caminho_modelo}")
-    print(f"Registrado em configuracao_estimativa (id={config_id}), metodo='regressao'.")
+from db import crud
+from db.database import obter_conexao
+from integracao import regressao
 
 
 if __name__ == "__main__":
-    treinar()
+    conexao = obter_conexao()
+    try:
+        print(regressao.atualizar_estimativa(conexao))
+        print(dict(crud.obter_configuracao_estimativa_vigente(conexao)))
+    finally:
+        conexao.close()

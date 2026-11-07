@@ -66,9 +66,20 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
     estimativa = calcular_estimativa(db, ocupacao, celebracao=celebracao)
     habitual = contagem_abaixo_do_habitual(db, ocupacao, celebracao, ao_vivo=ativa, agora=datetime.now())
 
+    # Missa encerrada mostra a estimativa gravada no fechamento (a mesma do Historico):
+    # o recalculo que vem depois de uma confirmacao vale para as proximas missas.
+    registro = crud.obter_estimativa_da_sessao(db, sessao["id"])
+    if not ativa and registro is not None and registro["estimativa_calculada"] is not None:
+        estimativa.comungantes = registro["estimativa_calculada"]
+        estimativa.hostias = registro["hostias_calculadas"] or 0
+
     # Contagem descartada: estimativa e hostias nao valem, entao nao vao para a tela.
     if descartada:
         estimativa.comungantes, estimativa.hostias, habitual = 0, 0, None
+
+    # Missa encerrada e valida, sem os comungantes confirmados: a tela pergunta.
+    aguardando = (not ativa and not descartada
+                  and (registro is None or registro["comungantes_reais"] is None))
 
     return DadosDashboard(
         metricas=MetricasDashboard(
@@ -80,6 +91,8 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
             contagemAtiva=ativa,
             possivelSubcontagem=habitual is not None,
             contagemDescartada=descartada,
+            sessaoId=sessao["id"],
+            aguardandoConfirmacao=aguardando,
         ),
         graficoOcupacao=grafico,
         resumoCelebracao=resumo,

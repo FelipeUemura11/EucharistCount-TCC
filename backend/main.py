@@ -20,6 +20,7 @@ from api.servidor import iniciar_em_background
 
 from cli import aplicar_argumentos, modo_manual, montar_argumentos
 from integracao import agendador as agenda
+from integracao import regressao
 from integracao.sessao import fechar_sessoes_presas, preencher_estimativas_atrasadas, sessao_de_monitoramento
 
 from motor.monitor import Monitor
@@ -123,6 +124,11 @@ def main() -> int:
                   f"terminado e foi(ram) fechada(s) como interrompida(s).")
 
         # Contagens antigas (ou cuja estimativa falhou) que ficaram com estimativa zerada no Historico.
+        # Banco novo (primeiro uso do .exe): entra com as missas de referencia e a estimativa ja calibrada.
+        semeadas = regressao.semear_banco_novo(RAIZ / "counting_people.csv")
+        if semeadas:
+            print(f"[!] Banco novo: {semeadas} missa(s) de referencia importada(s) do counting_people.csv.")
+
         atrasadas = preencher_estimativas_atrasadas()
         if atrasadas:
             print(f"[!] Estimativa calculada para {atrasadas} contagem(ns) que estava(m) sem.")

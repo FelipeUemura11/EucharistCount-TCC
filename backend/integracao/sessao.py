@@ -15,6 +15,7 @@ from typing import Iterator
 
 from db import crud
 from db.database import obter_conexao
+from integracao.regressao import assumir_estimativas_nao_confirmadas, atualizar_estimativa
 from integracao.estimativa import (
     motivo_contagem_invalida,
     preencher_estimativas_pendentes,
@@ -93,6 +94,13 @@ def sessao_de_monitoramento(
     # A fonte pode ser uma URL RTSP com senha: o banco guarda so a mascarada.
     parametros = asdict(config)
     parametros["camera"]["fonte"] = mascarar_senha(config.camera.fonte)
+
+    # Uma missa nova comecando: a anterior que ficou sem confirmacao passa a valer pela estimativa.
+    if assumir_estimativas_nao_confirmadas(conexao):
+        try:
+            print(f"[estimativa] {atualizar_estimativa(conexao)}")
+        except Exception as e:
+            print(f"[AVISO] Nao foi possivel recalcular a estimativa: {e}")
 
     sessao_id = crud.iniciar_sessao(
         conexao, celebracao_id,
