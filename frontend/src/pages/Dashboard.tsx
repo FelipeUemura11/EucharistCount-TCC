@@ -31,6 +31,7 @@ export default function Dashboard() {
                     <div className="min-w-0">
                         <GraficoOcupacao
                             pontos={graficoOcupacao}
+                            maxCapacity={metricas.capacidade}
                             currentValue={metricas.ocupacaoAtual}
                             inicioMonitoramento={resumoCelebracao?.inicioMonitoramento}
                             fimMonitoramento={resumoCelebracao?.fimMonitoramento}

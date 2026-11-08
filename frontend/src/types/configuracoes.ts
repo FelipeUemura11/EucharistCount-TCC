@@ -19,4 +19,5 @@ export interface InfoCamera {
 export interface ConfiguracoesGlobais {
     agendaPadrao: AgendaDia[];
     infoCamera: InfoCamera;
+    capacidade: number; // pessoas que cabem na igreja (grafico do Dashboard)
 }

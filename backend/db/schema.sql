@@ -213,6 +213,18 @@ CREATE TABLE IF NOT EXISTS evento_sistema (
 CREATE INDEX IF NOT EXISTS idx_evento_sistema_tempo ON evento_sistema(registrado_em);
 
 -- -----------------------------------------------------------------------------
+-- 8b. parametro
+-- -----------------------------------------------------------------------------
+-- Ajustes gerais da paroquia que a tela Configuracoes altera (ex.: capacidade
+-- da igreja, usada no grafico do Dashboard). Chave e valor em texto.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS parametro (
+    chave           TEXT PRIMARY KEY,
+    valor           TEXT NOT NULL,
+    atualizado_em   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S', 'now'))
+);
+
+-- -----------------------------------------------------------------------------
 -- 9. vw_historico — view de conveniencia para a tela "Historico"
 -- -----------------------------------------------------------------------------
 -- Junta celebracao + sessao (a mais recente concluida) + estimativa em uma

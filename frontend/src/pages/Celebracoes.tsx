@@ -4,8 +4,14 @@ import CalendarioCelebracoes from "../components/celebracoes/CalendarioCelebraco
 import ModalHorariosDia from "../components/celebracoes/ModalHorariosDia";
 import ModalNovaCelebracao from "../components/celebracoes/ModalNovaCelebracao";
 import { useCelebracoes } from "../hooks/useCelebracoes";
-import { cancelarCelebracao, criarCelebracao } from "../services/celebracoes";
-import type { Celebracao, CelebracaoCriar } from "../types/celebrations";
+import {
+    alterarMissaDaRotina,
+    cancelarCelebracao,
+    cancelarMissaDaRotina,
+    criarCelebracao,
+    editarCelebracao,
+} from "../services/celebracoes";
+import type { Celebracao, CelebracaoCriar, TipoCelebracao } from "../types/celebrations";
 import {
     dataIso,
     montarDiasDoMes,
@@ -24,6 +30,8 @@ export default function Celebracoes() {
     // Data (YYYY-MM-DD) do formulario aberto; null = formulario fechado.
     const [dataNova, setDataNova] = useState<string | null>(null);
     const [erroCancelar, setErroCancelar] = useState<string | null>(null);
+    // Celebracao aberta para editar (avulsa) ou alterar so no dia (rotina); null = nenhuma.
+    const [editando, setEditando] = useState<Celebracao | null>(null);
 
     const { celebracoes, recarregar } = useCelebracoes(periodo.ano, periodo.mes);
 
@@ -45,9 +53,12 @@ export default function Celebracoes() {
     const salvarNova = async (corpo: CelebracaoCriar) => {
         await criarCelebracao(corpo);
         setDataNova(null);
+        irPara(corpo.data);
+    };
 
-        // Criada em outro mes: o calendario vai para ele; no mesmo mes, so recarrega a lista.
-        const [ano, mes] = corpo.data.split("-").map(Number);
+    // Recarrega a lista do mes em que a celebracao ficou (outro mes = o calendario vai para ele).
+    const irPara = (data: string) => {
+        const [ano, mes] = data.split("-").map(Number);
         if (ano === periodo.ano && mes === periodo.mes) {
             recarregar();
         } else {
@@ -55,12 +66,31 @@ export default function Celebracoes() {
         }
     };
 
+    const salvarEdicao = async (corpo: CelebracaoCriar) => {
+        if (!editando) return;
+        if (editando.horarioPadraoId !== null) {
+            await alterarMissaDaRotina(editando.horarioPadraoId, corpo);
+        } else if (editando.id !== null) {
+            await editarCelebracao(editando.id, corpo);
+        }
+        setEditando(null);
+        irPara(corpo.data);
+    };
+
     const cancelar = async (celebracao: Celebracao) => {
-        if (!window.confirm(`Cancelar "${celebracao.titulo}"? A contagem não vai ligar nesse horário.`)) {
+        const daRotina = celebracao.horarioPadraoId !== null;
+        const aviso = daRotina
+            ? `Cancelar "${celebracao.titulo}" só neste dia? As outras semanas continuam.`
+            : `Cancelar "${celebracao.titulo}"? A contagem não vai ligar nesse horário.`;
+        if (!window.confirm(aviso)) {
             return;
         }
         try {
-            await cancelarCelebracao(celebracao.id);
+            if (daRotina && celebracao.horarioPadraoId !== null) {
+                await cancelarMissaDaRotina(celebracao.horarioPadraoId, celebracao.data);
+            } else if (celebracao.id !== null) {
+                await cancelarCelebracao(celebracao.id);
+            }
             setErroCancelar(null);
             recarregar();
         } catch (error) {
@@ -104,13 +134,35 @@ export default function Celebracoes() {
                 onNextMonth={() => mudarMes(1)}
             />
 
-            {selectedDay && dataNova === null && (
+            {selectedDay && dataNova === null && editando === null && (
                 <ModalHorariosDia
                     dateLabel={rotuloDoDia(periodo.ano, periodo.mes, selectedDay)}
                     celebracoes={celebracoesDoDia}
                     onClose={() => setSelectedDay(null)}
                     onNovaCelebracao={() => setDataNova(dataIso(periodo.ano, periodo.mes, selectedDay))}
                     onCancelar={cancelar}
+                    onEditar={setEditando}
+                />
+            )}
+
+            {editando !== null && (
+                <ModalNovaCelebracao
+                    dataInicial={editando.data}
+                    hoje={hojeIso}
+                    cabecalho={editando.horarioPadraoId !== null ? "Alterar neste dia" : "Editar celebração"}
+                    rotulo={editando.horarioPadraoId !== null ? "Só neste dia; as outras semanas continuam" : "Celebração avulsa"}
+                    inicial={{
+                        titulo: editando.titulo,
+                        tipo: editando.tipo as TipoCelebracao,
+                        data: editando.data,
+                        horarioMissa: editando.horarioMissa,
+                        inicioGravacao: editando.inicioMonitoramento,
+                        fimGravacao: editando.fimMonitoramento,
+                    }}
+                    mostrarRepetir={false}
+                    dataFixa={editando.horarioPadraoId !== null}
+                    onClose={() => setEditando(null)}
+                    onSalvar={salvarEdicao}
                 />
             )}
 

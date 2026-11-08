@@ -189,6 +189,27 @@ def limpar_celebracoes_vencidas(conexao: sqlite3.Connection, limite: str) -> int
 TIPOS_ESPECIAIS = ("especial", "natal", "pascoa", "casamento", "exequias")
 
 
+CAPACIDADE_PADRAO = 400
+
+
+def obter_capacidade(conexao: sqlite3.Connection) -> int:
+    """Capacidade da igreja (tela Configuracoes). 400 enquanto ninguem cadastrar."""
+    linha = conexao.execute("SELECT valor FROM parametro WHERE chave = 'capacidade'").fetchone()
+    return int(linha["valor"]) if linha else CAPACIDADE_PADRAO
+
+
+def definir_capacidade(conexao: sqlite3.Connection, capacidade: int) -> None:
+    conexao.execute(
+        """
+        INSERT INTO parametro (chave, valor) VALUES ('capacidade', ?)
+        ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor,
+            atualizado_em = strftime('%Y-%m-%dT%H:%M:%S', 'now')
+        """,
+        (str(capacidade),),
+    )
+    conexao.commit()
+
+
 def listar_contagens_do_horario(
     conexao: sqlite3.Connection, dia_semana: int, horario_missa: str, antes_de: str, limite: int = 8
 ) -> list[int]:
@@ -213,6 +234,20 @@ def listar_contagens_do_horario(
         (*TIPOS_ESPECIAIS, horario_missa, dia_semana, antes_de, limite),
     ).fetchall()
     return [linha["ocupacao_final"] for linha in linhas]
+
+
+def atualizar_celebracao(conexao: sqlite3.Connection, celebracao_id: int, **campos) -> None:
+    """Muda so os campos informados (titulo, tipo, horarios, status, ligacao com a agenda...)."""
+    permitidos = {"titulo", "tipo", "data", "horario_missa", "horario_inicio_monitoramento",
+                  "horario_fim_monitoramento", "horario_padrao_id", "origem", "status"}
+    desconhecidos = set(campos) - permitidos
+    if desconhecidos:
+        raise ValueError(f"campos que nao podem ser alterados: {sorted(desconhecidos)}")
+    if not campos:
+        return
+    atribuicoes = ", ".join(f"{nome} = ?" for nome in campos)
+    conexao.execute(f"UPDATE celebracao SET {atribuicoes} WHERE id = ?", (*campos.values(), celebracao_id))
+    conexao.commit()
 
 
 def listar_proximas_celebracoes(conexao: sqlite3.Connection, a_partir_de: str, limite: int = 20) -> list[sqlite3.Row]:

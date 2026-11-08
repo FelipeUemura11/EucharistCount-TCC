@@ -135,7 +135,9 @@ A configuração efetiva, já com os argumentos aplicados, fica gravada em `sess
 | `GET /api/status` | `rotas/status.py` | Se há contagem ativa | Selo "Contagem ativa" no topo das páginas (a cada 5 s) |
 | `GET /api/dashboard` | `rotas/dashboard.py` | Métricas, gráfico e resumo da missa atual ou da última | Página Dashboard (a cada 2 s) |
 | `GET /api/celebracoes` | `rotas/celebracoes.py` | Celebrações de um mês (`?ano=&mes=`) | Página Celebrações (calendário) |
-| `POST /api/celebracoes` / `DELETE /api/celebracoes/{id}` | `rotas/celebracoes.py` | Cria ou cancela uma celebração avulsa (seção 4.4) | Página Celebrações |
+| `POST /api/celebracoes` / `PUT` / `DELETE /api/celebracoes/{id}` | `rotas/celebracoes.py` | Cria, edita ou cancela uma celebração avulsa (seção 4.4) | Página Celebrações |
+| `POST /api/celebracoes/rotina/{id}/cancelar` / `PUT /api/celebracoes/rotina/{id}` | `rotas/celebracoes.py` | Cancela ou altera uma missa da rotina só numa data (seção 4.4) | Página Celebrações |
+| `PUT /api/configuracoes/capacidade` | `rotas/configuracoes.py` | Grava a capacidade da igreja (padrão 400) | Página Configurações |
 | `POST /api/sessoes/{id}/comungantes` | `rotas/comunhao.py` | Grava quantos comungaram de verdade e recalcula a estimativa (seção 8.1) | Dashboard, no fim da missa |
 | `GET /api/historico` | `rotas/historico.py` | Missas encerradas, com os resultados | Página Histórico (a cada 10 s) |
 | `GET /api/configuracoes` | `rotas/configuracoes.py` | Agenda padrão e dados da câmera (`infoCamera`) | Página Configurações |
@@ -252,7 +254,10 @@ Tela Celebrações. A agenda semanal fica em `/api/configuracoes` (seção 4.6);
 
 | Rota | Comportamento |
 |---|---|
-| `GET /api/celebracoes?ano=&mes=` | Celebrações do mês pedido (`crud.listar_celebracoes_do_mes`, que filtra por `data LIKE 'AAAA-MM%'`). Sem `ano` e `mes`, vale o mês atual. `mes` fora de 1 a 12 responde **422** |
+| `GET /api/celebracoes?ano=&mes=` | Celebrações do mês pedido (`crud.listar_celebracoes_do_mes`) e, de hoje em diante, as missas da rotina semanal que ainda não estão no banco, com `prevista: true`, `id: null` e o `horarioPadraoId`. Sem `ano` e `mes`, vale o mês atual. `mes` fora de 1 a 12 responde **422** |
+| `PUT /api/celebracoes/{id}` | Edita título, tipo, data e horários de uma celebração avulsa `agendada`, com as mesmas validações do `POST` (a própria janela não conta como sobreposição). Missa da rotina responde **409**: ela é alterada pela rota abaixo |
+| `POST /api/celebracoes/rotina/{id}/cancelar` | A missa da rotina não acontece nessa data (feriado, missa suspensa): grava a linha daquela data como `cancelada`, e o agendador não liga a câmera. As outras semanas continuam |
+| `PUT /api/celebracoes/rotina/{id}` | Altera a missa da rotina só nessa data. Com o mesmo horário de missa, a linha da data vira avulsa com a janela nova; com outro horário, a da rotina é cancelada nessa data e nasce uma avulsa no horário novo. O disparo semanal pula a data (`_executar_janela` vê que a linha não é mais da rotina) |
 | `POST /api/celebracoes` | Cria uma celebração **agendada** e responde **201** com o registro criado |
 | `DELETE /api/celebracoes/{id}` | Cancela (`status = 'cancelada'`). **404** se não existir; **409** se já estiver `em_andamento` ou `finalizada` |
 

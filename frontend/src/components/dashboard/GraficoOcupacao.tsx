@@ -20,7 +20,7 @@ interface GraficoOcupacaoProps {
 
 export default function GraficoOcupacao({
   pontos,
-  maxCapacity = 300,
+  maxCapacity = 400,
   currentValue,
   inicioMonitoramento,
   fimMonitoramento

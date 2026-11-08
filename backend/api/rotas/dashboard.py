@@ -32,7 +32,7 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
         return DadosDashboard(
             metricas=MetricasDashboard(
                 ocupacaoAtual=0, estimativaComunhao=0, hostiasSugeridas=0,
-                entradas=0, saidas=0, contagemAtiva=False,
+                entradas=0, saidas=0, contagemAtiva=False, capacidade=crud.obter_capacidade(db),
             ),
             graficoOcupacao=[], resumoCelebracao=None,
         )
@@ -93,6 +93,7 @@ def get_dashboard(db: sqlite3.Connection = Depends(obter_db)):
             contagemDescartada=descartada,
             sessaoId=sessao["id"],
             aguardandoConfirmacao=aguardando,
+            capacidade=crud.obter_capacidade(db),
         ),
         graficoOcupacao=grafico,
         resumoCelebracao=resumo,

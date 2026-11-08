@@ -25,3 +25,12 @@ export const removerAgendaPadrao = async (id: number): Promise<void> => {
     });
     if (!res.ok) throw new Error("Erro ao deletar agenda");
 };
+
+export const salvarCapacidade = async (capacidade: number): Promise<void> => {
+    const res = await fetch("/api/configuracoes/capacidade", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ capacidade })
+    });
+    if (!res.ok) throw new Error("Capacidade inválida: use um número entre 1 e 5000.");
+};

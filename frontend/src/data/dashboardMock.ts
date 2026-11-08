@@ -14,6 +14,7 @@ export const dashboardMock: DadosDashboard = {
     contagemDescartada: false,
     sessaoId: null,
     aguardandoConfirmacao: false,
+    capacidade: 400,
   },
   graficoOcupacao: [],
   resumoCelebracao: null,

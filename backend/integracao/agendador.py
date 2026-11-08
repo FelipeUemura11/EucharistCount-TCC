@@ -248,6 +248,8 @@ class Agendador:
                 )
                 celebracao = crud.obter_celebracao(conexao, celebracao_id)
                 cancelada = celebracao is not None and celebracao["status"] == "cancelada"
+                # Alterada so nesta data: virou celebracao avulsa, que tem o proprio disparo.
+                substituida = celebracao is not None and celebracao["horario_padrao_id"] != horario_id
             except BaseException:
                 self._ocupado.release()
                 raise
@@ -258,6 +260,9 @@ class Agendador:
         try:
             if cancelada:
                 print(f"[agenda] Missa das {rotulo}: celebracao cancelada, nao sera contada.")
+                return
+            if substituida:
+                print(f"[agenda] Missa das {rotulo}: alterada nesta data, contada pelo horario novo.")
                 return
             self._contar(celebracao_id, fim, rotulo)
         finally:

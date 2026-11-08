@@ -4,9 +4,10 @@ export type TipoCelebracao = 'comum' | 'especial' | 'natal' | 'pascoa' | 'casame
 
 // Espelha Celebracao de backend/api/schemas.py.
 export interface Celebracao {
-  id: number;
+  id: number | null; // null = missa da rotina ainda nao gravada (so prevista)
   titulo: string;
   tipo: string;
+  data: string; // "YYYY-MM-DD"
   dia: number;
   diaSemana: string;
   horarioMissa: string;
@@ -15,6 +16,8 @@ export interface Celebracao {
   pessoasEsperadas: number;
   capacidade: number;
   status: StatusCelebracao;
+  horarioPadraoId: number | null; // missa da rotina semanal
+  prevista: boolean;
 }
 
 // Corpo do POST /api/celebracoes (espelha CelebracaoCriar no backend).

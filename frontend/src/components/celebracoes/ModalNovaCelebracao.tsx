@@ -5,6 +5,12 @@ import type { CelebracaoCriar, TipoCelebracao } from '../../types/celebrations';
 interface ModalNovaCelebracaoProps {
   dataInicial: string; // "YYYY-MM-DD"
   hoje: string; // "YYYY-MM-DD", limite minimo do campo de data
+  // Para editar: cabecalho, valores ja preenchidos, sem "repetir" e, na rotina, com a data fixa.
+  cabecalho?: string;
+  rotulo?: string;
+  inicial?: Partial<CelebracaoCriar>;
+  mostrarRepetir?: boolean;
+  dataFixa?: boolean;
   onClose: () => void;
   // Rejeita com Error(mensagem) quando o backend recusa; a mensagem aparece no formulário.
   onSalvar: (corpo: CelebracaoCriar) => Promise<void>;
@@ -21,7 +27,17 @@ const tipos: { value: TipoCelebracao; label: string }[] = [
 
 const inputClassName = 'w-full rounded-lg border border-border bg-white px-3 py-2 text-sm font-semibold text-text-dark outline-none focus:border-secondary';
 
-export default function ModalNovaCelebracao({ dataInicial, hoje, onClose, onSalvar }: ModalNovaCelebracaoProps) {
+export default function ModalNovaCelebracao({
+  dataInicial,
+  hoje,
+  cabecalho = 'Nova celebração',
+  rotulo = 'Fora da agenda semanal',
+  inicial,
+  mostrarRepetir = true,
+  dataFixa = false,
+  onClose,
+  onSalvar,
+}: ModalNovaCelebracaoProps) {
   const [corpo, setCorpo] = useState<CelebracaoCriar>({
     titulo: '',
     tipo: 'comum',
@@ -30,6 +46,7 @@ export default function ModalNovaCelebracao({ dataInicial, hoje, onClose, onSalv
     inicioGravacao: '18:30',
     fimGravacao: '20:00',
     repetirSemanalmente: false,
+    ...inicial,
   });
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -62,8 +79,8 @@ export default function ModalNovaCelebracao({ dataInicial, hoje, onClose, onSalv
     <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/40 px-4 py-6">
       <form onSubmit={enviar} className="max-h-full w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-sm">
         <div className="border-b border-border p-6">
-          <p className="m-0 text-sm font-semibold uppercase text-text-muted">Fora da agenda semanal</p>
-          <h3 className="m-0 mt-1 text-2xl font-extrabold text-text-dark">Nova celebração</h3>
+          <p className="m-0 text-sm font-semibold uppercase text-text-muted">{rotulo}</p>
+          <h3 className="m-0 mt-1 text-2xl font-extrabold text-text-dark">{cabecalho}</h3>
           <p className="m-0 mt-1 text-sm text-text-muted">
             A contagem liga e desliga sozinha na janela de gravação, com o programa aberto.
           </p>
@@ -100,6 +117,7 @@ export default function ModalNovaCelebracao({ dataInicial, hoje, onClose, onSalv
               type="date"
               value={corpo.data}
               min={hoje}
+              disabled={dataFixa}
               onChange={(e) => alterar({ data: e.target.value })}
               className={inputClassName}
             />
@@ -136,20 +154,22 @@ export default function ModalNovaCelebracao({ dataInicial, hoje, onClose, onSalv
             </label>
           </div>
 
-          <label className="col-span-2 flex items-start gap-3 rounded-lg border border-border bg-app-bg p-4 max-[640px]:col-span-1">
-            <input
-              type="checkbox"
-              checked={corpo.repetirSemanalmente}
-              onChange={(e) => alterar({ repetirSemanalmente: e.target.checked })}
-              className="mt-0.5 size-4 accent-secondary"
-            />
-            <span>
-              <span className="block text-sm font-bold text-text-dark">Repetir toda semana neste dia</span>
-              <span className="block text-sm text-text-muted">
-                Também entra na agenda semanal (Configurações), no mesmo dia da semana e horário. Sem marcar, vale só para esta data.
+          {mostrarRepetir && (
+            <label className="col-span-2 flex items-start gap-3 rounded-lg border border-border bg-app-bg p-4 max-[640px]:col-span-1">
+              <input
+                type="checkbox"
+                checked={corpo.repetirSemanalmente}
+                onChange={(e) => alterar({ repetirSemanalmente: e.target.checked })}
+                className="mt-0.5 size-4 accent-secondary"
+              />
+              <span>
+                <span className="block text-sm font-bold text-text-dark">Repetir toda semana neste dia</span>
+                <span className="block text-sm text-text-muted">
+                  Também entra na agenda semanal (Configurações), no mesmo dia da semana e horário. Sem marcar, vale só para esta data.
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
+          )}
 
           {erro && <p className="col-span-2 m-0 text-sm font-semibold text-red-600 max-[640px]:col-span-1">{erro}</p>}
         </div>

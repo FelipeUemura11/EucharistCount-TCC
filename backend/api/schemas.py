@@ -37,6 +37,8 @@ class MetricasDashboard(BaseModel):
     # Sessao mostrada (para confirmar os comungantes) e se ela ainda espera essa confirmacao.
     sessaoId: int | None = None
     aguardandoConfirmacao: bool = False
+    # Capacidade da igreja (tela Configuracoes), linha de referencia do grafico.
+    capacidade: int = 400
 
 
 class DadosDashboard(BaseModel):
@@ -47,9 +49,11 @@ class DadosDashboard(BaseModel):
 
 
 class Celebracao(BaseModel):
-    id: int
+    # id None = missa da rotina semanal ainda nao gravada no banco (so prevista no calendario).
+    id: int | None
     titulo: str
     tipo: str
+    data: str  # YYYY-MM-DD
     dia: int
     diaSemana: str
     horarioMissa: str
@@ -58,6 +62,8 @@ class Celebracao(BaseModel):
     pessoasEsperadas: int
     capacidade: int
     status: str
+    horarioPadraoId: int | None = None  # missa da rotina semanal
+    prevista: bool = False
 
 
 HORARIO = r"^([01]\d|2[0-3]):[0-5]\d$"  # HH:MM, 24h
@@ -102,6 +108,22 @@ class ConfirmacaoComunhao(BaseModel):
     comungantes: int = Field(ge=0, le=5000)
 
 
+class CancelamentoNaData(BaseModel):
+    """Corpo do POST /api/celebracoes/rotina/{id}/cancelar: a data em que a missa da rotina nao acontece."""
+    data: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+    @field_validator("data")
+    @classmethod
+    def data_valida_e_futura(cls, data: str) -> str:
+        if date.fromisoformat(data) < date.today():
+            raise ValueError("A data não pode estar no passado.")
+        return data
+
+
+class CapacidadeIgreja(BaseModel):
+    capacidade: int = Field(ge=1, le=5000)
+
+
 class RegistroHistorico(BaseModel):
     id: int
     data: str
@@ -141,3 +163,4 @@ class InfoCamera(BaseModel):
 class ConfiguracoesGlobais(BaseModel):
     agendaPadrao: list[AgendaDia]
     infoCamera: InfoCamera
+    capacidade: int

@@ -195,6 +195,8 @@ Uma data concreta com missa.
 
 `atualizado_em` é mantido por um gatilho (seção 4.3).
 
+Uma missa da rotina só vira linha nesta tabela quando é contada ou quando é mudada para uma data (cancelada ou alterada na tela Celebrações). Até lá, o calendário a mostra como prevista, calculada a partir de `horario_padrao`.
+
 **Celebrações avulsas que passam sem ser contadas são apagadas.** Uma avulsa (`origem = 'personalizada'`, sem `horario_padrao_id`) `agendada` ou `cancelada`, sem nenhuma sessão, é removida 24 horas depois do fim da gravação (`crud.limpar_celebracoes_vencidas`). A condição "sem sessão" é obrigatória: a sessão tem `ON DELETE CASCADE` e o `vw_historico` lê a celebração, então apagar uma missa contada apagaria o Histórico. As contadas ficam como `finalizada` para sempre.
 
 ### 3.3 `sessao_monitoramento`
@@ -255,6 +257,10 @@ Guardar as três separadas, em vez de sobrescrever uma com a outra, é o que sus
 ### 3.7 `evento_sistema`
 
 Um log leve de saúde e operação (câmera, modelo, reconexões, erros), pensado para alimentar uma seção "Saúde do sistema" no dashboard. Essa seção foi removida do frontend, e a tabela e as funções (`registrar_evento_sistema`, `ultimo_evento_por_componente`) **não são usadas** pelo motor nem pela API: ficam reservadas para um log de operação futuro.
+
+### 3.7b `parametro`
+
+Ajustes gerais da paróquia, em chave e valor. Hoje guarda só a `capacidade` da igreja, cadastrada em Configurações e usada como limite no gráfico do Dashboard (padrão 400 enquanto ninguém cadastrar; `crud.obter_capacidade` e `crud.definir_capacidade`).
 
 ### 3.8 `vw_historico` (view)
 

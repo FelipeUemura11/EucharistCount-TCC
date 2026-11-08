@@ -1,4 +1,4 @@
-import { Clock3, Plus, Trash2 } from 'lucide-react';
+import { Clock3, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Celebracao, StatusCelebracao } from '../../types/celebrations';
 
 interface ModalHorariosDiaProps {
@@ -7,6 +7,7 @@ interface ModalHorariosDiaProps {
   onClose: () => void;
   onNovaCelebracao: () => void;
   onCancelar: (celebracao: Celebracao) => void;
+  onEditar: (celebracao: Celebracao) => void;
 }
 
 const statusLabel: Record<StatusCelebracao, string> = {
@@ -29,6 +30,7 @@ export default function ModalHorariosDia({
   onClose,
   onNovaCelebracao,
   onCancelar,
+  onEditar,
 }: ModalHorariosDiaProps) {
   return (
     <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/40 px-4 py-6">
@@ -63,34 +65,47 @@ export default function ModalHorariosDia({
 
           {celebracoes.length === 0 ? (
             <p className="m-0 rounded-lg border border-dashed border-border bg-app-bg p-4 text-sm font-semibold text-text-muted">
-              As missas da agenda semanal aparecem aqui quando a contagem delas começa. Use "Nova celebração" para cadastrar uma missa fora da rotina.
+              Nenhuma missa neste dia. Use "Nova celebração" para cadastrar uma missa fora da rotina.
             </p>
           ) : (
             <div className="flex flex-col gap-3">
               {celebracoes.map((celebracao) => (
-                <article key={celebracao.id} className="rounded-lg border border-border bg-app-bg p-4">
+                <article key={`${celebracao.data}-${celebracao.horarioMissa}`} className="rounded-lg border border-border bg-app-bg p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h4 className="m-0 truncate text-base font-bold text-text-dark">{celebracao.titulo}</h4>
+                      {celebracao.horarioPadraoId !== null && (
+                        <p className="m-0 text-xs font-semibold uppercase text-text-muted">Rotina semanal</p>
+                      )}
                       <p className="m-0 mt-1 text-sm text-text-muted">
                         Missa às {celebracao.horarioMissa} · gravação {celebracao.inicioMonitoramento || '—'} às {celebracao.fimMonitoramento || '—'}
                       </p>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                       <span className={`rounded-full px-3 py-1 text-xs font-bold ${statusStyle[celebracao.status]}`}>
                         {statusLabel[celebracao.status]}
                       </span>
-                      {/* Só a agendada pode ser cancelada: em andamento e finalizada já têm contagem. */}
+                      {/* Só a agendada muda: em andamento e finalizada já têm contagem. Na rotina, vale só para este dia. */}
                       {celebracao.status === 'agendada' && (
-                        <button
-                          type="button"
-                          onClick={() => onCancelar(celebracao)}
-                          className="flex items-center gap-2 rounded-lg border border-red-100 bg-white px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 size={16} />
-                          Cancelar
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onEditar(celebracao)}
+                            className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-bold text-text-dark hover:bg-border-light"
+                          >
+                            <Pencil size={16} />
+                            {celebracao.horarioPadraoId !== null ? 'Alterar neste dia' : 'Editar'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onCancelar(celebracao)}
+                            className="flex items-center gap-2 rounded-lg border border-red-100 bg-white px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 size={16} />
+                            {celebracao.horarioPadraoId !== null ? 'Cancelar neste dia' : 'Cancelar'}
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
