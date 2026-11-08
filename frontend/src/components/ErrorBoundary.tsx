@@ -4,6 +4,7 @@ import { TriangleAlert } from 'lucide-react';
 interface Props { children: ReactNode }
 interface State { hasError: boolean }
 
+// Class component porque getDerivedStateFromError/componentDidCatch nao existem em hooks.
 export default class ErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false };
 

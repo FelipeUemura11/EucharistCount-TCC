@@ -13,7 +13,7 @@ Dois pontos importantes para o computador da igreja:
 
 import os
 import time
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Callable
 
 import cv2
 import numpy as np
@@ -25,10 +25,12 @@ class FonteVideo:
         fonte: str,
         fps_alvo: float = 6.0,
         segundos_reconexao: float = 3.0,
+        checar_interrupcao: Optional[Callable[[], bool]] = None,
     ):
         self.fonte = fonte
         self.fps_alvo = fps_alvo
         self.segundos_reconexao = segundos_reconexao
+        self.checar_interrupcao = checar_interrupcao
 
         self._cap: Optional[cv2.VideoCapture] = None
         self._ao_vivo = False
@@ -39,6 +41,9 @@ class FonteVideo:
 
         # Indice do frame que acabou de ser entregue, contado na fonte.
         self.indice_atual = 0
+
+        # Salto pedido por pular(), aplicado na proxima leitura do __iter__.
+        self._salto: Optional[int] = None
 
     @property
     def tempo_atual(self) -> float:
@@ -74,6 +79,57 @@ class FonteVideo:
             self._cap.release()
             self._cap = None
 
+    @property
+    def ao_vivo(self) -> bool:
+        """Webcam ou camera IP (definido em abrir(), mesmo se falhar)."""
+        return self._ao_vivo
+
+    def reconectar(self) -> bool:
+        """
+        Tenta reabrir um stream ate conseguir. Retorna False so se o
+        monitoramento for interrompido (checar_interrupcao) antes disso.
+        """
+        print(
+            f"[camera] Stream interrompido. "
+            f"Reconectando em {self.segundos_reconexao:.0f}s..."
+        )
+        self.fechar()
+
+        # Laco ate reabrir; so sai antes se o monitoramento for parado.
+        while True:
+
+            if self.checar_interrupcao and self.checar_interrupcao():
+                print("[camera] Monitoramento interrompido cancelando reconexao.")
+                return False
+
+            time.sleep(self.segundos_reconexao)
+
+            if self.abrir():
+                print("[camera] Reconectado.")
+                return True
+
+            print("[camera] Falha ao reconectar. Tentando novamente...")
+
+    def pular(self, segundos: float) -> Optional[float]:
+        """
+        Avanca (positivo) ou volta (negativo) o video, so para arquivo.
+
+        O salto vale a partir da proxima leitura do __iter__. Retorna o
+        instante de destino em segundos, ou None se nao der para pular
+        (camera ao vivo nao tem como voltar nem adiantar).
+        """
+        if self._ao_vivo or self._cap is None:
+            return None
+
+        destino = self.indice_atual + round(segundos * self.fps_original)
+        if self.total_frames > 0:
+            destino = min(destino, self.total_frames - 1)
+        destino = max(0, destino)
+
+        self._cap.set(cv2.CAP_PROP_POS_FRAMES, destino)
+        self._salto = destino
+        return destino / max(self.fps_original, 1e-6)
+
     # ---------- Leitura ----------
 
     def __iter__(self) -> Iterator[np.ndarray]:
@@ -86,16 +142,23 @@ class FonteVideo:
         if self._cap is None:
             raise RuntimeError("Chame abrir() antes de iterar.")
 
+        # Arquivo usa passo (1 a cada N frames); stream usa intervalo minimo em segundos.
         passo = self._calcular_passo()
         indice = 0
         ultimo_envio = 0.0
         intervalo_minimo = 1.0 / self.fps_alvo if self.fps_alvo > 0 else 0.0
 
         while True:
+            if self._salto is not None:
+                # pular() reposicionou a captura: o proximo read() entrega
+                # o frame `_salto`, e o indice local precisa acompanhar.
+                indice, self._salto = self._salto, None
+
             ok, frame = self._cap.read()
 
+            # Falha de leitura: stream tenta reconectar, arquivo chegou ao fim.
             if not ok:
-                if self._ao_vivo and self._reconectar():
+                if self._ao_vivo and self.reconectar():
                     continue
                 break
 
@@ -140,23 +203,8 @@ class FonteVideo:
         """Quantos frames pular entre processamentos (somente arquivo)."""
         if self.fps_alvo <= 0 or self.fps_original <= 0:
             return 1
+        # Ex.: origem 30 fps e alvo 7.5 fps -> processa 1 a cada 4 frames.
         return max(1, int(round(self.fps_original / self.fps_alvo)))
-
-    def _reconectar(self) -> bool:
-        """Tenta reabrir um stream que caiu. Retorna True se conseguiu."""
-        print(
-            f"[camera] Stream interrompido. "
-            f"Reconectando em {self.segundos_reconexao:.0f}s..."
-        )
-        self.fechar()
-        time.sleep(self.segundos_reconexao)
-
-        if self.abrir():
-            print("[camera] Reconectado.")
-            return True
-
-        print("[camera] Falha ao reconectar.")
-        return False
 
     # ---------- Informacao ----------
 

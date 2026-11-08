@@ -1,6 +1,6 @@
 # Backend — Eucharist Count
 
-Módulo de visão computacional para contagem de pessoas em celebrações litúrgicas.
+Módulo de visão computacional, banco de dados e API para contagem de pessoas em celebrações litúrgicas.
 
 Projetado para rodar **na máquina da paróquia**: CPU comum, sem placa de vídeo,
 sem conexão com a nuvem. Nenhuma imagem é armazenada.
@@ -11,21 +11,25 @@ sem conexão com a nuvem. Nenhuma imagem é armazenada.
 
 ```
 backend/
-├── main.py                  # ponto de entrada: só orquestra (argumentos → banco → API → motor)
+├── main.py                  # ponto de entrada: só orquestra (argumentos → banco → API → motor, agora ou pela agenda)
 ├── cli.py                   # argumentos de linha de comando → Config
 ├── gerar_dados.py           # popula o banco com dados de demonstração
 ├── config.json              # parâmetros ajustáveis (editável)
+├── .env.example             # modelo de configuração local (CAMERA_FONTE)
 ├── bytetrack_ajustado.yaml  # tracker ajustado para esta cena
-├── counting_people.csv      # contagem manual de referência (validação)
+├── counting_people.csv      # contagem manual × câmera × comungantes, por missa (formato em db/README.md)
 ├── requirements.txt
 │
 ├── DOCUMENTACAO_MOTOR.md    # o porquê de cada decisão do motor
 ├── DOCUMENTACAO_BANCO.md    # modelo de dados, com diagramas das tabelas
 ├── DOCUMENTACAO_API.md      # API, ligação motor → banco, dashboard ao vivo
+├── DOCUMENTACAO_DISTRIBUICAO.md  # empacotamento em .exe, caminhos, início com o Windows
+├── eucharist_count.spec     # receita do PyInstaller (um único .exe)
+├── inicializacao.py         # comportamento do .exe: log, instância única, início com o Windows
 │
 ├── motor/                   # Motor de Visão Computacional (OpenCV + YOLO + ByteTrack)
-│   ├── config.py            # carrega o config.json
-│   ├── camera.py            # captura: arquivo, webcam ou RTSP
+│   ├── config.py            # carrega o config.json e o .env
+│   ├── camera.py            # captura: arquivo, webcam ou RTSP (e salto A/D em arquivo)
 │   ├── detector.py          # YOLO + ByteTrack → lista de Pessoa
 │   ├── contador.py          # contagem por cruzamento de linha virtual
 │   ├── visual.py            # desenho (só para monitoramento)
@@ -33,25 +37,27 @@ backend/
 │
 ├── api/                     # servidor FastAPI — ver DOCUMENTACAO_API.md
 │   ├── app.py               # criar_app(): monta o FastAPI
-│   ├── servidor.py          # sobe o uvicorn numa thread
+│   ├── servidor.py          # sobe o uvicorn numa thread daemon (127.0.0.1:8000)
 │   ├── dependencias.py      # obter_db (uma conexão por requisição)
 │   ├── schemas.py           # modelos Pydantic (contrato com o frontend)
-│   ├── formatacao.py        # datas, hora local, dia da semana, status
+│   ├── formatacao.py        # datas, hora local, dia da semana
 │   ├── frontend.py          # serve o React compilado (frontend/dist)
-│   └── rotas/               # uma rota por tela: status, dashboard, celebracoes, historico
+│   └── rotas/               # uma rota por tela: status, dashboard, celebracoes, historico, configuracoes
 │
 ├── integracao/              # ponte motor ↔ banco
 │   ├── sessao.py            # GravadorSessao, abrir/fechar sessão, sessões presas
-│   └── estimativa.py        # estimativa de comunhão e hóstias
+│   ├── estimativa.py        # estimativa de comunhão e hóstias (coeficiente fixo e regressão)
+│   └── agendador.py         # APScheduler: liga e desliga a contagem nos horários da agenda
 │
 ├── db/                      # persistência SQLite — ver db/README.md
 │
+├── tests/                   # testes automatizados (unittest)
 ├── scripts/
 │   ├── preparar_modelo.py   # baixa e exporta o modelo para ONNX
 │   ├── calibrar.py          # descobre a melhor configuração pro seu vídeo
 │   └── calibrar_linha.py    # marca a linha de contagem por clique
 │
-├── modelos/                 # modelos .onnx (fora do Git)
+├── modelos/                 # modelos .onnx
 └── videos/                  # vídeos de teste (fora do Git)
 ```
 
@@ -73,6 +79,26 @@ pip install -r requirements.txt --extra-index-url https://download.pytorch.org/w
 O `--extra-index-url` é importante: sem ele o pip baixa a versão CUDA do
 PyTorch (~2.5 GB) que não serve para nada numa máquina sem GPU.
 
+### Configuração local (`.env`)
+
+A fonte da câmera da igreja costuma ser uma URL RTSP com usuário e senha.
+Ela vai num `.env`, que **não é versionado**, e não no `config.json`:
+
+```bash
+copy .env.example .env          # Windows
+# cp .env.example .env          # Linux/Mac
+```
+
+| Variável | O que faz |
+|---|---|
+| `CAMERA_FONTE` | **Obrigatória.** Fonte da câmera: arquivo de vídeo, índice de webcam (`0`) ou `rtsp://usuario:senha@ip:554/stream` |
+
+A fonte da câmera **não fica no `config.json`**: vem só do `.env` (ou do
+`--fonte` na linha de comando, que ganha dele). Sem nenhum dos dois, o motor
+avisa no terminal e não inicia, mas o dashboard continua no ar para consultas. Na tela de Configurações
+e no `parametros_contagem` gravado no banco, a senha da URL aparece
+mascarada (`rtsp://usuario:***@...`).
+
 ---
 
 ## Primeira execução
@@ -83,8 +109,8 @@ PyTorch (~2.5 GB) que não serve para nada numa máquina sem GPU.
 python -m scripts.calibrar
 ```
 
-Testa combinações de modelo/resolução/confiança nos frames do
-`videos/20-09-teste.mp4` e mede a velocidade **nesta máquina**. Os frames de teste
+Testa combinações de modelo/resolução/confiança nos frames da fonte configurada
+(`CAMERA_FONTE` no `.env` ou `--fonte`) e mede a velocidade **nesta máquina**. Os frames de teste
 ficam só em memória durante a execução — nada é salvo em disco.
 
 O script recomenda uma configuração com base em quantidade de detecções
@@ -96,14 +122,22 @@ e velocidade.
 python -m scripts.preparar_modelo --modelo yolo11n --imgsz 640
 ```
 
-Exporta para ONNX, que roda 2 a 4× mais rápido em CPU que o `.pt`.
+Exporta para ONNX, que roda 2 a 4× mais rápido em CPU que o `.pt`, e
+salva em `modelos/`. Por padrão o modelo é exportado com resolução
+**dinâmica**: o mesmo `.onnx` aceita qualquer `imgsz` (múltiplo de 32)
+definido no `config.json`. `--fixo` trava o modelo no `--imgsz` da
+exportação.
 
 ### 3. Posicione a linha de contagem e rode
 
 ```bash
 python -m scripts.calibrar_linha     # opcional: clique os 2 pontos da linha
-python main.py
+python main.py --agora               # conta agora, com a janela do vídeo
 ```
+
+Use `--agora` (ou `--fonte`) para testar: sem eles, o `main.py` entra no
+modo agendado e só conta nos horários cadastrados em Configurações
+(seção *Uso*).
 
 Ajuste `contagem.linha` no `config.json` até a linha amarela ficar sobre
 o portão. A seta verde **ENTRA** aponta para a esquerda e a vermelha
@@ -119,24 +153,32 @@ tupla pronta para colar no `config.json`.
 ## Uso
 
 ```bash
-# vídeo de teste
+# modo agendado (padrao): segue a agenda da tela Configuracoes, sem janela
+python main.py
+
+# modo manual: conta agora, com a fonte do .env
+python main.py --agora
+
+# vídeo de teste (passar --fonte tambem e modo manual)
 python main.py --fonte videos/20-09-teste.mp4
 
-# câmera IP da igreja
+# câmera IP da igreja (no dia a dia, prefira CAMERA_FONTE no .env:
+# na linha de comando, a senha fica no histórico do terminal)
 python main.py --fonte "rtsp://usuario:senha@192.168.1.50:554/stream1"
 
 # ajustar a linha do portao (x1,y1,x2,y2 em fracoes do frame)
 python main.py --linha 0.25,0.0,0.25,1.0
 
-# maquina fraca: menor resolucao, menos threads, sem janela
-python main.py --imgsz 480 --threads 2 --sem-janela
+# maquina fraca: menor resolucao, menos fps, sem janela
+python main.py --imgsz 480 --fps 7.5 --sem-janela
 ```
 
-**Teclas (janela do vídeo):** `ESC`/`Q` encerra a contagem · `ESPAÇO` pausa
+**Teclas (janela do vídeo, só no modo manual):** `ESC`/`Q` encerra a contagem · `ESPAÇO` pausa · `A`/`D` volta/avança 10s (somente em arquivo de vídeo; ao voltar, o trecho já contado roda em modo `REPLAY` sem duplicar contagens)
 
-Quando o vídeo acaba (ou com `ESC`), a contagem é encerrada e gravada no
+No modo manual, quando o vídeo acaba (ou com `ESC`), a contagem é encerrada e gravada no
 banco, mas **o programa continua rodando**: o dashboard em
 `http://127.0.0.1:8000` segue no ar mostrando os números finais da missa.
+O mesmo acontece se o modelo ou a fonte de vídeo falharem ao abrir: o motor exibe um aviso no terminal e mantém a interface web ativa.
 Para fechar o programa, `Ctrl+C` no terminal.
 
 Se a execução anterior tiver sido encerrada à força (queda de energia,
@@ -148,6 +190,41 @@ ou salvo em arquivo.
 
 Depois de qualquer mudança no frontend, rode `npm run build` na pasta
 `frontend`: o `main.py` serve a versão compilada (`frontend/dist`).
+
+### Por que o programa não fecha sozinho
+
+A API (uvicorn) e o agendador rodam em **threads daemon**. No Python, o
+processo termina assim que a thread principal acaba, e as threads daemon são
+derrubadas junto, sem esperar por elas. Por isso o final do `main.py` mantém
+a thread principal viva:
+
+```python
+while True:
+    time.sleep(1)
+```
+
+- **Sem esse loop**, o `main.py` iniciaria a API e o agendador, chegaria ao
+  fim e encerraria o processo: o dashboard sairia do ar logo após subir.
+- **`time.sleep(1)`, e não `pass`**: a thread fica dormindo quase o tempo
+  todo, sem ocupar 100% de um núcleo da CPU.
+- **Ctrl+C**: no Python, o `KeyboardInterrupt` só chega à thread principal.
+  Com o `sleep` curto ela acorda a cada segundo, recebe o Ctrl+C e entra no
+  `except KeyboardInterrupt`, que fecha a contagem em andamento antes de sair.
+  Um `thread.join()` sem timeout pode não responder ao Ctrl+C, principalmente
+  no Windows.
+- **Por que as threads continuam daemon**: se não fossem, o processo ficaria
+  vivo mesmo depois do Ctrl+C, porque a thread principal terminaria e as outras
+  continuariam rodando. Aí só daria para encerrar matando o processo.
+
+---
+
+## Testes
+
+```bash
+python -m unittest discover -s tests -t .
+```
+
+Cobrem as celebrações avulsas (validação, rotas, agendador e limpeza). Cada teste usa um banco SQLite temporário, então o `eucharist_count.db` não é tocado, e nenhum disparo real do agendador acontece. Não precisam de câmera, modelo nem dependência extra além do `requirements.txt`.
 
 ---
 
@@ -161,8 +238,9 @@ A cada frame o sistema calcula a **distância com sinal** entre os pés de
 cada pessoa e essa linha: o sinal diz de que lado ela está, o módulo diz
 a quantos pixels. Quando o lado muda, conta-se uma entrada ou uma saída.
 
-Em volta da linha existe uma **zona morta** de `margem` pixels para cada
-lado, onde nenhum lado é decidido. É ela que impede o tremor natural da
+Em volta da linha existe uma **zona morta** de `margem` para cada lado
+(uma fração da largura do frame; `0.035` = 3,5%), onde nenhum lado é
+decidido. É ela que impede o tremor natural da
 caixa delimitadora — o YOLO nunca desenha a caixa no mesmo pixel dois
 frames seguidos — de virar entrada e saída falsas para alguém parado em
 cima da linha. A travessia da faixa não precisa acontecer num único
@@ -210,7 +288,6 @@ Em ordem de impacto:
 | `fps_processamento` | maior ganho, menor perda. Pessoas não andam rápido o bastante para poucos fps ser insuficiente |
 | `imgsz: 480` | mais rápido que 640/960, mas perde pessoas ao fundo |
 | `modelo: yolo11n.onnx` | o mais leve que ainda detecta bem |
-| `threads` | limita o uso de CPU e mantém a máquina utilizável |
 | `mostrar_janela: false` | desenhar e exibir consome CPU à toa em produção |
 
 Se as pessoas do fundo não forem detectadas, o problema quase sempre é o
@@ -221,7 +298,7 @@ Se as pessoas do fundo não forem detectadas, o problema quase sempre é o
 ## Parâmetros do `config.json`
 
 **camera**
-- `fonte` — arquivo, `"0"` para webcam, ou URL `rtsp://`
+- `fonte` — **não vai aqui**: use `CAMERA_FONTE` no `.env` (ver *Configuração local*). Se aparecer no `config.json`, é ignorada com aviso
 - `fps_processamento` — quadros por segundo a analisar
 - `segundos_reconexao` — espera antes de retentar um stream caído
 
@@ -230,7 +307,7 @@ Se as pessoas do fundo não forem detectadas, o problema quase sempre é o
 - `imgsz` — resolução de inferência, múltiplo de 32
 - `confianca` — limiar (0–1); mais baixo detecta mais e erra mais
 - `iou` — limiar do NMS; baixo demais funde pessoas próximas numa caixa só
-- `threads` — limite de núcleos; `0` = automático
+- `max_deteccoes` — teto de pessoas por frame (padrão `300`)
 
 **rastreio**
 - `algoritmo` — arquivo do tracker. O padrão é o
@@ -244,8 +321,14 @@ Se as pessoas do fundo não forem detectadas, o problema quase sempre é o
 **filtro** — descarta caixas com geometria improvável para uma pessoa.
 Os limites são permissivos de propósito: numa igreja há gente sentada,
 de perfil e parcialmente oculta pelos bancos.
+- `ativo` — liga/desliga o filtro
+- `area_min` / `area_max` — área da caixa em fração da área do frame
+  (padrão `0.0001` a `0.35`)
+- `aspecto_min` / `aspecto_max` — proporção largura/altura da caixa
+  (padrão `0.10` a `3.2`)
 
 **contagem**
+- `ativo` — liga/desliga a contagem por linha
 - `linha` — dois pontos (x1,y1,x2,y2), em frações do frame, definindo a
   linha sobre o portão. Os pontos são ordenados de cima para baixo pelo
   próprio contador, então a ordem em que você os escreve não troca
@@ -253,9 +336,18 @@ de perfil e parcialmente oculta pelos bancos.
 - `margem` — meia-largura da zona morta, em fração da largura do frame.
   Maior = mais resistente a tremor, porém exige que a pessoa se afaste
   mais da linha para ser contada
+- `minimo_pessoas` — contagem final abaixo disso, ou com mais saídas que
+  entradas, é descartada (por obstrução na entrada): a sessão fica como
+  `interrompida`, sem estimativa, Histórico nem regressão. Padrão: 20
 - `segundos_cooldown` / `segundos_esquecer` — tempo mínimo entre duas
   contagens da mesma pessoa e tempo até esquecer quem sumiu do
   enquadramento, contados no tempo do vídeo (não da CPU)
+
+**visual** — a janela de monitoramento
+- `mostrar_janela` — abre a janela do vídeo. No modo agendado ela fica
+  sempre desligada (a contagem roda numa thread do agendador)
+- `escala_janela` — tamanho da janela em relação ao frame (padrão `0.6`)
+- `mostrar_linhas` — desenha a linha de contagem e a zona morta
 
 ---
 
@@ -281,17 +373,23 @@ versionados no Git — o `.gitignore` do projeto já bloqueia isso.
 
 - [x] API FastAPI servindo o dashboard — ver [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md)
 - [x] Motor gravando no banco durante a missa, com dashboard ao vivo
-- [ ] Agendamento automático com APScheduler
-- [ ] Empacotamento com PyInstaller
+- [x] Telas de Configurações (cadastro da agenda padrão) e Ajuda
+- [x] Estimativa de comunhão e hóstias por coeficiente fixo e por regressão linear (`.joblib`)
+- [x] Agendamento automático com APScheduler — agenda semanal e celebrações avulsas (`POST /api/celebracoes`), ver [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md), seções 9 e 9.6
+- [x] Empacotamento com PyInstaller — receita em `eucharist_count.spec`, ver [`DOCUMENTACAO_DISTRIBUICAO.md`](./DOCUMENTACAO_DISTRIBUICAO.md) *(build ainda não validado em Windows)*
+- [ ] Instalador (Inno Setup)
 
-`python main.py` já sobe tudo junto: o motor conta, grava no SQLite, e o
-dashboard em `http://127.0.0.1:8000` acompanha a contagem ao vivo e, ao fim
-do vídeo, continua mostrando o resultado da última missa. Ver
+`python main.py` já sobe tudo junto: banco, API e dashboard em
+`http://127.0.0.1:8000`, e a contagem, nos horários da agenda (modo
+agendado) ou na hora (`--agora` / `--fonte`). O motor grava no SQLite
+durante a missa, o dashboard acompanha ao vivo e, ao fim, continua
+mostrando o resultado da última missa, com a estimativa de comunhão
+gravada no Histórico. Ver
 [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md) para a organização do
 código em `api/` e `integracao/`,
 [`DOCUMENTACAO_BANCO.md`](./DOCUMENTACAO_BANCO.md) para o modelo de dados
 e [`../frontend/README.md`](../frontend/README.md) para o dashboard.
 
 A classe `Monitor` é controlada de fora por `executar(ao_atualizar=...)`
-e `parar()`, a mesma interface que o APScheduler vai usar para iniciar e
-encerrar o monitoramento no horário de cada missa.
+e `parar()`, a mesma interface que o agendador (`integracao/agendador.py`)
+usa para iniciar e encerrar o monitoramento no horário de cada missa.

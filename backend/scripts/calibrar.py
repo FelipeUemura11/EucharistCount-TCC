@@ -43,6 +43,7 @@ def amostrar_frames(caminho: str, quantidade: int) -> list[tuple[int, np.ndarray
 
     if total > 0:
         for i in range(quantidade):
+            # Meio de cada fatia do video, para nao pegar so inicio e fim.
             cap.set(cv2.CAP_PROP_POS_FRAMES, int(total * (i + 0.5) / quantidade))
             ok, frame = cap.read()
             if ok:
@@ -75,6 +76,7 @@ def descrever_video(caminho: str) -> None:
     if total > 0:
         print(f"Duracao   : {total / max(fps, 1):.0f}s ({total} frames)")
 
+    # Brilho medio do primeiro frame: cena escura pede confianca menor.
     ok, frame = cap.read()
     if ok:
         brilho = frame.mean()
@@ -111,6 +113,7 @@ def testar(amostras, modelos, resolucoes, confiancas) -> list[dict]:
                     for _, frame in amostras:
                         r = modelo.predict(
                             frame, imgsz=imgsz, conf=conf,
+                            # classes=[0]: so pessoa (COCO).
                             classes=[0], device="cpu", verbose=False,
                         )[0]
                         contagens.append(len(r.boxes))
@@ -118,6 +121,7 @@ def testar(amostras, modelos, resolucoes, confiancas) -> list[dict]:
                     print(f"{nome:<14}{imgsz:>7}{conf:>7.2f}  erro: {str(e)[:28]}")
                     continue
 
+                # ms/frame: tempo total do loop dividido pelo numero de amostras.
                 ms = (time.perf_counter() - inicio) / len(amostras) * 1000
                 media = float(np.mean(contagens))
                 maximo = int(np.max(contagens))
@@ -140,7 +144,7 @@ def main() -> int:
     )
     ap.add_argument("--fonte",
                     help="video, indice de webcam (0) ou rtsp://. "
-                         "Padrao: a fonte do config.json")
+                         "Padrao: CAMERA_FONTE do .env")
     ap.add_argument("--frames", type=int, default=8)
     ap.add_argument("--max-ms", type=float, default=400.0,
                     help="descarta configuracoes mais lentas que isto")
@@ -176,12 +180,14 @@ def main() -> int:
     if not resultados:
         return 1
 
+    # Filtra pelo limite de tempo; se nada passar, avalia todas.
     viaveis = [r for r in resultados if r["ms"] <= args.max_ms]
     if not viaveis:
         print(f"\n[AVISO] Nenhuma configuracao ficou abaixo de {args.max_ms:.0f}ms.")
         print("        Esta maquina pode nao dar conta em tempo real.")
         viaveis = resultados
 
+    # Sem gabarito, usa mais deteccoes como criterio; empate vai pra mais rapida.
     melhor = max(viaveis, key=lambda r: (r["media"], -r["ms"]))
 
     print(f"\nRECOMENDADO (mais deteccoes dentro do limite de tempo):")

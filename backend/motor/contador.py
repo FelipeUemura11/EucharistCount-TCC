@@ -89,6 +89,7 @@ class ContadorLinha:
     def __init__(self, config: ConfigContagem, largura: int, altura: int):
         self.config = config
         self.linha = self._preparar_linha(largura, altura)
+        # A margem da config e fracao da largura; aqui vira pixels.
         self.margem = config.margem * largura
         self.entradas = 0
         self.saidas = 0
@@ -114,6 +115,7 @@ class ContadorLinha:
         (ax, ay), (bx, by) = self.linha
         px, py = ponto
 
+        # Produto vetorial dividido pelo comprimento da linha = distancia em pixels, com sinal.
         produto = (bx - ax) * (py - ay) - (by - ay) * (px - ax)
         comprimento = math.hypot(bx - ax, by - ay)
 
@@ -128,6 +130,15 @@ class ContadorLinha:
         """Reinicia os contadores. Chamado no inicio de cada celebracao."""
         self.entradas = 0
         self.saidas = 0
+        self._rastros.clear()
+
+    def esquecer_rastros(self) -> None:
+        """
+        Esquece o lado de cada pessoa, mantendo entradas e saidas.
+
+        Chamado quando o video avanca ou volta: os lados guardados nao
+        valem mais e o tempo do video deixa de ser crescente.
+        """
         self._rastros.clear()
 
     # ---------- Ciclo principal ----------
@@ -174,18 +185,24 @@ class ContadorLinha:
             return None  # zona morta: lado indefinido, nada muda
 
         lado = 1 if distancia > 0 else -1
-        anterior, rastro.lado = rastro.lado, lado
+        anterior = rastro.lado
 
         if anterior == lado:
             return None  # continua do mesmo lado
         if anterior == 0:
+            rastro.lado = lado
             return None  # primeira vez fora da zona morta: so registra
 
         # Cooldown: quem acabou de ser contado nao conta de novo ao
-        # oscilar perto da linha.
+        # oscilar perto da linha. O lado NAO e atualizado aqui: continua
+        # sendo o da ultima contagem. Sem isso, quem entra, recua e entra
+        # de novo contava 2 entradas e 0 saidas; assim conta 1 entrada, e
+        # quem realmente voltou e ficou do outro lado e contado como saida
+        # quando o cooldown acabar.
         if agora - rastro.contado_em < self.config.segundos_cooldown:
             return None
 
+        rastro.lado = lado
         rastro.contado_em = agora
 
         sentido = Sentido(lado)  # foi para a esquerda = entrou

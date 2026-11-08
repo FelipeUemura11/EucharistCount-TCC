@@ -1,20 +1,23 @@
 import { useMemo, useState } from "react";
-import FiltrosHistorico from "../components/historico/FiltrosHistorico";
+import FiltrosHistorico, { PERIODO_TUDO } from "../components/historico/FiltrosHistorico";
 import TabelaHistorico from "../components/historico/TabelaHistorico";
 import { useHistorico } from "../hooks/useHistorico";
 import type { RegistroHistorico } from "../types/history";
+import { exportarCsv } from "../utils/exportarCsv";
 
 interface HistoryFilterState {
     searchTerm: string;
     periodInDays: number;
 }
 
+// A API entrega a data como dd/mm/aaaa.
 function parseDateFromHistory(dateString: string) {
     const [day, month, year] = dateString.split("/").map(Number);
 
     return new Date(year, month - 1, day);
 }
 
+// Dentro do periodo = ate N dias antes da data de referencia.
 function isWithinPeriod(
     recordDate: Date,
     referenceDate: Date,
@@ -28,6 +31,7 @@ function isWithinPeriod(
     return diffInDays >= 0 && diffInDays <= periodInDays;
 }
 
+// Data de referencia = registro mais recente, nao hoje: o periodo conta a partir do ultimo dado.
 function getLatestRecordDate(registros: RegistroHistorico[]) {
     return registros.reduce((latestDate, registro) => {
         const recordDate = parseDateFromHistory(registro.data);
@@ -37,6 +41,7 @@ function getLatestRecordDate(registros: RegistroHistorico[]) {
 
 export default function Historico() {
     const { registros } = useHistorico();
+    // draft = o que esta nos inputs; applied = o que filtra a tabela (so muda ao clicar em aplicar).
     const [draftSearchTerm, setDraftSearchTerm] = useState("");
     const [draftPeriodInDays, setDraftPeriodInDays] = useState(30);
     const [appliedFilters, setAppliedFilters] = useState<HistoryFilterState>({
@@ -44,6 +49,7 @@ export default function Historico() {
         periodInDays: 30,
     });
 
+    // Filtro no cliente: a API devolve todos os registros e busca/periodo sao aplicados aqui.
     const filteredRecords = useMemo(() => {
         if (registros.length === 0) {
             return [];
@@ -61,11 +67,13 @@ export default function Historico() {
             const matchesSearchTerm =
                 normalizedSearchTerm.length === 0 ||
                 searchableText.includes(normalizedSearchTerm);
-            const matchesPeriod = isWithinPeriod(
-                parseDateFromHistory(registro.data),
-                referenceDate,
-                appliedFilters.periodInDays,
-            );
+            const matchesPeriod =
+                appliedFilters.periodInDays === PERIODO_TUDO ||
+                isWithinPeriod(
+                    parseDateFromHistory(registro.data),
+                    referenceDate,
+                    appliedFilters.periodInDays,
+                );
 
             return matchesSearchTerm && matchesPeriod;
         });
@@ -78,8 +86,10 @@ export default function Historico() {
         });
     };
 
+    // Exportar ainda nao gera arquivo, so loga no console.
     const handleExportRecords = () => {
-        console.log("Exportando registros de histórico...");
+        if (filteredRecords.length === 0) return;
+        exportarCsv(filteredRecords);
     };
 
     return (
@@ -93,6 +103,8 @@ export default function Historico() {
             />
 
             <TabelaHistorico
+                // Novo filtro aplicado = key nova = tabela recomeça na página 1.
+                key={`${appliedFilters.searchTerm}|${appliedFilters.periodInDays}`}
                 registros={filteredRecords}
                 onExport={handleExportRecords}
             />

@@ -28,6 +28,7 @@ def main() -> int:
                          "o ONNX aceita qualquer resolucao em tempo de execucao")
     args = ap.parse_args()
 
+    # Import tardio: so carrega o ultralytics (pesado) quando o script roda.
     from ultralytics import YOLO
 
     PASTA_MODELOS.mkdir(parents=True, exist_ok=True)
@@ -55,6 +56,7 @@ def main() -> int:
         device="cpu",
     )
 
+    # O export grava ao lado do .pt; move para a pasta de modelos usada pelo config.
     destino = PASTA_MODELOS / f"{args.modelo}.onnx"
     origem = Path(caminho_onnx)
     if origem.resolve() != destino.resolve():

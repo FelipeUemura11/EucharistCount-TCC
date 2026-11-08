@@ -33,6 +33,7 @@ def cor_do_id(identificador: int | None) -> tuple[int, int, int]:
     if identificador is None:
         return (0, 200, 255)
 
+    # Semente derivada do ID: o mesmo ID sempre gera a mesma cor. Canais de 80 a 255 evitam tons escuros.
     rng = np.random.default_rng(identificador * 9781)
     return tuple(int(c) for c in rng.integers(80, 256, size=3))
 
@@ -43,6 +44,7 @@ def desenhar_pessoa(frame: np.ndarray, pessoa: Pessoa) -> None:
 
     cv2.rectangle(frame, (pessoa.x1, pessoa.y1), (pessoa.x2, pessoa.y2), cor, 2)
 
+    # Rotulo "ID n confianca" sobre a caixa, com fundo na cor do ID.
     rotulo = f"ID {pessoa.id}" if pessoa.id is not None else "pessoa"
     rotulo += f" {pessoa.confianca:.2f}"
 
@@ -73,6 +75,7 @@ def desenhar_painel(frame: np.ndarray, linhas: list[str]) -> None:
     altura = 22 * len(linhas) + 14
     largura = 300
 
+    # Fundo preto a 55% (addWeighted) para o texto ficar legivel sobre a imagem.
     sobreposicao = frame.copy()
     cv2.rectangle(sobreposicao, (8, 8), (largura, altura), PRETO, -1)
     cv2.addWeighted(sobreposicao, 0.55, frame, 0.45, 0, frame)
@@ -113,6 +116,7 @@ def desenhar_linha(
     # de cima para baixo, aponta para a esquerda do frame.
     nx, ny = -dy / comprimento, dx / comprimento
 
+    # Desloca a linha ao longo da perpendicular: gera as bordas da zona morta.
     def deslocar(distancia: float):
         ox, oy = nx * distancia, ny * distancia
         return (int(ax + ox), int(ay + oy)), (int(bx + ox), int(by + oy))

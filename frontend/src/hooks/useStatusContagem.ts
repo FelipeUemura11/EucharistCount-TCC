@@ -8,18 +8,20 @@ export function useStatusContagem() {
 
     async function verificarStatus() {
       try {
-        const response = await fetch('http://127.0.0.1:8000/api/status');
+        const response = await fetch('/api/status');
         if (response.ok) {
           const dados = await response.json();
           if (mounted) setContagemAtiva(dados.contagemAtiva);
         }
       } catch (error) {
+        // Sem resposta da API: o header mostra contagem inativa.
         console.error(error);
         if (mounted) setContagemAtiva(false);
       }
     }
 
     verificarStatus();
+    // Poll de 5 s so para o indicador de contagem ativa no header.
     const interval = setInterval(verificarStatus, 5000);
 
     return () => {

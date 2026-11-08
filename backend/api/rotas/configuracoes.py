@@ -1,0 +1,79 @@
+"""
+GET/POST/PUT/DELETE /api/configuracoes — pagina Configuracoes.
+
+A agenda padrao fica na tabela horario_padrao; camera e deteccao vem do
+config.json.
+"""
+
+import sqlite3
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from api.dependencias import obter_db
+from api.schemas import AgendaDia, AgendaDiaCriar, CapacidadeIgreja, ConfiguracoesGlobais, InfoCamera
+from db import crud
+from integracao.agendador import recarregar_agenda
+from motor.config import Config, mascarar_senha
+
+router = APIRouter()
+
+
+@router.get("/configuracoes", response_model=ConfiguracoesGlobais)
+def get_configuracoes(db: sqlite3.Connection = Depends(obter_db)):
+    # Banco (snake_case) -> schema (camelCase) campo a campo.
+    agenda = [
+        AgendaDia(
+            id=linha["id"],
+            diaSemana=linha["dia_semana"],
+            horarioMissa=linha["horario_missa"],
+            inicioGravacao=linha["horario_inicio_gravacao"],
+            fimGravacao=linha["horario_fim_gravacao"],
+        )
+        for linha in crud.listar_horarios_padrao(db)
+    ]
+
+    # Config.carregar() resolve o config.json pela raiz do backend, nao pela
+    # pasta de onde o processo foi iniciado.
+    try:
+        config = Config.carregar()
+    except Exception:
+        config = None
+
+    if config is None:
+        info_camera = InfoCamera(fonte="Erro ao ler config.json", resolucao="Desconhecida", fpsProcessado=0.0)
+    else:
+        imgsz = config.deteccao.imgsz
+        info_camera = InfoCamera(
+            # URL RTSP pode ter senha: so a versao mascarada sai da API.
+            fonte=mascarar_senha(config.camera.fonte) or "Não definida (CAMERA_FONTE no .env)",
+            resolucao=f"{imgsz}x{imgsz} (processamento)",
+            fpsProcessado=config.camera.fps_processamento,
+        )
+
+    return ConfiguracoesGlobais(agendaPadrao=agenda, infoCamera=info_camera, capacidade=crud.obter_capacidade(db))
+
+
+@router.post("/configuracoes/agenda", response_model=AgendaDia)
+def criar_agenda(agenda: AgendaDiaCriar, db: sqlite3.Connection = Depends(obter_db)):
+    novo_id = crud.criar_horario_padrao(
+        db, agenda.diaSemana, agenda.horarioMissa, agenda.inicioGravacao, agenda.fimGravacao
+    )
+    # O horario novo passa a valer na hora, sem reiniciar o programa.
+    recarregar_agenda()
+    return AgendaDia(id=novo_id, **agenda.model_dump())
+
+
+@router.delete("/configuracoes/agenda/{agenda_id}")
+def deletar_agenda(agenda_id: int, db: sqlite3.Connection = Depends(obter_db)):
+    # Soft delete: celebracoes geradas por este horario mantem a referencia.
+    if not crud.remover_horario_padrao(db, agenda_id):
+        raise HTTPException(status_code=404, detail="Horario nao encontrado")
+    recarregar_agenda()
+    return {"sucesso": True}
+
+
+@router.put("/configuracoes/capacidade", response_model=CapacidadeIgreja)
+def definir_capacidade(corpo: CapacidadeIgreja, db: sqlite3.Connection = Depends(obter_db)):
+    # Linha de referencia do grafico do Dashboard.
+    crud.definir_capacidade(db, corpo.capacidade)
+    return corpo

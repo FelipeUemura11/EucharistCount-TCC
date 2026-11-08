@@ -1,5 +1,6 @@
 """
-Serve o dashboard React compilado (frontend/dist) na mesma porta da API.
+O frontend.py entrega as telas do site e, para isso, 
+só entrega arquivos da pasta dist, nunca nada de fora dela.
 
 Esta rota aceita QUALQUER caminho, por isso e registrada por ultimo no
 app (ver api/app.py): se viesse antes, capturaria tambem /api/*.
@@ -34,9 +35,12 @@ def serve_frontend_spa(catchall: str):
     if catchall == "api" or catchall.startswith("api/"):
         raise HTTPException(status_code=404, detail="Rota da API nao encontrada")
     
-    requested_path = FRONTEND_DIST_DIR / catchall
-    
-    if requested_path.is_file():
+    # Evita ataques de requisicoes pedindo dados do .env/config.json e etc
+    # Sem isso, no navegador: /%2e%2e/%2e%2e/backend/config.json devolvia qualquer arquivo
+    # do disco (config, banco, .env) para quem estivesse na rede.
+    requested_path = (FRONTEND_DIST_DIR / catchall).resolve()
+
+    if requested_path.is_relative_to(FRONTEND_DIST_DIR.resolve()) and requested_path.is_file():
         return FileResponse(requested_path)
 
     index_path = FRONTEND_DIST_DIR / "index.html"

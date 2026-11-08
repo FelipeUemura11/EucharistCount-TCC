@@ -56,10 +56,16 @@ class Monitor:
 
     JANELA = "Eucharist Count - Monitoramento"
 
+    # Quanto as teclas A (voltar) e D (avancar) pulam no video.
+    SEGUNDOS_SALTO = 10.0
+
     def __init__(self, config: Config, raiz: Path):
         self.config = config
         self.raiz = raiz
         self.metricas = Metricas()
+
+        # Fonte nao definida falha aqui, antes de abrir sessao no banco.
+        config.resolver_fonte_camera(config.camera.fonte)
 
         self.detector = DetectorPessoas(
             config.deteccao,
@@ -70,8 +76,16 @@ class Monitor:
 
         self._parar = False
         self._pausado = False
+        # FPS exibido = media dos ultimos 30 frames.
         self._janela_fps: deque[float] = deque(maxlen=30)
         self.contador: ContadorLinha | None = None
+
+        # Navegacao no video (teclas A/D). Ao voltar, o trecho ja contado
+        # e so revisto ("replay"): a contagem retoma quando o video passa
+        # do maior frame ja contado, sem contar ninguem duas vezes.
+        self._fonte: FonteVideo | None = None
+        self._frame_max_contado = 0
+        self._replay = False
 
     def parar(self) -> None:
         """Interrompe o loop. Sera chamado pelo APScheduler ao fim da missa."""
@@ -80,6 +94,18 @@ class Monitor:
     # ---------- Loop principal ----------
 
     def executar(self, ao_atualizar: Callable[[Metricas, float], None] | None = None) -> Metricas:
+        # Cada execucao comeca do zero, mesmo reusando a instancia: sem
+        # isto, um parar() anterior encerraria esta no primeiro frame e os
+        # IDs, o FPS e o rastreador viriam da execucao passada.
+        # Cuidado: um parar() chamado ANTES de executar() comecar e apagado
+        # aqui. Quem agendar (APScheduler) deve chamar parar() so depois.
+        self._parar = False
+        self._pausado = False
+        self.metricas = Metricas()
+        self._janela_fps.clear()
+        self.contador = None
+        self.detector.reiniciar_rastreio()
+
         cfg = self.config
         fonte_resolvida = cfg.resolver_fonte_camera(cfg.camera.fonte)
 
@@ -87,12 +113,21 @@ class Monitor:
             fonte_resolvida,
             fps_alvo=cfg.camera.fps_processamento,
             segundos_reconexao=cfg.camera.segundos_reconexao,
+            checar_interrupcao=lambda: self._parar,
         )
 
         if not fonte.abrir():
-            raise RuntimeError(
-                f"Nao foi possivel abrir a fonte de video: {fonte_resolvida}"
-            )
+            # Camera ao vivo pode estar so demorando a subir: espera por ela.
+            # Arquivo que nao abre nao vai abrir depois.
+            if not fonte.ao_vivo:
+                raise RuntimeError(f"Nao foi possivel abrir o arquivo de video: {fonte_resolvida}")
+            print(f"[aviso] Fonte {fonte_resolvida} indisponivel. Aguardando conexao...")
+            if not fonte.reconectar():
+                raise RuntimeError("Monitoramento cancelado antes de conectar a camera.")
+
+        self._fonte = fonte
+        self._frame_max_contado = 0
+        self._replay = False
 
         print(fonte.resumo())
         print(f"Modelo     : {self.detector.caminho_modelo.name}")
@@ -116,10 +151,14 @@ class Monitor:
                 int(fonte.largura * cfg.visual.escala_janela),
                 int(fonte.altura * cfg.visual.escala_janela),
             )
-            print("ESC/Q = sair | ESPACO = pausa\n")
+            print(
+                "ESC/Q = sair | ESPACO = pausa | "
+                f"A/D = voltar/avancar {self.SEGUNDOS_SALTO:.0f}s\n"
+            )
 
         ultimo_instante = time.perf_counter()
 
+        # Ciclo por frame: detectar, contar (se nao for replay), metricas, callback, janela.
         try:
             for frame in fonte:
                 if self._parar:
@@ -127,7 +166,11 @@ class Monitor:
 
                 pessoas = self.detector.detectar(frame)
 
-                if self.contador is not None:
+                # Frame ja contado antes (depois de voltar com A): so exibe, nao conta.
+                self._replay = fonte.indice_atual <= self._frame_max_contado
+
+                if self.contador is not None and not self._replay:
+                    self._frame_max_contado = fonte.indice_atual
                     # Tempo do video, nao da maquina: mantem a contagem
                     # identica em qualquer CPU e com qualquer modelo.
                     eventos = self.contador.atualizar(pessoas, fonte.tempo_atual)
@@ -144,6 +187,7 @@ class Monitor:
 
                 self._atualizar_metricas(pessoas, ultimo_instante)
 
+                # Callback opcional: recebe metricas e tempo do video a cada frame.
                 if ao_atualizar is not None:
                     ao_atualizar(self.metricas, fonte.tempo_atual)
 
@@ -173,6 +217,7 @@ class Monitor:
             if p.id is not None:
                 m.ids_unicos.add(p.id)
 
+        # FPS instantaneo = 1 / tempo desde o frame anterior; a media da janela suaviza.
         decorrido = time.perf_counter() - instante_anterior
         self._janela_fps.append(1.0 / max(decorrido, 1e-6))
         m.fps = sum(self._janela_fps) / len(self._janela_fps)
@@ -184,6 +229,7 @@ class Monitor:
     def _anotar(self, frame, pessoas: list[Pessoa]) -> None:
         cfg = self.config
 
+        # Ordem de desenho: linha e zona morta, caixas, painel por cima.
         if self.contador is not None and cfg.visual.mostrar_linhas:
             desenhar_linha(frame, self.contador.linha, self.contador.margem)
 
@@ -206,10 +252,14 @@ class Monitor:
                 f"FPS              : {m.fps:.1f}",
             ]
 
+        if self._replay:
+            linhas_painel.append("REPLAY (sem contar)")
+
         desenhar_painel(frame, linhas_painel)
 
     def _tratar_teclado(self, frame) -> bool:
         """Processa teclas. Retorna False quando o usuario pede para sair."""
+        # Mostra o frame reduzido e le a tecla (1 ms de espera por frame).
         exibir = redimensionar(frame, self.config.visual.escala_janela)
         cv2.imshow(self.JANELA, exibir)
 
@@ -220,11 +270,48 @@ class Monitor:
 
         if tecla == ord(" "):
             self._pausado = not self._pausado
-            while self._pausado:
-                t = cv2.waitKey(30) & 0xFF
-                if t == ord(" "):
-                    self._pausado = False
-                elif t in (27, ord("q"), ord("Q")):
-                    return False
+        elif tecla in (ord("a"), ord("A"), ord("d"), ord("D")):
+            self._saltar(tecla)
+
+        # Pausa: segura o loop ate ESPACO, sair ou saltar no video.
+        while self._pausado:
+            t = cv2.waitKey(30) & 0xFF
+            if t == ord(" "):
+                self._pausado = False
+            elif t in (27, ord("q"), ord("Q")):
+                return False
+            elif t in (ord("a"), ord("A"), ord("d"), ord("D")):
+                # Continua pausado: o loop principal le e mostra o frame
+                # de destino e volta a parar aqui.
+                self._saltar(t)
+                break
 
         return True
+
+    def _saltar(self, tecla: int) -> None:
+        """Volta (A) ou avanca (D) o video e prepara rastreio e contagem."""
+        voltar = tecla in (ord("a"), ord("A"))
+        segundos = -self.SEGUNDOS_SALTO if voltar else self.SEGUNDOS_SALTO
+
+        destino = self._fonte.pular(segundos) if self._fonte else None
+        if destino is None:
+            print("[aviso] Voltar/avancar so funciona com arquivo de video.")
+            return
+
+        # Depois do salto as pessoas "teletransportam": trilhas e lados
+        # antigos gerariam IDs trocados e cruzamentos falsos.
+        self.detector.reiniciar_rastreio()
+        if self.contador is not None:
+            self.contador.esquecer_rastros()
+
+        minutos, segs = divmod(int(destino), 60)
+        if voltar:
+            print(
+                f"[VOLTOU] {minutos:02d}:{segs:02d}  "
+                "(replay: a contagem retoma ao passar do ponto anterior)"
+            )
+        else:
+            print(
+                f"[AVANCOU] {minutos:02d}:{segs:02d}  "
+                "(quem cruzou no trecho pulado nao foi contado)"
+            )

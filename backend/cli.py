@@ -12,19 +12,28 @@ def montar_argumentos() -> argparse.ArgumentParser:
     p.add_argument("--imgsz", type=int, help="resolucao de inferencia")
     p.add_argument("--conf", type=float, help="limiar de confianca (0-1)")
     p.add_argument("--fps", type=float, help="frames por segundo a processar")
-    p.add_argument("--threads", type=int, help="limite de threads de CPU")
     p.add_argument("--sem-janela", action="store_true", help="roda sem interface grafica")
     p.add_argument("--linha", type=str, help="linha de contagem: x1,y1,x2,y2 em fracoes (0-1)")
+    p.add_argument("--agora", action="store_true", help="conta imediatamente, sem esperar a agenda (passar --fonte tambem faz isso)")
+    p.add_argument("--boot", action="store_true", help="iniciado pelo Windows: segue a agenda sem abrir o navegador")
     return p
 
+def modo_manual(args: argparse.Namespace) -> bool:
+    """
+    Manual = contar ja, como sempre foi (testes com video, demonstracao).
+    Sem --agora nem --fonte, o programa segue a agenda da tela Configuracoes.
+    """
+    return args.agora or args.fonte is not None
+
 def aplicar_argumentos(config: Config, args: argparse.Namespace) -> Config:
+    # So sobrescreve o que foi passado (None = nao informado), mantendo o valor do config.json.
     if args.fonte is not None: config.camera.fonte = args.fonte
     if args.modelo is not None: config.deteccao.modelo = args.modelo
     if args.fps is not None: config.camera.fps_processamento = args.fps
     if args.imgsz is not None: config.deteccao.imgsz = args.imgsz
     if args.conf is not None: config.deteccao.confianca = args.conf
-    if args.threads is not None: config.deteccao.threads = args.threads
     if args.sem_janela: config.visual.mostrar_janela = False
+    # Linha vem como texto "x1,y1,x2,y2" e e convertida em tupla de 4 floats.
     if args.linha:
         valores = tuple(float(v) for v in args.linha.split(","))
         if len(valores) != 4: raise SystemExit("--linha precisa de 4 numeros: x1,y1,x2,y2")

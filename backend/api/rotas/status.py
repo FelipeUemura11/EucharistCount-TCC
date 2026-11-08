@@ -11,5 +11,6 @@ router = APIRouter()
 
 @router.get("/status")
 def get_status(db: sqlite3.Connection = Depends(obter_db)):
+    # Basta existir sessao em andamento; nao le metricas.
     sessao = crud.obter_sessao_ativa(db)
     return { "contagemAtiva": sessao is not None }

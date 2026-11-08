@@ -1,6 +1,5 @@
 {
   "camera": {
-    "fonte": "videos/27-09.mp4",
     "fps_processamento": 7.5,
     "segundos_reconexao": 3.0
   },
@@ -9,8 +8,7 @@
     "imgsz": 480,
     "confianca": 0.15,
     "iou": 0.7,
-    "max_deteccoes": 300,
-    "threads": 0
+    "max_deteccoes": 300
   },
   "rastreio": {
     "algoritmo": "bytetrack_ajustado.yaml"
@@ -26,6 +24,7 @@
     "ativo": true,
     "linha": [0.25, 0.0, 0.25, 1.00],
     "margem": 0.035,
+    "minimo_pessoas": 20,
     "segundos_cooldown": 3.0,
     "segundos_esquecer": 10.0
   },

@@ -7,6 +7,9 @@ venv/
 __pycache__/
 *.pyc
 
+# Modelos de estimativa treinados (regenerar com db/treinar_regressao.py)
+backend/db/modelos_estimativa/
+
 # Modelos (pesados, regenerar com scripts/preparar_modelo.py)
 *.pt
 *.onnx
@@ -16,6 +19,10 @@ __pycache__/
 backend/modelos/
 *_openvino_model/
 .aiassistant
+.agents
+.gemini
+CLAUDE.md
+.claude/
 
 # Videos — NUNCA versionar filmagens de fieis (LGPD)
 backend/videos/
@@ -30,6 +37,9 @@ backend/videos/
 !frontend/**/*.png
 !frontend/**/*.jpg
 
+# Configuracao local com segredos (URL RTSP com senha)
+.env
+
 # Banco de dados local
 *.db
 *.sqlite
@@ -43,6 +53,8 @@ kernel.errors.txt
 build/
 dist/
 *.spec
+# Receita do build do .exe: versionada (ver backend/DOCUMENTACAO_DISTRIBUICAO.md)
+!backend/eucharist_count.spec
 
 # IDEs
 .idea/

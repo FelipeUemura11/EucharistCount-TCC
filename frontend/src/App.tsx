@@ -4,15 +4,18 @@ import Dashboard from "./pages/Dashboard";
 import Celebracoes from "./pages/Celebracoes";
 import Historico from "./pages/Historico";
 import Configuracoes from "./pages/Configuracoes";
+import Ajuda from "./pages/Ajuda";
 
 function App() {
     return (
         <Routes>
+            {/* Todas as paginas dentro do AppLayout (sidebar + header); rota desconhecida volta ao Dashboard. */}
             <Route element={<AppLayout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/celebracoes" element={<Celebracoes />} />
                 <Route path="/historico" element={<Historico />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />
+                <Route path="/ajuda" element={<Ajuda />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
         </Routes>

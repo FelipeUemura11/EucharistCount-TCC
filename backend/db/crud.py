@@ -57,6 +57,7 @@ def criar_horario_padrao(conexao: sqlite3.Connection, dia_semana: int, horario_m
 
 
 def listar_horarios_padrao(conexao: sqlite3.Connection, apenas_ativos: bool = True) -> list[sqlite3.Row]:
+    # Horarios removidos ficam no banco com ativo = 0; por padrao nao aparecem.
     query = "SELECT * FROM horario_padrao"
     if apenas_ativos:
         query += " WHERE ativo = 1"
@@ -64,9 +65,18 @@ def listar_horarios_padrao(conexao: sqlite3.Connection, apenas_ativos: bool = Tr
     return conexao.execute(query).fetchall()
 
 
-def remover_horario_padrao(conexao: sqlite3.Connection, horario_id: int) -> None:
-    conexao.execute("UPDATE horario_padrao SET ativo = 0 WHERE id = ?", (horario_id,))
+def remover_horario_padrao(conexao: sqlite3.Connection, horario_id: int) -> bool:
+    """Soft delete. Retorna False se nao havia horario ativo com esse id."""
+    cursor = conexao.execute(
+        """
+        UPDATE horario_padrao
+        SET ativo = 0, atualizado_em = strftime('%Y-%m-%dT%H:%M:%S', 'now')
+        WHERE id = ? AND ativo = 1
+        """,
+        (horario_id,),
+    )
     conexao.commit()
+    return cursor.rowcount > 0
 
 
 # ============================================================================
@@ -106,6 +116,140 @@ def obter_celebracao(conexao: sqlite3.Connection, celebracao_id: int) -> sqlite3
     return conexao.execute("SELECT * FROM celebracao WHERE id = ?", (celebracao_id,)).fetchone()
 
 
+def obter_celebracao_do_horario(conexao: sqlite3.Connection, data: str, horario_missa: str) -> sqlite3.Row | None:
+    """A celebracao daquela data e horario, se existir (chave natural, a mesma do UNIQUE)."""
+    return conexao.execute(
+        "SELECT * FROM celebracao WHERE data = ? AND horario_missa = ?",
+        (data, horario_missa),
+    ).fetchone()
+
+
+def listar_celebracoes_do_dia(conexao: sqlite3.Connection, data: str) -> list[sqlite3.Row]:
+    """Celebracoes de uma data que ainda contam como ocupando a agenda (as canceladas ficam de fora)."""
+    return conexao.execute(
+        "SELECT * FROM celebracao WHERE data = ? AND status != 'cancelada' ORDER BY horario_missa",
+        (data,),
+    ).fetchall()
+
+
+def listar_celebracoes_avulsas_agendadas(conexao: sqlite3.Connection, a_partir_de: str) -> list[sqlite3.Row]:
+    """Celebracoes avulsas (fora da agenda semanal) ainda por contar, de `a_partir_de` (YYYY-MM-DD) em diante."""
+    # Sem janela de monitoramento nao ha o que agendar.
+    return conexao.execute(
+        """
+        SELECT * FROM celebracao
+        WHERE horario_padrao_id IS NULL
+          AND status = 'agendada'
+          AND data >= ?
+          AND horario_inicio_monitoramento IS NOT NULL
+          AND horario_fim_monitoramento IS NOT NULL
+        ORDER BY data, horario_missa
+        """,
+        (a_partir_de,),
+    ).fetchall()
+
+
+def remover_celebracao_cancelada(conexao: sqlite3.Connection, celebracao_id: int) -> bool:
+    """Apaga uma celebracao cancelada que nunca foi contada, liberando o horario para cadastrar de novo."""
+    cursor = conexao.execute(
+        """
+        DELETE FROM celebracao
+        WHERE id = ? AND status = 'cancelada'
+          AND NOT EXISTS (SELECT 1 FROM sessao_monitoramento WHERE celebracao_id = celebracao.id)
+        """,
+        (celebracao_id,),
+    )
+    conexao.commit()
+    return cursor.rowcount > 0
+
+
+def limpar_celebracoes_vencidas(conexao: sqlite3.Connection, limite: str) -> int:
+    """
+    Apaga avulsas que passaram sem serem contadas. `limite` e 'YYYY-MM-DDTHH:MM'
+    (o chamador passa agora menos 24h). Devolve quantas foram apagadas.
+    """
+    # Nunca apaga quem tem sessao: ela iria junto (CASCADE) e o Historico depende da celebracao.
+    cursor = conexao.execute(
+        """
+        DELETE FROM celebracao
+        WHERE horario_padrao_id IS NULL
+          AND origem = 'personalizada'
+          AND status IN ('agendada', 'cancelada')
+          AND (data || 'T' || COALESCE(horario_fim_monitoramento, horario_missa)) < ?
+          AND NOT EXISTS (SELECT 1 FROM sessao_monitoramento WHERE celebracao_id = celebracao.id)
+        """,
+        (limite,),
+    )
+    conexao.commit()
+    return cursor.rowcount
+
+
+# Celebracoes fora do normal (procissao, Natal...): nao servem de referencia do que e habitual.
+# Mesma lista de api/schemas.CelebracaoCriar, menos "comum".
+TIPOS_ESPECIAIS = ("especial", "natal", "pascoa", "casamento", "exequias")
+
+
+CAPACIDADE_PADRAO = 400
+
+
+def obter_capacidade(conexao: sqlite3.Connection) -> int:
+    """Capacidade da igreja (tela Configuracoes). 400 enquanto ninguem cadastrar."""
+    linha = conexao.execute("SELECT valor FROM parametro WHERE chave = 'capacidade'").fetchone()
+    return int(linha["valor"]) if linha else CAPACIDADE_PADRAO
+
+
+def definir_capacidade(conexao: sqlite3.Connection, capacidade: int) -> None:
+    conexao.execute(
+        """
+        INSERT INTO parametro (chave, valor) VALUES ('capacidade', ?)
+        ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor,
+            atualizado_em = strftime('%Y-%m-%dT%H:%M:%S', 'now')
+        """,
+        (str(capacidade),),
+    )
+    conexao.commit()
+
+
+def listar_contagens_do_horario(
+    conexao: sqlite3.Connection, dia_semana: int, horario_missa: str, antes_de: str, limite: int = 8
+) -> list[int]:
+    """
+    Contagens finais das ultimas missas comuns concluidas naquele dia da semana
+    (0 = domingo) e horario, anteriores a `antes_de`.
+    """
+    especiais = ", ".join("?" for _ in TIPOS_ESPECIAIS)
+    linhas = conexao.execute(
+        f"""
+        SELECT s.ocupacao_final
+        FROM sessao_monitoramento s
+        JOIN celebracao c ON c.id = s.celebracao_id
+        WHERE s.status = 'concluida' AND s.ocupacao_final > 0
+          AND c.tipo NOT IN ({especiais})
+          AND c.horario_missa = ?
+          AND CAST(strftime('%w', c.data) AS INTEGER) = ?
+          AND c.data < ?
+        ORDER BY c.data DESC
+        LIMIT ?
+        """,
+        (*TIPOS_ESPECIAIS, horario_missa, dia_semana, antes_de, limite),
+    ).fetchall()
+    return [linha["ocupacao_final"] for linha in linhas]
+
+
+def atualizar_celebracao(conexao: sqlite3.Connection, celebracao_id: int, **campos) -> None:
+    """Muda so os campos informados (titulo, tipo, horarios, status, ligacao com a agenda...)."""
+    permitidos = {"titulo", "tipo", "data", "horario_missa", "horario_inicio_monitoramento",
+                  "horario_fim_monitoramento", "horario_padrao_id", "origem", "status"}
+    desconhecidos = set(campos) - permitidos
+    if desconhecidos:
+        raise ValueError(f"campos que nao podem ser alterados: {sorted(desconhecidos)}")
+    if not campos:
+        return
+    atribuicoes = ", ".join(f"{nome} = ?" for nome in campos)
+    conexao.execute(f"UPDATE celebracao SET {atribuicoes} WHERE id = ?", (*campos.values(), celebracao_id))
+    conexao.commit()
+
+
 def listar_proximas_celebracoes(conexao: sqlite3.Connection, a_partir_de: str, limite: int = 20) -> list[sqlite3.Row]:
     """`a_partir_de` no formato 'YYYY-MM-DD' — normalmente a data de hoje."""
     return conexao.execute(
@@ -121,6 +265,7 @@ def listar_proximas_celebracoes(conexao: sqlite3.Connection, a_partir_de: str, l
 
 def listar_celebracoes_do_mes(conexao: sqlite3.Connection, ano: int, mes: int) -> list[sqlite3.Row]:
     """Para o calendario mensal da tela Celebracoes. `mes` de 1 a 12."""
+    # data e TEXT ISO, entao LIKE 'YYYY-MM%' pega o mes inteiro.
     prefixo = f"{ano:04d}-{mes:02d}"
     return conexao.execute(
         "SELECT * FROM celebracao WHERE data LIKE ? ORDER BY data, horario_missa",
@@ -176,6 +321,7 @@ def atualizar_totais_sessao(conexao: sqlite3.Connection, sessao_id: int,
     Mantem os totais da sessao ativa em dia durante a missa — e o que o
     Dashboard ao vivo le. Chamado a cada entrada/saida, nao a cada frame.
     """
+    # Com a sessao aberta, ocupacao_final guarda a ocupacao corrente.
     conexao.execute(
         """
         UPDATE sessao_monitoramento
@@ -192,6 +338,7 @@ def atualizar_totais_sessao(conexao: sqlite3.Connection, sessao_id: int,
 
 def obter_ou_criar_celebracao(conexao: sqlite3.Connection, titulo: str,
                               data: str, horario_missa: str, **extras) -> int:
+    # Chave natural (data, horario_missa), a mesma do UNIQUE do schema.
     linha = conexao.execute(
         "SELECT id FROM celebracao WHERE data = ? AND horario_missa = ?",
         (data, horario_missa),
@@ -202,7 +349,7 @@ def obter_ou_criar_celebracao(conexao: sqlite3.Connection, titulo: str,
 
 def obter_instantaneos(conexao: sqlite3.Connection, sessao_id: int) -> list[sqlite3.Row]:
     return conexao.execute(
-        "SELECT * FROM instantaneo_ocupacao WHERE sessao_id = ? ORDER BY registrado_em",
+        "SELECT * FROM instantaneo_ocupacao WHERE sessao_id = ? ORDER BY registrado_em, id",
         (sessao_id,),
     ).fetchall()
 
@@ -225,6 +372,7 @@ def finalizar_sessao(
     'interrompida' quando terminou por erro — so as concluidas entram
     no historico (vw_historico).
     """
+    # COALESCE nos opcionais: None preserva o valor que a sessao ja tinha.
     conexao.execute(
         """
         UPDATE sessao_monitoramento
@@ -288,10 +436,28 @@ def obter_ultima_sessao_concluida(conexao: sqlite3.Connection) -> sqlite3.Row | 
     """
     A ultima contagem que ocorreu para aparecer no Dashboard
     """
+    # So da camera: a contagem manual importada do CSV nao entra aqui.
     return conexao.execute(
         """
         SELECT * FROM sessao_monitoramento
         WHERE status= 'concluida' AND origem_contagem = 'visao_computacional'
+        ORDER BY finalizado_em DESC, id DESC
+        LIMIT 1
+        """
+    ).fetchone()
+
+def obter_ultima_sessao_encerrada(conexao: sqlite3.Connection) -> sqlite3.Row | None:
+    """
+    A ultima contagem da camera que terminou, valida ou descartada pela regra do
+    minimo (sessao_de_monitoramento): e o que o Dashboard mostra sem contagem ativa.
+    Uma sessao interrompida por erro ou queda de energia nao entra.
+    """
+    return conexao.execute(
+        """
+        SELECT * FROM sessao_monitoramento
+        WHERE origem_contagem = 'visao_computacional'
+          AND (status = 'concluida'
+               OR (status = 'interrompida' AND observacoes LIKE 'Contagem descartada%'))
         ORDER BY finalizado_em DESC, id DESC
         LIMIT 1
         """
@@ -320,7 +486,7 @@ def obter_configuracao_estimativa_vigente(conexao: sqlite3.Connection) -> sqlite
 
 
 def definir_configuracao_estimativa(conexao: sqlite3.Connection, coeficiente_comunhao: float,
-                                     margem_hostias: float = 0.10, metodo: str = "coeficiente_fixo",
+                                     margem_hostias: float = 0.12, metodo: str = "coeficiente_fixo",
                                      modelo_path: str | None = None,
                                      observacoes: str | None = None) -> int:
     """
@@ -359,6 +525,7 @@ def registrar_estimativa(
     `comungantes_reais`/`hostias_reais`; quando o modelo existir,
     `estimativa_calculada`/`hostias_calculadas`/`coeficiente_utilizado`.
     """
+    # Upsert (1 linha por sessao): COALESCE so sobrescreve campo que veio preenchido.
     conexao.execute(
         """
         INSERT INTO estimativa_comunhao
@@ -379,6 +546,10 @@ def registrar_estimativa(
     conexao.commit()
 
 
+def obter_estimativa_da_sessao(conexao: sqlite3.Connection, sessao_id: int) -> sqlite3.Row | None:
+    return conexao.execute("SELECT * FROM estimativa_comunhao WHERE sessao_id = ?", (sessao_id,)).fetchone()
+
+
 def ajustar_estimativa(conexao: sqlite3.Connection, sessao_id: int,
                         estimativa_ajustada: int | None = None,
                         hostias_ajustadas: int | None = None,
@@ -389,7 +560,7 @@ def ajustar_estimativa(conexao: sqlite3.Connection, sessao_id: int,
         UPDATE estimativa_comunhao
         SET estimativa_ajustada = COALESCE(?, estimativa_ajustada),
             hostias_ajustadas = COALESCE(?, hostias_ajustadas),
-            ajustado_por = ?,
+            ajustado_por = COALESCE(?, ajustado_por),
             ajustado_em = ?
         WHERE sessao_id = ?
         """,
@@ -405,6 +576,7 @@ def ajustar_estimativa(conexao: sqlite3.Connection, sessao_id: int,
 def obter_historico(conexao: sqlite3.Connection, data_inicio: str | None = None,
                      data_fim: str | None = None) -> list[sqlite3.Row]:
     """Le direto da view vw_historico, ja no formato das colunas do frontend."""
+    # WHERE 1=1 so para encadear os filtros opcionais com AND.
     query = "SELECT * FROM vw_historico WHERE 1=1"
     parametros: list[str] = []
 
@@ -415,7 +587,7 @@ def obter_historico(conexao: sqlite3.Connection, data_inicio: str | None = None,
         query += " AND data <= ?"
         parametros.append(data_fim)
 
-    query += " ORDER BY data DESC"
+    query += " ORDER BY data DESC, horario_missa DESC"
     return conexao.execute(query, parametros).fetchall()
 
 

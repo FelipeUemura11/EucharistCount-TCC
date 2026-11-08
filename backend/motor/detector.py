@@ -77,33 +77,8 @@ class DetectorPessoas:
         if not self.caminho_tracker.exists():
             self.caminho_tracker = Path(config_rastreio.algoritmo)
 
-        self._limitar_threads()
         self.modelo = YOLO(str(caminho), task="detect") # Carrega a rede neural convolucional (CNN) - ja treinada
         self.caminho_modelo = caminho
-
-    def _limitar_threads(self) -> None:
-        """
-        Restringe o uso de CPU.
-
-        Sem isso, o ONNX Runtime toma todos os nucleos e a maquina da
-        igreja fica inutilizavel para qualquer outra tarefa.
-        """
-        n = self.config.threads
-        if n <= 0:
-            return
-
-        import os
-
-        for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS",
-                    "OPENBLAS_NUM_THREADS"):
-            os.environ[var] = str(n)
-
-        try:
-            import torch
-
-            torch.set_num_threads(n)
-        except ImportError:
-            pass
 
     # ---------- Inferencia ----------
 
@@ -112,6 +87,7 @@ class DetectorPessoas:
         Detecta pessoas em um frame, cada uma com um ID estavel entre
         frames — e o ID que permite contar sem duplicar.
         """
+        # track() faz deteccao e ByteTrack numa chamada: ja devolve caixas com ID.
         resultado = self.modelo.track(
             frame,
             imgsz=self.config.imgsz,
@@ -127,6 +103,16 @@ class DetectorPessoas:
 
         return self._converter(resultado, frame.shape[1], frame.shape[0])
 
+    def reiniciar_rastreio(self) -> None:
+        """
+        Esquece as trilhas e recomeca os IDs. O persist=True mantem o
+        rastreador entre chamadas de detectar(); sem isto, uma segunda
+        execucao herdaria as pessoas e os IDs da anterior.
+        """
+        predictor = self.modelo.predictor
+        for rastreador in getattr(predictor, "trackers", None) or []:
+            rastreador.reset()
+
     def _converter(self, resultado, largura: int, altura: int) -> list[Pessoa]:
         """Traduz a saida da Ultralytics para objetos Pessoa, aplicando o filtro."""
         caixas = resultado.boxes
@@ -136,6 +122,7 @@ class DetectorPessoas:
         xyxy = caixas.xyxy.cpu().numpy()
         confs = caixas.conf.cpu().numpy()
 
+        # id vem None enquanto o tracker nao confirmou a trilha.
         if caixas.id is not None:
             ids = caixas.id.cpu().numpy().astype(int)
         else:
@@ -169,6 +156,7 @@ class DetectorPessoas:
         if largura <= 0 or altura <= 0:
             return False
 
+        # Filtro em duas etapas: area relativa ao frame, depois proporcao largura/altura.
         fracao_area = (largura * altura) / (largura_frame * altura_frame)
         if not (f.area_min <= fracao_area <= f.area_max):
             return False

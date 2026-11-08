@@ -2,13 +2,20 @@ import type { RegistroHistorico } from "../types/history";
 
 export async function buscarHistorico(): Promise<RegistroHistorico[]> {
     try {
-        const response = await fetch("http://127.0.0.1:8000/api/historico");
+        const response = await fetch("/api/historico");
         if (!response.ok) {
             throw new Error(`Erro de rede: ${response.status}`);
         }
-        return await response.json();
+        const registros: RegistroHistorico[] = await response.json();
+
+        // Registros antigos podem ter total negativo (oclusao); a tela mostra 0.
+        return registros.map((registro) => ({
+            ...registro,
+            totalPessoas: Math.max(0, registro.totalPessoas),
+        }));
     } catch (error) {
         console.error("Falha ao consultar o histórico:", error);
-        return [];
+        // Relanca para o hook decidir o que fazer (ele mantem a tabela anterior).
+        throw error;
     }
 }

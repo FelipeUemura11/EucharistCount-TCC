@@ -48,7 +48,7 @@ Máquina Local da Igreja
    Câmera IP / NVR — stream RTSP
 ```
 
-Tudo roda num único executável local (empacotado com PyInstaller), sem conectividade externa. A câmera fornece o stream via RTSP; o motor de IA processa os frames em memória, sem gravar nada em disco; a API expõe os dados agregados ao dashboard via `localhost`.
+A câmera fornece o stream via RTSP; o motor de IA processa os frames em memória, sem gravar nada em disco; a API expõe os dados agregados ao dashboard via `localhost` (`127.0.0.1:8000`). O agendamento automático (APScheduler) liga e desliga a contagem nos horários da agenda semanal e nas celebrações avulsas cadastradas na tela Celebrações; o empacotamento em executável único (PyInstaller) está em validação.
 
 ---
 
@@ -62,34 +62,35 @@ Conforme especificado no documento do TCC:
 | Visão computacional | **OpenCV** | Captura, redimensionamento e desenho sobre os frames |
 | Detecção | **Ultralytics YOLO** | Detecção de pessoas (classe `person`) no quadro da câmera de acesso |
 | Rastreamento | **ByteTrack** | Identificadores únicos e persistentes por indivíduo |
-| API | **FastAPI + Uvicorn** | Rotas HTTP assíncronas, comunicação local |
+| Estimativa / Regressão | **Pandas + scikit-learn + joblib** | Cálculo de comungantes e hóstias (coeficiente fixo e regressão linear) |
+| API | **FastAPI + Uvicorn** | Rotas HTTP e entrega do frontend na mesma origem (`127.0.0.1:8000`) |
 | Validação de dados | **Pydantic** | Tipagem e validação dos schemas trafegados |
 | Persistência | **SQLite** | Celebrações, contagens, snapshots — em arquivo único, local |
-| Agendamento | **APScheduler** | Início/fim automático do monitoramento por celebração |
-| Frontend | **React + TypeScript + Vite** | Dashboard, Celebrações, Histórico, Configurações |
+| Agendamento | **APScheduler** | Início/fim automático do monitoramento: agenda semanal e celebrações avulsas |
+| Frontend | **React + TypeScript + Vite + Tailwind** | Dashboard, Celebrações, Histórico, Configurações e Ajuda (FAQ) |
 | Gráficos | **Recharts** | Evolução da ocupação ao longo da celebração |
-| HTTP client | **Axios** | Comunicação do frontend com a API local |
+| HTTP client | **Fetch API** | Comunicação do frontend com a API local (`/api/...`) |
 | Empacotamento | **PyInstaller** | Executável autônomo para a máquina da paróquia |
 
 ---
 
 ## Estado atual do projeto
 
-Este é um TCC em duas etapas. **O que está implementado até aqui:** a visão computacional conta de ponta a ponta, grava cada missa no SQLite durante a contagem, e a API serve o dashboard, que acompanha a contagem ao vivo e mostra o histórico das missas encerradas. Tudo sobe com um único `python main.py`.
+Este é um TCC em duas etapas. **O que está implementado até aqui:** a visão computacional conta de ponta a ponta, grava cada missa no SQLite durante a contagem, e a API serve o dashboard, que acompanha a contagem ao vivo e mostra o histórico das missas encerradas. A contagem liga e desliga sozinha nos horários da agenda (APScheduler). Tudo sobe com um único `python main.py`.
 
 | Componente | Status |
 |---|---|
-| Captura de vídeo (arquivo / webcam / RTSP, com reconexão) | ✅ Implementado |
+| Captura de vídeo (arquivo / webcam / RTSP, com reconexão e salto A/D em arquivo) | ✅ Implementado |
 | Detecção de pessoas (YOLO, otimizado para CPU via ONNX) | ✅ Implementado |
-| Rastreamento com ID persistente (ByteTrack) | ✅ Implementado |
-| Contagem por cruzamento de linha virtual (entrada/saída) | ✅ Implementado |
-| Painel de monitoramento em tempo real (janela local) | ✅ Implementado |
+| Rastreamento com ID persistente (ByteTrack ajustado) | ✅ Implementado |
+| Contagem por cruzamento de linha virtual (entrada/saída, zona morta e cooldown) | ✅ Implementado |
+| Painel de monitoramento em tempo real (janela local com modo replay) | ✅ Implementado |
 | Persistência (SQLite) — o motor grava cada missa durante a contagem | ✅ Implementado |
-| API (FastAPI) — status, dashboard, celebrações e histórico, em [`backend/api/`](./backend/api/) | ✅ Implementado |
-| Dashboard web (React) — Dashboard ao vivo e Histórico ligados à API | 🚧 Celebrações e Configurações ainda com dados fictícios |
-| Estimativa de comunhão e hóstias sugeridas | 🚧 Coeficiente fixo calculado e exibido; gravação automática no histórico e uso da regressão pendentes |
-| Agendamento automático (APScheduler) | Em Desenvolvimento |
-| Empacotamento (PyInstaller) | Em Desenvolvimento |
+| API (FastAPI) — status, dashboard, celebrações, histórico e configurações, em [`backend/api/`](./backend/api/) | ✅ Implementado |
+| Dashboard web (React) — Dashboard ao vivo, Celebrações, Histórico, Configurações e Ajuda (FAQ) ligados à API | ✅ Implementado |
+| Estimativa de comunhão e hóstias sugeridas (`integracao/estimativa.py`) | ✅ Coeficiente fixo e regressão (`.joblib`); estimativa gravada automaticamente ao fechar a sessão |
+| Agendamento automático (APScheduler) — agenda semanal e celebrações avulsas (Natal, Páscoa, casamento, missa de última hora), com opção de repetir toda semana | ✅ Implementado |
+| Empacotamento (PyInstaller) — `.exe` único com dashboard, modelo e configuração; início com o Windows | 🚧 Implementado, build ainda não validado em Windows |
 
 Detalhes de uso, configuração e arquitetura interna do módulo de visão computacional estão em [`backend/README.md`](./backend/README.md).
 
@@ -102,19 +103,21 @@ EucharistCount-TCC/
 ├── README.md                    # este arquivo
 │
 ├── backend/
-│   ├── main.py                  # ponto de entrada: sobe banco, API e motor
+│   ├── main.py                  # ponto de entrada: sobe banco, API e motor (agora ou pela agenda)
 │   ├── cli.py                   # argumentos de linha de comando
+│   ├── gerar_dados.py           # popula o banco com dados de demonstração
 │   ├── config.json              # parâmetros ajustáveis (câmera, modelo, contagem)
+│   ├── .env.example             # modelo de variáveis locais (CAMERA_FONTE)
 │   ├── bytetrack_ajustado.yaml  # tracker ajustado para esta cena
-│   ├── counting_people.csv      # contagem manual de referência (validação)
+│   ├── counting_people.csv      # contagem manual × câmera × comungantes, por missa (validação e estimativa)
 │   ├── requirements.txt
 │   ├── README.md                # documentação detalhada do backend
 │   ├── DOCUMENTACAO_MOTOR.md    # o porquê de cada decisão do motor de visão
 │   ├── DOCUMENTACAO_BANCO.md    # modelo de dados, diagramas e estimativa de comunhão
 │   ├── DOCUMENTACAO_API.md      # API FastAPI, ligação motor → banco e dashboard ao vivo
 │   │
-│   ├── motor/                    # Motor de Visao Computacional (nome alinhado ao TCC)
-│   │   ├── config.py            # carrega o config.json
+│   ├── motor/                   # Motor de Visão Computacional (nome alinhado ao TCC)
+│   │   ├── config.py            # carrega o config.json e o .env
 │   │   ├── camera.py            # captura: arquivo, webcam ou RTSP
 │   │   ├── detector.py          # YOLO + ByteTrack → lista de Pessoa
 │   │   ├── contador.py          # contagem por cruzamento de linha virtual
@@ -122,19 +125,19 @@ EucharistCount-TCC/
 │   │   └── monitor.py           # orquestra o ciclo completo
 │   │
 │   ├── api/                     # servidor FastAPI: uma rota por tela + frontend compilado
-│   ├── integracao/              # ponte motor ↔ banco: sessão, sessões presas, estimativa
+│   ├── integracao/              # ponte motor ↔ banco: sessão, sessões presas, estimativa, agendador
 │   │
 │   ├── db/                      # camada de persistência SQLite (TCC II)
 │   │   ├── schema.sql           # tabelas, índices e a view do histórico
 │   │   ├── crud.py              # uma função por operação, para a API usar
-│   │   └── ...                  # importação do CSV e estimativa de comunhão
+│   │   └── ...                  # importação do CSV e treino da regressão de comunhão
 │   │
 │   ├── scripts/
 │   │   ├── preparar_modelo.py   # exporta o modelo YOLO para ONNX
 │   │   ├── calibrar.py          # testa combinações de modelo/resolução/confiança
 │   │   └── calibrar_linha.py    # marca a linha de contagem por clique
 │   │
-│   ├── modelos/                 # modelos .onnx (fora do Git)
+│   ├── modelos/                 # modelos .onnx
 │   └── videos/                  # vídeos de teste (fora do Git)
 │
 └── frontend/                    # React + TypeScript + Vite (servido pelo backend em :8000)
@@ -147,9 +150,10 @@ EucharistCount-TCC/
 ```bash
 cd backend
 python -m venv .venv
-.venv\Scripts\activate          # Windows
+.venv\Scripts\activate          # Windows (no Linux/Mac: source .venv/bin/activate)
 
 pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+cp .env.example .env            # defina CAMERA_FONTE no .env (ou passe --fonte)
 
 python -m scripts.preparar_modelo --modelo yolo11n --imgsz 640
 
@@ -157,11 +161,19 @@ cd ../frontend && npm install && npm run build && cd ../backend
 python main.py
 ```
 
-O dashboard fica em `http://127.0.0.1:8000`. Quando o vídeo termina, ele continua no ar mostrando o resultado da missa; `Ctrl+C` no terminal encerra o programa.
+O dashboard fica em `http://127.0.0.1:8000`. O programa tem dois modos:
+
+| Comando | Modo | O que faz |
+|---|---|---|
+| `python main.py` | **Agendado** (uso na igreja) | Sobe o dashboard e espera: a contagem liga e desliga sozinha nos horários cadastrados em **Configurações**, sem janela de vídeo. Mudanças na agenda valem na hora, sem reiniciar |
+| `python main.py --agora` | **Manual** | Conta imediatamente, com a janela do vídeo, usando a fonte do `.env` |
+| `python main.py --fonte videos/x.mp4` | **Manual** | Conta imediatamente o vídeo informado |
+
+No modo manual, quando o vídeo termina (ou caso a câmera não esteja conectada), o dashboard continua no ar mostrando o resultado da última missa e permitindo consultar Histórico e Configurações. Nos dois modos, `Ctrl+C` no terminal encerra o programa; uma contagem em andamento é fechada como interrompida e não entra no Histórico.
 
 Instruções completas — calibração de modelo, ajuste da linha de contagem e parâmetros de `config.json` — estão em [`backend/README.md`](./backend/README.md).
 
-O frontend (`frontend/`) é servido já compilado pelo próprio backend, na mesma porta da API: depois de qualquer mudança nele, é preciso rodar `npm run build` de novo. As telas Dashboard e Histórico consomem a API; Celebrações e Configurações ainda usam dados fictícios. Instruções em [`frontend/README.md`](./frontend/README.md).
+O frontend (`frontend/`) é servido já compilado pelo próprio backend, na mesma porta da API: depois de qualquer mudança nele, é preciso rodar `npm run build` de novo. Todas as telas consomem a API. Instruções em [`frontend/README.md`](./frontend/README.md).
 
 ---
 
@@ -209,6 +221,8 @@ Conforme o objetivo específico *e*, a validação do sistema em campo (igreja c
 - Desempenho com câmera em posição diagonal;
 - Usabilidade do painel pela equipe litúrgica.
 
+Os dados de campo coletados até agora estão em [`backend/counting_people.csv`](./backend/counting_people.csv): para cada missa, a contagem manual (`people`), a contagem da câmera (`system_count`, quando a câmera estava ligada) e o número de comungantes (`communed`). O formato do arquivo está em [`backend/db/README.md`](./backend/db/README.md).
+
 ---
 
 ## Referências técnicas
@@ -219,7 +233,8 @@ A documentação técnica do backend está dividida por parte:
 
 - [`backend/DOCUMENTACAO_MOTOR.md`](./backend/DOCUMENTACAO_MOTOR.md) — o porquê de cada decisão do motor de visão computacional: fórmulas, parâmetros e as medições que os justificam;
 - [`backend/DOCUMENTACAO_BANCO.md`](./backend/DOCUMENTACAO_BANCO.md) — o modelo de dados com diagramas das tabelas, como uma missa é gravada e a estimativa de comunhão;
-- [`backend/DOCUMENTACAO_API.md`](./backend/DOCUMENTACAO_API.md) — a API FastAPI, a ligação do motor com o banco e o dashboard ao vivo.
+- [`backend/DOCUMENTACAO_API.md`](./backend/DOCUMENTACAO_API.md) — a API FastAPI, a ligação do motor com o banco e o dashboard ao vivo;
+- [`backend/DOCUMENTACAO_DISTRIBUICAO.md`](./backend/DOCUMENTACAO_DISTRIBUICAO.md) — o `.exe` único, onde ficam os dados, o início com o Windows e os trabalhos futuros de distribuição.
 
 ---
 

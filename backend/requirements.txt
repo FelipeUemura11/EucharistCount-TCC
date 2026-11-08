@@ -8,6 +8,10 @@
 # Deteccao e rastreio (ByteTrack ja vem embutido)
 ultralytics==8.3.155
 
+# Associacao do ByteTrack. Sem ele o Ultralytics tenta instalar sozinho em
+# tempo de execucao, o que nao funciona dentro do .exe.
+lap==0.5.13
+
 # Processamento de imagem e video
 opencv-python==4.10.0.84
 numpy==1.26.4
@@ -30,3 +34,9 @@ joblib==1.4.2
 fastapi>=0.111.0
 uvicorn>=0.30.0
 pydantic>=2.7.0
+
+# Segredos da maquina (URL RTSP com senha) no .env, fora do Git
+python-dotenv==1.2.4
+
+# Agenda: liga e desliga a contagem nos horarios da tela Configuracoes
+apscheduler>=3.10,<4

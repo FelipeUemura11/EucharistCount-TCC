@@ -15,7 +15,13 @@ from typing import Iterator
 
 from db import crud
 from db.database import obter_conexao
-from motor.config import Config
+from integracao.regressao import assumir_estimativas_nao_confirmadas, atualizar_estimativa
+from integracao.estimativa import (
+    motivo_contagem_invalida,
+    preencher_estimativas_pendentes,
+    registrar_estimativa_da_sessao,
+)
+from motor.config import Config, mascarar_senha
 from motor.monitor import Metricas, Monitor
 
 class GravadorSessao:
@@ -25,9 +31,12 @@ class GravadorSessao:
         self.conexao = conexao
         self.sessao_id = sessao_id
         self.intervalo = intervalo
+        # -inf: o primeiro frame ja grava um instantaneo.
         self._ultimo = -math.inf
         self.pico = 0
         self._totais = (0, 0) # entradas e saidas finais
+        # Preenchido ao fechar a sessao quando a contagem e descartada (quem chamou le depois do with).
+        self.motivo_descarte: str | None = None
 
     def __call__(self, metricas: Metricas, instante: float) -> None:
         self.pico = max(self.pico, metricas.dentro)
@@ -55,31 +64,53 @@ class GravadorSessao:
             saidas_acumuladas=metricas.saidas
         )
 @contextmanager
-def sessao_de_monitoramento(monitor: Monitor, config: Config) -> Iterator[GravadorSessao]:
+def sessao_de_monitoramento(
+    monitor: Monitor,
+    config: Config,
+    celebracao_id: int | None = None,
+) -> Iterator[GravadorSessao]:
     """
         Abre uma sessao no banco, entrega o gravador e fecha a sessao no fim,
         aconteca o que acontecer (ESC, erro ou Ctrl+C): nenhuma sessao fica orfa.
 
             with sessao_de_monitoramento(monitor, config) as gravador:
                 monitor.executar(ao_atualizar=gravador)
+
+        `celebracao_id`: a celebracao da agenda, quando a contagem vem do
+        agendador. Sem ele (execucao manual), cria uma celebracao com a data
+        e a hora de agora, como antes.
     """
     conexao = obter_conexao()
-    agora = datetime.now()
 
-    celebracao_id = crud.obter_ou_criar_celebracao(
-        conexao,
-        titulo="Missa (monitoramento automatico)",
-        data=agora.strftime("%Y-%m-%d"),
-        horario_missa=agora.strftime("%H:%M"),
-    )
+    if celebracao_id is None:
+        agora = datetime.now()
+        # Celebracao por data + hora atual; se ja existe (UNIQUE no schema), reaproveita.
+        celebracao_id = crud.obter_ou_criar_celebracao(
+            conexao,
+            titulo="Missa (monitoramento automatico)",
+            data=agora.strftime("%Y-%m-%d"),
+            horario_missa=agora.strftime("%H:%M"),
+        )
+    # A fonte pode ser uma URL RTSP com senha: o banco guarda so a mascarada.
+    parametros = asdict(config)
+    parametros["camera"]["fonte"] = mascarar_senha(config.camera.fonte)
+
+    # Uma missa nova comecando: a anterior que ficou sem confirmacao passa a valer pela estimativa.
+    if assumir_estimativas_nao_confirmadas(conexao):
+        try:
+            print(f"[estimativa] {atualizar_estimativa(conexao)}")
+        except Exception as e:
+            print(f"[AVISO] Nao foi possivel recalcular a estimativa: {e}")
+
     sessao_id = crud.iniciar_sessao(
         conexao, celebracao_id,
         origem_contagem="visao_computacional",
-        parametros_contagem=json.dumps(asdict(config)),
+        parametros_contagem=json.dumps(parametros),
     )
 
     gravador = GravadorSessao(conexao, sessao_id)
 
+    # Status final: 'concluida' ate que algum erro ou interrupcao mude para 'interrompida'.
     status = "concluida"
     try:
         yield gravador
@@ -88,8 +119,20 @@ def sessao_de_monitoramento(monitor: Monitor, config: Config) -> Iterator[Gravad
         # normalmente e nao deve entrar no historico como se fosse valida.
         status = "interrompida"
         raise
+    # Sempre fecha a sessao, com os totais das ultimas metricas do monitor.
     finally:
         m = monitor.metricas
+
+        # Contagem impossivel ou baixa demais (oclusao): a sessao fica guardada
+        # como interrompida, sem estimativa, Historico nem regressao.
+        motivo = None
+        if status == "concluida" and config.contagem.ativo:
+            motivo = motivo_contagem_invalida(m.entradas, m.saidas, config.contagem.minimo_pessoas)
+            if motivo:
+                status = "interrompida"
+                gravador.motivo_descarte = motivo
+                print(f"[AVISO] Contagem descartada: {motivo} (entradas {m.entradas}, saidas {m.saidas}).")
+
         crud.finalizar_sessao(
             conexao, sessao_id,
             total_entradas=m.entradas,
@@ -97,8 +140,16 @@ def sessao_de_monitoramento(monitor: Monitor, config: Config) -> Iterator[Gravad
             ocupacao_final=m.dentro,
             ocupacao_maxima=gravador.pico,
             contagem_sistema=m.dentro,
+            observacoes=f"Contagem descartada: {motivo}" if motivo else None,
             status=status,
         )
+        # So contagem concluida entra no Historico, entao so ela precisa de estimativa.
+        if status == "concluida":
+            try:
+                registrar_estimativa_da_sessao(conexao, sessao_id, m.dentro)
+            except Exception as e:
+                # A sessao ja esta salva; a estimativa e refeita na proxima vez que o programa abrir.
+                print(f"[AVISO] Nao foi possivel calcular a estimativa da sessao {sessao_id}: {e}")
         conexao.close()
 
 def fechar_sessoes_presas() -> int:
@@ -106,5 +157,13 @@ def fechar_sessoes_presas() -> int:
     conexao = obter_conexao()
     try:
         return crud.interromper_sessoes_orfas(conexao)
+    finally:
+        conexao.close()
+
+def preencher_estimativas_atrasadas() -> int:
+    """Grava a estimativa das sessoes concluidas que ficaram sem. Ver estimativa.preencher_estimativas_pendentes."""
+    conexao = obter_conexao()
+    try:
+        return preencher_estimativas_pendentes(conexao)
     finally:
         conexao.close()

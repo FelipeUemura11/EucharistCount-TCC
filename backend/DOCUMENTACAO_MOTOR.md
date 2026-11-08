@@ -118,7 +118,7 @@ Um grafo ONNX pode ter a resolução de entrada **fixa** ou **dinâmica**, e o s
 
 A opção dinâmica é o padrão porque a resolução é um dos parâmetros que mais se ajusta durante a calibração de uma instalação nova (ver a tabela "Ajustando para máquina fraca" no `README.md`), e reexportar o modelo a cada tentativa seria um atrito sem ganho.
 
-Atenção: `yolo11s.onnx` e `yolov8n.onnx`, que também estão em `modelos/`, foram exportados no modo fixo (só o tamanho do lote é variável). Usá-los exige o mesmo `imgsz` com que foram exportados. A versão dinâmica do modelo `s` é `yolo11s_dyn.onnx`.
+Atenção: a pasta `modelos/` não vai para o Git, então cada máquina tem os modelos que exportou. Um `.onnx` exportado com `--fixo` (ou por uma versão antiga do script, antes de o modo dinâmico virar o padrão) só aceita o `imgsz` com que foi exportado. Na dúvida, exporte de novo sem `--fixo`.
 
 ### Por que os parâmetros de exportação são esses
 
@@ -141,7 +141,7 @@ No código (`detector.py`), a chamada relevante é:
 
 ```python
 resultado = self.modelo.track(
-    entrada,
+    frame,
     imgsz=self.config.imgsz,
     conf=self.config.confianca,
     iou=self.config.iou,
@@ -329,8 +329,6 @@ intacta a proteção contra tremor descrita na seção 8.4. Empurrar a linha
 para `0.40` começa a contar gente demais: naquela altura do quadro ela
 cruza o caminho de quem apenas circula pelo pátio sem entrar.
 
-
-
 ---
 
 ## 8. A contagem por linha virtual
@@ -426,7 +424,17 @@ Dois parâmetros temporais governam o ciclo de vida de cada rastro:
 
 **`segundos_cooldown` (3.0s)** — depois de confirmar uma contagem para uma pessoa, o sistema ignora novos eventos dela por esse período. Isso evita contar a mesma pessoa duas vezes caso ela volte a atravessar a faixa logo após ser contada — alguém que para na porta, hesita e volta, por exemplo.
 
-> **Limitação conhecida.** O cooldown suprime o evento de volta, mas o lado registrado da pessoa é atualizado mesmo assim (`contador.py`, a atribuição `rastro.lado = lado` vem antes do teste de cooldown). Se ela entra, recua para fora dentro dos 3 s e entra de novo depois deles, a segunda entrada é contada e a saída não: **2 entradas e 0 saídas para uma pessoa só**, o que infla a ocupação. Reproduzido com uma trajetória sintética. A correção é só atualizar o lado depois de passar pelo cooldown.
+Durante o cooldown, `rastro.lado` **não é atualizado** (permanece o lado da última contagem confirmada):
+
+```python
+if agora - rastro.contado_em < self.config.segundos_cooldown:
+    return None
+
+rastro.lado = lado
+rastro.contado_em = agora
+```
+
+Se `rastro.lado` fosse atualizado antes do teste de cooldown, uma pessoa que entrasse, recuasse dentro dos 3 s e entrasse de novo depois deles geraria 2 entradas e 0 saídas. Mantendo o lado da última contagem durante o cooldown, a hesitação é absorvida como 1 única entrada — e se a pessoa realmente voltou e ficou do lado de fora, a saída é registrada normalmente assim que o cooldown termina.
 
 **`segundos_esquecer` (10.0s)** — pessoas que somem do enquadramento (ou que o rastreador simplesmente perde) têm seu rastro apagado após esse tempo:
 
@@ -457,6 +465,17 @@ Para um arquivo de vídeo, o tempo é `número do frame ÷ fps original do arqui
 
 Um cuidado que decorre disso: o campo `contado_em` de cada rastro nasce em `-infinito`, e não em zero. Como o tempo do vídeo começa em zero, um valor inicial zero colocaria todo mundo em cooldown durante os primeiros 3 segundos de gravação — ninguém que cruzasse a linha nesse intervalo seria contado.
 
+### 8.9 Navegação no vídeo (teclas A/D) e modo Replay
+
+Em arquivos de vídeo, a janela de monitoramento permite voltar (`A`) ou avançar (`D`) 10 segundos (`Monitor.SEGUNDOS_SALTO = 10.0`) por meio de `FonteVideo.pular()`. Como o salto reposiciona o vídeo abruptamente, duas proteções entram em ação:
+
+1. **Limpeza de trilhas e lados:** `Monitor._saltar()` chama `detector.reiniciar_rastreio()` e `contador.esquecer_rastros()` (que limpa os lados mas preserva `entradas` e `saidas`), evitando cruzamentos falsos causados pelo "teletransporte" das caixas entre o frame antigo e o de destino.
+2. **Modo Replay (`_replay`):** `Monitor` guarda em `_frame_max_contado` o maior índice de frame já avaliado pelo contador. Quando o usuário volta o vídeo com `A`, enquanto `fonte.indice_atual <= _frame_max_contado`, o sistema entra em modo `REPLAY (sem contar)`: continua detectando e desenhando na tela para inspeção visual, mas não chama `contador.atualizar()`. A contagem só retoma automaticamente quando o vídeo ultrapassa o ponto onde estava antes do salto, impedindo contar a mesma pessoa duas vezes.
+
+### 8.10 Contagem baixa demais ou impossível
+
+Quando algo tapa a entrada (gente na frente da câmera, por exemplo), o contador pode perder entradas e ainda contar as saídas de quem já estava dentro. A conta fecha baixa, ou até negativa. Ao fechar a sessão, o `sessao_de_monitoramento` descarta a contagem se houver mais saídas que entradas ou se `entradas - saídas` for menor que `contagem.minimo_pessoas` (20 por padrão, no `config.json`). O número contado fica guardado, mas a sessão não gera estimativa, não vai para o Histórico e não treina a regressão. O piso só pega falhas grosseiras: uma contagem de 30 numa missa de 50 passa, e para isso existe a correção manual da estimativa.
+
 ---
 
 ## 9. Captura de vídeo: ritmo e resiliência
@@ -482,16 +501,14 @@ if agora - ultimo_envio < intervalo_minimo:
 
 ### 9.2 Reconexão automática
 
-Se um stream ao vivo (RTSP ou webcam) parar de entregar frames no meio de uma celebração, o sistema não encerra na hora: ele espera `segundos_reconexao` (3.0s) e tenta reabrir a conexão automaticamente. Isso cobre o caso mais comum, uma queda momentânea da rede Wi-Fi, sem exigir que alguém da equipe litúrgica intervenha no meio da missa.
+Se um stream ao vivo (RTSP ou webcam) parar de entregar frames no meio de uma celebração, o sistema não encerra: `FonteVideo.reconectar()` espera `segundos_reconexao` (3.0s) e tenta reabrir a conexão, repetindo até conseguir. Só desiste se o monitoramento for interrompido (`Monitor.parar()`), que ele confere antes de cada tentativa. A mesma espera vale quando a câmera ainda não está disponível no início da missa. Isso cobre o caso mais comum, uma queda momentânea da rede Wi-Fi, sem exigir que alguém da equipe litúrgica intervenha no meio da missa.
 
 Para arquivos de vídeo não há reconexão: o fim da leitura é o fim do vídeo.
-
-> **Limitação conhecida.** A reconexão é tentada **uma única vez**. Se a câmera ainda estiver fora do ar depois dos 3 segundos, `_reconectar()` devolve `False`, o loop termina e a sessão é fechada. Uma queda de rede mais longa encerra a contagem daquela missa. Para tornar a reconexão persistente, `_reconectar()` precisaria repetir a tentativa até conseguir ou até `Monitor.parar()` ser chamado.
 
 
 ### 9.3 De onde vem o frame: arquivo, webcam ou câmera IP
 
-A mesma configuração `camera.fonte` aceita três tipos de fonte, e cada um precisa chegar ao OpenCV de um jeito:
+A mesma fonte (`camera.fonte`) aceita três tipos, e cada um precisa chegar ao OpenCV de um jeito:
 
 | Fonte | Exemplo | Como chega ao `FonteVideo` |
 |---|---|---|
@@ -499,18 +516,19 @@ A mesma configuração `camera.fonte` aceita três tipos de fonte, e cada um pre
 | Webcam | `0`, `1` | Intacta: o `FonteVideo` a converte para o índice inteiro que o OpenCV espera |
 | Câmera IP | `rtsp://usuario:senha@192.168.1.50:554/stream1` | Intacta, aberta com o FFmpeg por TCP |
 
+Como a URL da câmera IP leva usuário e senha, ela não fica no `config.json`, que é versionado. A fonte vem **só** da variável `CAMERA_FONTE` do `backend/.env`, que fica fora do Git, aplicada em `Config.carregar()`; o `--fonte` da linha de comando ainda ganha dela. O padrão do dataclass é vazio: sem `.env` nem `--fonte`, `resolver_fonte_camera()` levanta `RuntimeError`, já no construtor do `Monitor`, antes de abrir sessão no banco, e o `main.py` mantém o dashboard no ar. Uma `fonte` que sobre no `config.json` é ignorada com aviso. Antes de ir para o `parametros_contagem` do banco, a fonte passa por `mascarar_senha()` (`rtsp://usuario:***@...`). O modelo é o `backend/.env.example`. No executável do PyInstaller, o `.env` é lido da pasta do `.exe`.
+
 Quem decide é `Config.resolver_fonte_camera()`: dígitos e URLs (`rtsp://`, `http://`, `https://`) passam sem mudança, e só o resto é tratado como arquivo. A regra existe por causa de um bug real: a versão anterior aplicava `caminho_absoluto()` a qualquer fonte, e no Windows isso transformava `"0"` em `...\backend\0` e `rtsp://...` em `...\backend\rtsp:\...`. **Webcam e câmera IP nunca abriam**, e só arquivos de vídeo funcionavam, justamente o contrário do que a instalação na paróquia precisa. Os scripts `calibrar.py` e `calibrar_linha.py` usam a mesma função.
 
 ---
 
-## 10. Limitação de threads de CPU
+## 10. Uso de CPU: por que não há limite de threads
 
-```python
-for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
-    os.environ[var] = str(n)
-```
+A inferência roda no ONNX Runtime, que por padrão usa **todos os núcleos disponíveis** da CPU. O projeto deixa assim de propósito: é o que dá o maior FPS na máquina da igreja.
 
-Por padrão, bibliotecas de computação numérica (como as usadas internamente pelo ONNX Runtime) tentam usar **todos os núcleos disponíveis** da CPU. Numa máquina dedicada de servidor isso é desejável; numa máquina de igreja que também precisa rodar outras coisas (o próprio sistema operacional, talvez outros programas), monopolizar todos os núcleos deixaria a máquina praticamente travada para qualquer outro uso. O parâmetro `threads` (atualmente `0`, ou seja, sem limite explícito) existe para poder restringir esse consumo quando necessário — por exemplo, `threads: 2` numa máquina de poucos núcleos.
+Houve uma opção `deteccao.threads` para limitar esse uso, mas ela foi removida porque não funcionava. Ela definia `OMP_NUM_THREADS` e chamava `torch.set_num_threads()`, e o ONNX Runtime ignora os dois: ele tem um pool de threads próprio, e a Ultralytics cria a sessão sem repassar um limite. Só o pré e o pós-processamento (em PyTorch) eram afetados.
+
+Para aliviar a CPU numa máquina fraca, os parâmetros que realmente fazem efeito são `camera.fps_processamento` (o de maior ganho), `deteccao.imgsz` e o próprio modelo (`yolo11n`).
 
 ---
 
@@ -522,7 +540,7 @@ Essa separação não é só estética. Ela tem três consequências práticas d
 
 1. **Testabilidade.** `ContadorLinha`, por exemplo, recebe objetos `Pessoa` (dataclasses simples) e devolve `Evento`s — nada de OpenCV, nada de YOLO. É possível escrever um teste automatizado que simula uma "pessoa" andando por posições específicas e verificar se a contagem funciona corretamente, sem precisar rodar um vídeo real. Isso será importante na fase de validação de acurácia do TCC II.
 2. **Substituibilidade.** Se um dia o projeto trocar o algoritmo de rastreamento, ou adicionar suporte a múltiplas câmeras, as mudanças ficam isoladas em `detector.py`/`camera.py` sem tocar na lógica de contagem.
-3. **Integração.** A classe `Monitor` expõe uma interface pequena para ser controlada de fora: `executar(ao_atualizar=...)` para rodar e publicar as métricas a cada frame, e `parar()` para encerrar. Foi por essa interface que o banco de dados e a API foram ligados ao motor sem alterar a lógica de visão (seção 13), e é o formato que o APScheduler vai precisar para iniciar e encerrar o monitoramento no horário de cada celebração.
+3. **Integração.** A classe `Monitor` expõe uma interface pequena para ser controlada de fora: `executar(ao_atualizar=...)` para rodar e publicar as métricas a cada frame, e `parar()` para encerrar. Foi por essa interface que o banco de dados e a API foram ligados ao motor sem alterar a lógica de visão (seção 13), e é por ela que o agendador (`integracao/agendador.py`) inicia e encerra o monitoramento no horário de cada celebração.
 
 ---
 
@@ -557,22 +575,19 @@ O contrato é simples:
 
 Esse padrão se chama **callback**: o motor avisa "atualizei", e quem passou a função decide o que fazer com o aviso. O motor continua sem importar nada de `db/`, e continua testável sem banco.
 
-Quem escuta, hoje, é o `GravadorSessao` de `integracao/sessao.py`, que grava os totais no banco a cada passagem pela linha e um ponto do gráfico a cada 5 segundos de vídeo. Esse lado está descrito em [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md), seção 6, e o motivo do intervalo de 5 segundos em [`DOCUMENTACAO_BANCO.md`](./DOCUMENTACAO_BANCO.md), seção 7.3.
+Quem escuta, hoje, é o `GravadorSessao` de `integracao/sessao.py`, que grava os totais no banco a cada passagem pela linha e um ponto do gráfico a cada 5 segundos de vídeo. É o mesmo nos dois modos do programa: na contagem manual (`main.py --agora`) e na agendada (`integracao/agendador.py`), que reaproveita a mesma instância do `Monitor` em todas as missas. Esse lado está descrito em [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md), seção 6, e o motivo do intervalo de 5 segundos em [`DOCUMENTACAO_BANCO.md`](./DOCUMENTACAO_BANCO.md), seção 7.3.
 
 O parâmetro é opcional: chamar `executar()` sem ele, como fazem os scripts de calibração, funciona exatamente como antes.
 
 ---
 
-## 14. Limitações conhecidas do motor
+## 14. Correções aplicadas e cuidados de integração
 
-Pontos identificados em revisão e ainda não corrigidos no código:
+Pontos identificados em revisões anteriores que já foram corrigidos no código:
 
-| Onde | Limitação | Efeito |
-|---|---|---|
-| `contador.py` — cooldown | Atualiza o lado antes de testar o cooldown | Quem hesita na porta pode ser contado duas vezes (seção 8.7) |
-| `camera.py` — `_reconectar()` | Uma única tentativa | Queda de rede longa encerra a contagem (seção 9.2) |
-| `monitor.py` — `executar()` | Não reinicia `_parar` nem as `Metricas` | Reusar a mesma instância de `Monitor` para duas missas acumula as contagens. Criar um `Monitor` novo por missa evita o problema |
-| `config.py` — `Config.carregar()` | Repassa as chaves do JSON direto para os dataclasses | Uma chave desconhecida no `config.json` (um erro de digitação, por exemplo) impede o programa de iniciar, com `TypeError` |
+- **Cooldown sem atualizar lado (`contador.py`):** anteriormente, `rastro.lado` era atualizado antes do teste de `segundos_cooldown`, fazendo quem hesitasse na porta contar 2 entradas e 0 saídas. Agora `rastro.lado` só muda quando a contagem é efetivamente confirmada (seção 8.7).
+- **Chaves desconhecidas no `config.json` (`config.py`):** `Config.carregar()` passa cada seção por `_construir()`, que ignora chaves desconhecidas com aviso no terminal (`[config] chave desconhecida ignorada: ...`) em vez de levantar `TypeError`, e converte `contagem.linha` de lista JSON para tupla.
+- **Reuso de instância do `Monitor` (`monitor.py`):** `Monitor.executar()` agora zera `_parar`, `_pausado`, `Metricas`, janela de FPS, `_frame_max_contado` e `_replay`, e chama `DetectorPessoas.reiniciar_rastreio()` para limpar as trilhas do ByteTrack (`persist=True`). **Cuidado com o agendador:** como `executar()` zera `self._parar = False` na primeira linha, um `Monitor.parar()` chamado antes de `executar()` começar se perde. Por isso o vigia do agendador (`integracao/agendador.py`) repete `parar()` a cada segundo até a contagem terminar (`DOCUMENTACAO_API.md`, seção 9.3).
 
 ---
 
@@ -594,6 +609,7 @@ Pontos identificados em revisão e ainda não corrigidos no código:
 | Posição da linha | Vertical em `x = 0.25` | Perto do portão, mas fora da zona onde o rastreio morre |
 | Sentido da entrada | Direita → esquerda | Lado da igreja de onde a câmera atual enquadra o portão |
 | Anti-tremor | Zona morta de ±3,5% da largura | Mesma garantia das 3 linhas antigas, com 1 parâmetro |
+| Salto no vídeo (A/D) | Modo replay (`_frame_max_contado`) | Permite rever trechos sem duplicar contagens |
 | Enquadramento | Câmera apontada para a entrada | Resolve fisicamente o que a ROI compensava em software |
 | Base de tempo da contagem | Tempo do vídeo, não da CPU | Reprodutibilidade entre execuções e hardwares |
 | Armazenamento de imagem | Inexistente no código | Conformidade estrutural com a LGPD |
