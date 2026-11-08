@@ -586,7 +586,7 @@ A câmera sozinha não sabe quantos comungam; quem ensina é a própria paróqui
 |---|---|
 | "Está certo" | A estimativa vira `estimativa_comunhao.comungantes_reais` |
 | "Corrigir" + um número | O número informado vira `comungantes_reais` |
-| Ninguém responde | Quando a próxima missa começa a ser contada, a estimativa vira `comungantes_reais` (decisão da equipe), e a sessão ganha a nota "Comunhão não confirmada: vale a estimativa do sistema", para dar para separar depois |
+| Ninguém responde | Quando a próxima missa começa a ser contada, a estimativa vira `comungantes_reais`: por decisão da equipe, uma previsão que ninguém contesta é tratada como real, e cada correção feita na tela puxa o modelo para o valor certo, e a sessão ganha a nota "Comunhão não confirmada: vale a estimativa do sistema", para dar para separar depois |
 
 A resposta **só alimenta o banco**: a tela continua mostrando, para aquela missa, a estimativa gravada no fechamento (a mesma do Histórico). Uma contagem descartada ou interrompida não é perguntada (`409` se alguém tentar), porque o número de pessoas dela não vale.
 

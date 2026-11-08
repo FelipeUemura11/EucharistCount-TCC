@@ -607,7 +607,10 @@ O divisor é a contagem da **câmera**, e não a manual, porque é a da câmera 
 | 18/10/2026 | 240 | 162 | 184 | 68% | 1,136 | descartada (câmera perdeu gente) |
 | 24/10/2026 | 103 | 53 | 80 | 51% | 1,509 | descartada (câmera perdeu gente) (superficial) |
 | 25/10/2026 | 140 | 127 | 108 | 91% | 0,850 | usada (superficial) |
+| 25/10/2026 (10h) | 246 | — | 191 | — | — | sem contagem da câmera (superficial) |
 | **Média das usadas** | | | | | **≈ 0,889** | 4 missas |
+
+**Comunhão estimada ("superficial").** Em todas as missas do CSV o número de pessoas foi contado fisicamente. Nas marcadas como `superficial`, não deu para contar os comungantes no dia, e a equipe registrou a estimativa do sistema (78% das pessoas). Por decisão da equipe, esses valores entram no coeficiente e no treino como se fossem contados, pela mesma regra aplicada às missas que ninguém confirma no fim (`DOCUMENTACAO_API.md`, seção 8.1): uma previsão que ninguém contesta é tratada como real, e cada correção feita na tela substitui a estimativa e puxa o modelo para o valor certo. As missas estimadas ficam identificáveis (nota `superficial` no CSV, "Comunhão não confirmada" na sessão), caso um dia se queira treinar só com as contadas.
 
 Os dias descartados têm razão acima de 1 (mais gente comungou do que a câmera contou), o que mostra que a câmera perdeu gente na entrada. Nos dias bons, comungam cerca de 89% do que a câmera conta, e é esse o `COEFICIENTE_PADRAO` do código.
 

@@ -232,9 +232,9 @@ NOTA_SEM_CONFIRMACAO = "Comunhao nao confirmada: vale a estimativa do sistema"
 
 def assumir_estimativas_nao_confirmadas(conexao: sqlite3.Connection) -> int:
     """
-    Missa da camera que ficou sem confirmacao na tela: a estimativa do sistema passa
-    a valer como o numero de comungantes (decisao da equipe). Fica anotado na sessao,
-    para dar para separar depois. Devolve quantas foram assumidas.
+    Missa da camera sem confirmacao na tela: a estimativa vira o numero de comungantes
+    (previsao nao contestada vale como real, decisao da equipe). Fica anotado na sessao.
+    Devolve quantas foram assumidas.
     """
     pendentes = [r["sessao_id"] for r in conexao.execute(
         """
