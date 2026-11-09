@@ -120,6 +120,7 @@ export default function Ajuda() {
                         <li>Para remover um horário, clique na lixeira ao lado dele.</li>
                         <li>As mudanças valem na hora, sem precisar reiniciar o programa.</li>
                         <li>O fim da gravação precisa ser depois do início, no mesmo dia (o período não pode passar da meia-noite).</li>
+                        <li>Ao preencher o horário da missa, o sistema já sugere o período padrão: de 20 minutos antes até 10 minutos depois do início da missa. Dá para alterar.</li>
                         <li>Comece a gravação antes de os fiéis chegarem: quem entra antes do início da gravação não é contado.</li>
                     </ul>
                     <div>
@@ -157,12 +158,12 @@ export default function Ajuda() {
                     <ul style={MARCADOR} className="space-y-1.5 pl-5">
                         <li>
                             <Termo>Estimativa para comunhão</Termo>: as pessoas presentes multiplicadas pela proporção de
-                            pessoas que costumam comungar, calculada a partir das missas já registradas (78% enquanto não
+                            pessoas que costumam comungar, calculada a partir das missas já registradas (89% enquanto não
                             houver dados). Com mais missas registradas, o sistema passa a considerar também o dia, o horário e
                             o tipo da celebração.
                         </li>
                         <li>
-                            <Termo>Hóstias sugeridas</Termo>: a estimativa mais uma margem de segurança (hoje, 10%),
+                            <Termo>Hóstias sugeridas</Termo>: a estimativa mais uma margem de segurança (hoje, 12%),
                             arredondada para cima.
                         </li>
                         <li>
@@ -170,8 +171,8 @@ export default function Ajuda() {
                         </li>
                     </ul>
                     <p>
-                        Exemplo: com 149 pessoas presentes e 78%, a estimativa é de 116 pessoas, e a sugestão é de
-                        128 hóstias (116 + 10%, arredondado para cima).
+                        Exemplo: com 149 pessoas presentes e 89%, a estimativa é de 132 pessoas, e a sugestão é de
+                        148 hóstias (132 + 12%, arredondado para cima).
                     </p>
                     <p>
                         É uma sugestão: a decisão final é sempre da equipe litúrgica. A conta depende de a câmera ver
