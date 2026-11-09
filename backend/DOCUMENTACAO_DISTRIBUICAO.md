@@ -74,16 +74,30 @@ O último caso é a instância única em ação: clicar de novo funciona como "a
 
 ## 4. Como gerar o `.exe`
 
-Na máquina de build (Windows), usando **sempre o mesmo venv**, para manter a versão do Python consistente:
+**Um comando.** Num Windows com Python 3.11 (`py -3.11`) e Node.js, dentro de `backend\`:
 
-```bash
-cd frontend && npm run build && cd ../backend     # 1. dashboard compilado
-python -m scripts.preparar_modelo --modelo yolo11n --imgsz 640   # 2. modelo ONNX
-pip install pyinstaller
-pyinstaller eucharist_count.spec                  # 3. dist/EucharistCount.exe
+```bat
+build_exe.bat
 ```
 
-O `modelos/*.onnx` e o `frontend/dist` não estão no Git (são regenerados), então os passos 1 e 2 são obrigatórios antes do 3.
+(ou dois cliques no arquivo). Ele faz, em ordem, e para no primeiro erro:
+
+| Passo | O que faz | Por quê |
+|---|---|---|
+| 1 | `npm ci` e `npm run build` em `frontend\` | O `frontend/dist` não está no Git e vai dentro do `.exe` |
+| 2 | Cria `.venv-build\` (só na primeira vez) e instala `requirements.txt` (PyTorch de CPU) e `requirements-build.txt` | Ambiente limpo e com as versões do `requirements.txt`, separado do `.venv` de desenvolvimento, que pode ter outras versões |
+| 3 | Exporta `modelos\yolo11n.onnx` se ele não existir (`scripts.preparar_modelo`) | O modelo não está no Git; esse passo baixa o YOLO11n, então precisa de internet |
+| 4 | `pyinstaller eucharist_count.spec --noconfirm --clean` | Gera `dist\EucharistCount.exe` |
+
+O PyInstaller e o pacote de *hooks* têm versões fixas em `requirements-build.txt`, para o build sair igual em qualquer máquina.
+
+**Depois do build**, antes de levar para a paróquia:
+
+1. Colocar um `.env` com `CAMERA_FONTE=...` na mesma pasta do `.exe` (modelo em `.env.example`).
+2. Abrir o `.exe` uma vez: ele cria `%APPDATA%\EucharistCount`, importa as missas de referência, se registra para iniciar com o Windows e abre o dashboard.
+3. Conferir em Configurações a fonte da câmera e cadastrar a rotina de missas e a capacidade da igreja.
+
+Para testar o build sem a câmera, dá para rodar o `.exe` num terminal com `EucharistCount.exe --fonte caminho\do\video.mp4` (modo manual).
 
 ---
 
