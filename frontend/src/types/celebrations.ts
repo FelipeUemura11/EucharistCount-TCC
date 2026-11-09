@@ -1,8 +1,13 @@
 export type StatusCelebracao = 'agendada' | 'em_andamento' | 'finalizada' | 'cancelada';
 
+export type TipoCelebracao = 'comum' | 'especial' | 'natal' | 'pascoa' | 'casamento' | 'exequias';
+
+// Espelha Celebracao de backend/api/schemas.py.
 export interface Celebracao {
-  id: number;
+  id: number | null; // null = missa da rotina ainda nao gravada (so prevista)
   titulo: string;
+  tipo: string;
+  data: string; // "YYYY-MM-DD"
   dia: number;
   diaSemana: string;
   horarioMissa: string;
@@ -11,6 +16,19 @@ export interface Celebracao {
   pessoasEsperadas: number;
   capacidade: number;
   status: StatusCelebracao;
+  horarioPadraoId: number | null; // missa da rotina semanal
+  prevista: boolean;
+}
+
+// Corpo do POST /api/celebracoes (espelha CelebracaoCriar no backend).
+export interface CelebracaoCriar {
+  titulo: string;
+  tipo: TipoCelebracao;
+  data: string; // "YYYY-MM-DD"
+  horarioMissa: string; // "HH:MM"
+  inicioGravacao: string;
+  fimGravacao: string;
+  repetirSemanalmente: boolean;
 }
 
 export interface CalendarDay {
@@ -19,21 +37,3 @@ export interface CalendarDay {
   hasCelebration?: boolean;
   isToday?: boolean;
 }
-
-export interface CelebrationDayInfo {
-  day: number;
-  dateLabel: string;
-  weekday: string;
-}
-
-export interface CelebrationMassSchedule {
-  id: string;
-  startTime: string;
-  recordingStartTime: string;
-  recordingEndTime: string;
-  source: 'global' | 'custom';
-}
-
-export type CelebrationMassScheduleChanges = Partial<
-  Pick<CelebrationMassSchedule, 'startTime' | 'recordingStartTime' | 'recordingEndTime'>
->;

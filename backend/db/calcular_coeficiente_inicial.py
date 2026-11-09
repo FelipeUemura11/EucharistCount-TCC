@@ -1,64 +1,56 @@
 """
-Calcula o coeficiente inicial de comunhao a partir dos dados reais ja
-importados (celebracao + sessao_monitoramento + estimativa_comunhao) e
-grava em configuracao_estimativa.
+Calcula o coeficiente de comunhao e grava em configuracao_estimativa (modo coeficiente_fixo).
 
-Formula: coeficiente = media de (comungantes_reais / ocupacao_final)
-entre todas as sessoes que tem os dois valores preenchidos.
+coeficiente = media de (comungantes / contagem da camera) nas missas em que a camera
+contou de fato. O divisor e a contagem da camera porque e ela que a estimativa recebe
+em producao; dias em que a camera contou menos de 75% da manual ficam de fora.
+A logica fica em integracao/regressao.py (o programa usa a mesma ao confirmar uma missa).
 
-Uso:
+Uso (dentro de backend/db):
     python calcular_coeficiente_inicial.py
 """
 
-from database import obter_conexao
-import crud
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/
+
+from db import crud
+from db.database import obter_conexao
+from integracao import regressao
+from integracao.estimativa import MARGEM_HOSTIAS_PADRAO
 
 
 def calcular_e_gravar() -> None:
     conexao = obter_conexao()
+    try:
+        exemplos = regressao.exemplos(conexao)
+        coeficiente = regressao.coeficiente(exemplos)
+        if coeficiente is None:
+            print("Nenhuma missa com contagem da camera e comungantes contados.")
+            print("Rode o import_csv.py primeiro (o CSV precisa da coluna system_count).")
+            return
 
-    # ocupacao_final > 0 evita divisao por zero; so entra missa com comunhao real.
-    linhas = conexao.execute(
-        """
-        SELECT c.data, c.horario_missa, s.ocupacao_final, e.comungantes_reais
-        FROM sessao_monitoramento s
-        JOIN celebracao c ON c.id = s.celebracao_id
-        JOIN estimativa_comunhao e ON e.sessao_id = s.id
-        WHERE s.ocupacao_final > 0 AND e.comungantes_reais IS NOT NULL
-        """
-    ).fetchall()
+        print(f"{'Data':<12} {'Contagem':>9} {'Comung.':>8} {'Razao':>8}")
+        usadas = [e for e in exemplos if e["camera_confiavel"]]
+        for e in usadas:
+            print(f"{e['data']:<12} {e['ocupacao_final']:>9} {e['comungantes_reais']:>8} "
+                  f"{e['comungantes_reais'] / e['ocupacao_final']:>8.2%}")
+        print(f"\nCoeficiente medio ({len(usadas)} missa(s) com a camera funcionando): "
+              f"{coeficiente:.4f} ({coeficiente:.1%})")
 
-    if not linhas:
-        print("Nenhuma sessao com 'ocupacao_final' e 'comungantes_reais' preenchidos ainda.")
-        print("Rode o import_csv.py primeiro.")
-        return
-
-    razoes = []
-    print(f"{'Data':<12} {'Horario':<8} {'Pessoas':>8} {'Comungantes':>12} {'Razao':>8}")
-    for linha in linhas:
-        razao = linha["comungantes_reais"] / linha["ocupacao_final"]
-        razoes.append(razao)
-        print(f"{linha['data']:<12} {linha['horario_missa']:<8} "
-              f"{linha['ocupacao_final']:>8} {linha['comungantes_reais']:>12} {razao:>8.2%}")
-
-    # Media simples das razoes: cada missa pesa igual, independente do tamanho.
-    coeficiente = sum(razoes) / len(razoes)
-    print(f"\nCoeficiente medio ({len(razoes)} celebracao(oes)): {coeficiente:.4f} ({coeficiente:.1%})")
-
-    # Insere nova versao (historico append-only); a mais recente vira a vigente.
-    config_id = crud.definir_configuracao_estimativa(
-        conexao,
-        coeficiente_comunhao=round(coeficiente, 4),
-        margem_hostias=0.10,
-        metodo="coeficiente_fixo",
-        observacoes=f"Calculado a partir de {len(razoes)} celebracao(oes) reais importadas do CSV manual.",
-    )
-
-    vigente = crud.obter_configuracao_estimativa_vigente(conexao)
-    print(f"\nGravado em configuracao_estimativa (id={config_id}):")
-    print(dict(vigente))
-
-    conexao.close()
+        # Versao nova (historico append-only); a mais recente vira a vigente.
+        config_id = crud.definir_configuracao_estimativa(
+            conexao,
+            coeficiente_comunhao=round(coeficiente, 4),
+            margem_hostias=MARGEM_HOSTIAS_PADRAO,
+            metodo="coeficiente_fixo",
+            observacoes=f"Comungantes / contagem da camera em {len(usadas)} missa(s).",
+        )
+        print(f"\nGravado em configuracao_estimativa (id={config_id}):")
+        print(dict(crud.obter_configuracao_estimativa_vigente(conexao)))
+    finally:
+        conexao.close()
 
 
 if __name__ == "__main__":

@@ -8,6 +8,10 @@
 # Deteccao e rastreio (ByteTrack ja vem embutido)
 ultralytics==8.3.155
 
+# Associacao do ByteTrack. Sem ele o Ultralytics tenta instalar sozinho em
+# tempo de execucao, o que nao funciona dentro do .exe.
+lap==0.5.13
+
 # Processamento de imagem e video
 opencv-python==4.10.0.84
 numpy==1.26.4

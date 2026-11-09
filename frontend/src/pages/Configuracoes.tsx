@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { PlusCircle, Trash2, Camera } from "lucide-react";
 import type { ConfiguracoesGlobais, AgendaDiaCriar } from "../types/configuracoes";
 import { getConfiguracoesGlobais, criarAgendaPadrao, removerAgendaPadrao } from "../services/configuracoes";
+import CapacidadeIgreja from "../components/configuracoes/CapacidadeIgreja";
 
+// Indice = dia_semana do banco (0 = domingo).
 const DIAS_SEMANA = [
     "Domingo",
     "Segunda-feira",
@@ -79,6 +81,7 @@ export default function Configuracoes() {
         }
     };
 
+    // Carregando e falha de leitura tem tela propria antes do conteudo.
     if (loading) return <div className="p-8 text-center text-text-muted">Carregando configurações...</div>;
     if (!configuracoes) return <div className="p-8 text-center text-text-muted">Erro ao carregar configurações.</div>;
 
@@ -210,7 +213,7 @@ export default function Configuracoes() {
                     </div>
                 </div>
 
-                {/* Coluna Lateral: Informações da Câmera */}
+                {/* Coluna Lateral: Informações da Câmera e capacidade da igreja */}
                 <div className="space-y-6">
                     {/* Informações da Câmera */}
                     <div className="rounded-xl bg-white p-6 shadow-sm border border-border">
@@ -233,6 +236,8 @@ export default function Configuracoes() {
                             </li>
                         </ul>
                     </div>
+
+                    <CapacidadeIgreja inicial={configuracoes.capacidade} />
                 </div>
             </div>
         </div>

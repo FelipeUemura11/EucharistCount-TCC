@@ -7,7 +7,7 @@ chama uma vez; um teste pode chamar a sua sem subir motor nem servidor.
 from fastapi import FastAPI
 
 from api import frontend
-from api.rotas import celebracoes, configuracoes, dashboard, historico, status
+from api.rotas import celebracoes, comunhao, configuracoes, dashboard, historico, status
 
 def criar_app() -> FastAPI:
     app = FastAPI(title="Eucharist Count")
@@ -15,7 +15,8 @@ def criar_app() -> FastAPI:
     # pelo main.py, ou pelo proxy do Vite em desenvolvimento). Assim, outro
     # site aberto no navegador deste PC nao consegue usar a API.
 
-    for rotas in (status, dashboard, celebracoes, historico, configuracoes):
+    # Uma rota por tela, todas sob /api.
+    for rotas in (status, dashboard, celebracoes, comunhao, historico, configuracoes):
         app.include_router(rotas.router, prefix="/api")
 
     # POR ULTIMO: o catch-all aceita qualquer caminho. O FastAPI testa as

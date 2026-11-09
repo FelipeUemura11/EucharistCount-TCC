@@ -55,6 +55,7 @@ function Termo({ children }: { children: React.ReactNode }) {
 }
 
 export default function Ajuda() {
+    // Item do FAQ aberto (acordeao) e imagem ampliada no lightbox.
     const [openId, setOpenId] = useState<string | null>("funciona");
     const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 

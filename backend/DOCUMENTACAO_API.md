@@ -9,6 +9,7 @@ Este documento explica **como as peças do backend foram ligadas**: o servidor F
 | [`DOCUMENTACAO_MOTOR.md`](./DOCUMENTACAO_MOTOR.md) | Motor de visão computacional: câmera, detecção, rastreio e contagem |
 | [`DOCUMENTACAO_BANCO.md`](./DOCUMENTACAO_BANCO.md) | Modelo de dados, camada de acesso e estimativa de comunhão |
 | **`DOCUMENTACAO_API.md`** (este) | Servidor FastAPI, ligação motor → banco e dashboard ao vivo |
+| [`DOCUMENTACAO_DISTRIBUICAO.md`](./DOCUMENTACAO_DISTRIBUICAO.md) | Empacotamento em `.exe`, caminhos e início com o Windows |
 
 ---
 
@@ -119,6 +120,7 @@ Se o modelo não existir (`FileNotFoundError`) ou a fonte de vídeo não estiver
 | `--linha` | `contagem.linha` | `--linha 0.25,0.0,0.25,1.0` |
 | `--sem-janela` | `visual.mostrar_janela = false` | produção, sem interface gráfica |
 | `--agora` | — (escolhe o modo) | conta agora, sem esperar a agenda; `--fonte` também ativa o modo manual (seção 9.1) |
+| `--boot` | não abre o navegador | usado pela entrada de início do Windows (`DOCUMENTACAO_DISTRIBUICAO.md`, seção 3.1) |
 
 Os argumentos numéricos são testados com `is not None`, e não com `if valor:`. Isso porque em Python `0` é falso: o teste antigo ignorava um `--fps 0` (processar todos os frames) digitado de propósito. O `argparse` usa `None` para "não informado", e é exatamente isso que o teste verifica.
 
@@ -132,7 +134,11 @@ A configuração efetiva, já com os argumentos aplicados, fica gravada em `sess
 |---|---|---|---|
 | `GET /api/status` | `rotas/status.py` | Se há contagem ativa | Selo "Contagem ativa" no topo das páginas (a cada 5 s) |
 | `GET /api/dashboard` | `rotas/dashboard.py` | Métricas, gráfico e resumo da missa atual ou da última | Página Dashboard (a cada 2 s) |
-| `GET /api/celebracoes` | `rotas/celebracoes.py` | Celebrações do mês corrente | Ainda não usado (a página Celebrações usa dados fixos) |
+| `GET /api/celebracoes` | `rotas/celebracoes.py` | Celebrações de um mês (`?ano=&mes=`) | Página Celebrações (calendário) |
+| `POST /api/celebracoes` / `PUT` / `DELETE /api/celebracoes/{id}` | `rotas/celebracoes.py` | Cria, edita ou cancela uma celebração avulsa (seção 4.4) | Página Celebrações |
+| `POST /api/celebracoes/rotina/{id}/cancelar` / `PUT /api/celebracoes/rotina/{id}` | `rotas/celebracoes.py` | Cancela ou altera uma missa da rotina só numa data (seção 4.4) | Página Celebrações |
+| `PUT /api/configuracoes/capacidade` | `rotas/configuracoes.py` | Grava a capacidade da igreja (padrão 400) | Página Configurações |
+| `POST /api/sessoes/{id}/comungantes` | `rotas/comunhao.py` | Grava quantos comungaram de verdade e recalcula a estimativa (seção 8.1) | Dashboard, no fim da missa |
 | `GET /api/historico` | `rotas/historico.py` | Missas encerradas, com os resultados | Página Histórico (a cada 10 s) |
 | `GET /api/configuracoes` | `rotas/configuracoes.py` | Agenda padrão e dados da câmera (`infoCamera`) | Página Configurações |
 | `POST /api/configuracoes/agenda` | `rotas/configuracoes.py` | O horário criado, com `id` | Página Configurações (botão "Adicionar") |
@@ -227,6 +233,9 @@ De onde vem cada campo:
 | `entradas` / `saidas` | `sessao_monitoramento.total_entradas` / `total_saidas` | A cada passagem pela linha |
 | `estimativaComunhao` | `calcular_estimativa(db, ocupação, celebracao=celebracao).comungantes` (seção 8) | Junto com a ocupação |
 | `hostiasSugeridas` | `calcular_estimativa(db, ocupação, celebracao=celebracao).hostias` (com `margem_hostias` do banco) | Junto com a ocupação |
+| `contagemDescartada` | `true` quando a última contagem terminou descartada (`sessao.status = 'interrompida'` com "Contagem descartada" nas observações, ver `DOCUMENTACAO_BANCO.md`, seção 5.2). Nesse caso `estimativaComunhao` e `hostiasSugeridas` vêm `0` e a tela mostra uma faixa de aviso e "—" nos três cards de estimativa, em vez de uma tela zerada sem explicação. As sessões interrompidas por erro ou queda de energia não entram: a tela continua mostrando a última contagem válida | Junto com a ocupação |
+| `sessaoId`, `aguardandoConfirmacao` | A sessão mostrada e se ela ainda espera quantos comungaram: `true` numa contagem encerrada e válida sem `comungantes_reais`. A tela pergunta (seção 8.1) | Junto com a ocupação |
+| `possivelSubcontagem` | `contagem_abaixo_do_habitual()`: `true` quando a contagem está abaixo de 70% da mediana do histórico do mesmo dia e horário. A tela mostra "Possível subcontagem" (`DOCUMENTACAO_BANCO.md`, seção 9.4) | Junto com a ocupação |
 | `contagemAtiva` | `sessao["status"] == "em_andamento"` | `false` quando mostra a última missa encerrada |
 | `graficoOcupacao[]` | `instantaneo_ocupacao`: `hora` = `hora_de_timestamp(registrado_em)`, `ocupacao` = `ocupacao_atual` | A cada 5 s de vídeo |
 | `resumoCelebracao` | Título e janela de monitoramento da celebração | — |
@@ -239,17 +248,45 @@ Três detalhes:
 
 Sem nenhuma sessão (nem ativa, nem encerrada), a rota devolve o mesmo formato, zerado, com o gráfico vazio e `resumoCelebracao: null`. O frontend mostra "Nenhuma missa registrada ainda." no lugar do resumo.
 
-### 4.4 `GET /api/celebracoes`
+### 4.4 `/api/celebracoes`
 
-Lista as celebrações do **mês atual** (`crud.listar_celebracoes_do_mes`, que filtra por `data LIKE 'AAAA-MM%'`).
+Tela Celebrações. A agenda semanal fica em `/api/configuracoes` (seção 4.6); aqui entram as missas **fora da rotina** (Natal, Páscoa, casamento, exéquias, missa de última hora) e o calendário do mês.
+
+| Rota | Comportamento |
+|---|---|
+| `GET /api/celebracoes?ano=&mes=` | Celebrações do mês pedido (`crud.listar_celebracoes_do_mes`) e, de hoje em diante, as missas da rotina semanal que ainda não estão no banco, com `prevista: true`, `id: null` e o `horarioPadraoId`. Sem `ano` e `mes`, vale o mês atual. `mes` fora de 1 a 12 responde **422** |
+| `PUT /api/celebracoes/{id}` | Edita título, tipo, data e horários de uma celebração avulsa `agendada`, com as mesmas validações do `POST` (a própria janela não conta como sobreposição). Missa da rotina responde **409**: ela é alterada pela rota abaixo |
+| `POST /api/celebracoes/rotina/{id}/cancelar` | A missa da rotina não acontece nessa data (feriado, missa suspensa): grava a linha daquela data como `cancelada`, e o agendador não liga a câmera. As outras semanas continuam |
+| `PUT /api/celebracoes/rotina/{id}` | Altera a missa da rotina só nessa data. Com o mesmo horário de missa, a linha da data vira avulsa com a janela nova; com outro horário, a da rotina é cancelada nessa data e nasce uma avulsa no horário novo. O disparo semanal pula a data (`_executar_janela` vê que a linha não é mais da rotina) |
+| `POST /api/celebracoes` | Cria uma celebração **agendada** e responde **201** com o registro criado |
+| `DELETE /api/celebracoes/{id}` | Cancela (`status = 'cancelada'`). **404** se não existir; **409** se já estiver `em_andamento` ou `finalizada` |
+
+Campos devolvidos pelo `GET` e pelo `POST`:
 
 | Campo | Origem |
 |---|---|
-| `id`, `titulo` | `celebracao.id`, `titulo` |
+| `id`, `titulo`, `tipo` | `celebracao.id`, `titulo`, `tipo` |
 | `dia`, `diaSemana` | Derivados de `celebracao.data` (`dia_do_mes`, `formatar_dia_semana`) |
 | `horarioMissa`, `inicioMonitoramento`, `fimMonitoramento` | `horario_missa`, `horario_inicio/fim_monitoramento` |
 | `pessoasEsperadas`, `capacidade` | `pessoas_esperadas`, `capacidade` (`0` se vazios) |
 | `status` | `celebracao.status`, sem conversão: `agendada`, `em_andamento`, `finalizada` ou `cancelada` |
+
+**Corpo do `POST`** (`CelebracaoCriar`): `titulo`, `tipo` (`comum`, `especial`, `natal`, `pascoa`, `casamento` ou `exequias`), `data` (`AAAA-MM-DD`), `horarioMissa`, `inicioGravacao`, `fimGravacao` (`HH:MM`) e `repetirSemanalmente`.
+
+**Validações**, as mesmas da agenda mais as da data:
+
+| Situação | Resposta |
+|---|---|
+| Hora fora do formato `HH:MM`, fim da gravação não depois do início, data impossível ou no passado, tipo fora da lista, título vazio | **422** |
+| Data de hoje com o fim da gravação já passado | **422** (não haveria o que contar) |
+| Já existe celebração naquela data e horário | **409** (`UNIQUE (data, horario_missa)`) |
+| A janela de gravação se sobrepõe a outra celebração do dia ou a uma missa da agenda daquele dia da semana | **409** (a contagem é uma por vez) |
+
+Uma celebração **cancelada** no mesmo dia e horário não bloqueia: ela é apagada para dar lugar à nova (só se nunca foi contada).
+
+**`repetirSemanalmente`:** além da celebração, grava um horário em `horario_padrao` (mesmo dia da semana e horário da missa), de modo que a missa passa a se repetir toda semana pela agenda existente, sem tabela nova. Se a agenda já tem esse dia e horário, ele é reaproveitado, sem duplicar. A celebração criada fica ligada a esse horário (`horario_padrao_id`), então o disparo semanal a reaproveita, com o título e o tipo escolhidos (seção 9.6).
+
+Depois de salvar ou cancelar, a rota chama `recarregar_agenda()`, e a mudança vale na hora, sem reiniciar o programa.
 
 ### 4.5 `GET /api/historico`
 
@@ -423,7 +460,7 @@ def sessao_de_monitoramento(monitor, config):
 
 - **Como o `@contextmanager` funciona.** Tudo antes do `yield` roda na entrada do `with`; o `yield` entrega o gravador para o bloco; o `finally` roda na saída, **mesmo se houver erro**. Quem lê `with sessao_de_monitoramento(...)` entende o que acontece sem ver os detalhes.
 - **O `Monitor` é criado antes de abrir a sessão.** Se o modelo não existir, o erro acontece antes de qualquer escrita, e não fica uma sessão vazia no banco.
-- **Concluída ou interrompida.** Se o bloco termina normalmente (fim do vídeo, ESC), a sessão fecha como `concluida`. Se termina por exceção (a fonte não abriu, um erro no motor, Ctrl+C), o `except` anota `interrompida` e relança a exceção, para o `main.py` ainda mostrar a mensagem. O `BaseException` é necessário porque o `KeyboardInterrupt` do Ctrl+C não herda de `Exception`. Só sessões `concluida` entram no Histórico, então uma contagem que falhou não aparece lá como resultado válido com zeros.
+- **Concluída ou interrompida.** Se o bloco termina normalmente (fim do vídeo, ESC), a sessão fecha como `concluida`. Se termina por exceção (a fonte não abriu, um erro no motor, Ctrl+C), o `except` anota `interrompida` e relança a exceção, para o `main.py` ainda mostrar a mensagem. O `BaseException` é necessário porque o `KeyboardInterrupt` do Ctrl+C não herda de `Exception`. Só sessões `concluida` entram no Histórico, então uma contagem que falhou não aparece lá como resultado válido com zeros. O mesmo vale para uma contagem que terminou normal, mas é impossível (mais saídas que entradas) ou menor que `contagem.minimo_pessoas`: a sessão é gravada como `interrompida`, com o motivo em `observacoes` (`DOCUMENTACAO_BANCO.md`, seção 5.2).
 - **Uma conexão para a missa inteira.** O gravador usa a mesma conexão durante toda a sessão, ao contrário da API, que abre uma por requisição (`DOCUMENTACAO_BANCO.md`, seção 7.5).
 
 **Qual celebração é usada:** no modo agendado, o agendador passa `celebracao_id` com a celebração da agenda, por exemplo "Missa das 10:00", ligada ao `horario_padrao` e com início e fim de monitoramento (seção 9). No modo manual, sem `celebracao_id`, a celebração é criada na hora, com a data e o horário em que a contagem começou e o título "Missa (monitoramento automatico)". Reiniciar no mesmo minuto reaproveita a celebração (`obter_ou_criar_celebracao`) e cria uma segunda sessão nela.
@@ -516,7 +553,7 @@ Se o dashboard e o histórico tivessem cada um a sua cópia da conta, bastaria a
 
 A regra opera em duas fases conforme a linha vigente de `configuracao_estimativa` (`DOCUMENTACAO_BANCO.md`, seções 9.1 e 9.2):
 
-1. **Modo `regressao`:** quando `metodo == 'regressao'` e `modelo_path` aponta para um artefato `.joblib` válido (salvo na pasta do banco, `CAMINHO_BANCO.parent / "modelos_estimativa"`), o pipeline scikit-learn é carregado com cache em memória (`_CACHE_MODELO`) e prevê a quantidade de comungantes a partir de `ocupacao_final`, `minutos_missa`, `dia_semana` e `tipo` da celebração (limitada ao intervalo `[0, ocupacao]`).
+1. **Modo `regressao`:** quando `metodo == 'regressao'` e `modelo_path` aponta para um artefato `.joblib` válido (salvo na pasta do banco, `CAMINHO_BANCO.parent / "modelos_estimativa"`), o pipeline scikit-learn é carregado com cache em memória (`_CACHE_MODELO`) e prevê a quantidade de comungantes a partir de `ocupacao_final`, `minutos_missa`, `dia_semana` e `tipo` da celebração (só não pode ser negativa: a contagem da câmera é um piso do total presente, não um teto).
 2. **Modo `coeficiente_fixo` (ou fallback):** enquanto não há modelo de regressão (ou caso o arquivo `.joblib` não possa ser carregado), aplica a proporção direta:
 
 ```python
@@ -524,9 +561,9 @@ comungantes = int(max(ocupacao, 0) * coeficiente)
 hostias     = math.ceil(comungantes * (1 + margem))
 ```
 
-- **`COEFICIENTE_PADRAO = 0.78`** é a média das 3 celebrações reais do `counting_people.csv` (17/22, 177/214, 250/340). Ele só vale enquanto não houver uma linha em `configuracao_estimativa`; na instalação, rodar `db/calcular_coeficiente_inicial.py` grava o valor real no banco. O padrão anterior era `0.4`, que estimava metade do observado: um número plausível e errado.
+- **`COEFICIENTE_PADRAO = 0.89`** é a média de `comungantes ÷ contagem da câmera` nas missas boas do `counting_people.csv` (`DOCUMENTACAO_BANCO.md`, seção 9.1). Ele só vale enquanto não houver uma linha em `configuracao_estimativa`, e vale de verdade no `.exe`, que começa com o banco vazio. A margem de hóstias padrão é de 12% (`MARGEM_HOSTIAS_PADRAO`). Rodar `db/calcular_coeficiente_inicial.py` grava os valores calculados no banco.
 - **`max(ocupacao, 0)`** protege o começo de um vídeo, quando `dentro` pode ficar negativo (uma saída antes de qualquer entrada).
-- O resultado é um objeto `Estimativa` (`comungantes`, `hostias`, `coeficiente`, `configuracao_id`), para quem usa escrever `est.hostias` em vez de `resultado[1]`.
+- O resultado é um objeto `Estimativa` (`comungantes`, `hostias`, `coeficiente`, `configuracao_id`, `margem`), para quem usa escrever `est.hostias` em vez de `resultado[1]`.
 
 **Por que a estimativa precisa ser gravada:** o Histórico lê as colunas de `estimativa_comunhao` pela `vw_historico`. Uma estimativa que só é calculada na hora de exibir o dashboard nunca chega ao banco, e o Histórico mostra estimativa e hóstias zeradas. `registrar_estimativa_da_sessao()` grava `estimativa_calculada`, `hostias_calculadas`, `coeficiente_utilizado` e `configuracao_estimativa_id` para a sessão.
 
@@ -538,6 +575,31 @@ python -c "from db.database import obter_conexao; from integracao.estimativa imp
 ```
 
 **Por que em `integracao/`:** é regra de negócio usada pelos dois lados, API e gravação. O arquivo não importa o `motor`, então a API continua rodando sem a `ultralytics`.
+
+---
+
+### 8.1 A estimativa melhora com o tempo (`integracao/regressao.py`)
+
+A câmera sozinha não sabe quantos comungam; quem ensina é a própria paróquia. No fim de cada missa contada, o Dashboard pergunta "Quantas pessoas comungaram?", com a estimativa do sistema já preenchida:
+
+| Resposta | O que é gravado |
+|---|---|
+| "Está certo" | A estimativa vira `estimativa_comunhao.comungantes_reais` |
+| "Corrigir" + um número | O número informado vira `comungantes_reais` |
+| Ninguém responde | Quando a próxima missa começa a ser contada, a estimativa vira `comungantes_reais`: por decisão da equipe, uma previsão que ninguém contesta é tratada como real, e cada correção feita na tela puxa o modelo para o valor certo, e a sessão ganha a nota "Comunhão não confirmada: vale a estimativa do sistema", para dar para separar depois |
+
+A resposta **só alimenta o banco**: a tela continua mostrando, para aquela missa, a estimativa gravada no fechamento (a mesma do Histórico). Uma contagem descartada ou interrompida não é perguntada (`409` se alguém tentar), porque o número de pessoas dela não vale.
+
+Cada confirmação chama `atualizar_estimativa()`:
+
+1. Recalcula o coeficiente (comungantes ÷ contagem da câmera) com todas as missas que têm a comunhão contada.
+2. Com 15 missas ou mais, treina a regressão (dia da semana, horário e tipo, além da contagem) e compara as duas pelo erro médio em *leave-one-out*, nas mesmas missas.
+3. **A regressão só passa a valer se errar menos que o coeficiente.** Se deixar de ser melhor, a estimativa volta para o coeficiente.
+4. Grava uma versão nova em `configuracao_estimativa` só quando algo mudou, mantendo a margem de hóstias vigente.
+
+O `scikit-learn` vai dentro do `.exe` (`DOCUMENTACAO_DISTRIBUICAO.md`), então o treino acontece no próprio computador da paróquia, sem ninguém rodar script. Como o `.exe` não troca de versão sozinho, o modelo salvo em `.joblib` é sempre lido pela mesma versão que o gravou.
+
+**Banco novo.** No primeiro uso, com o banco ainda sem nenhuma sessão, o `main.py` importa o `counting_people.csv` embutido (`semear_banco_novo`), e a estimativa já nasce calculada com as missas de referência.
 
 ---
 
@@ -596,7 +658,7 @@ O `Monitor` é criado **uma vez só**, no `main.py`, e reaproveitado em todas as
 | Computador em suspensão no horário de início | Conta ao acordar, se ainda estiver dentro da janela | `misfire_grace_time` igual à duração da janela; o `_executar_janela` confere o fim de novo antes de abrir a câmera |
 | Programa ligado **depois** do fim | Não conta | Conferência `inicio <= agora < fim` |
 | Janelas sobrepostas | Só a primeira conta; a segunda é ignorada com aviso no terminal | Trava `_ocupado` (`threading.Lock`), tentada com `acquire(blocking=False)` |
-| Mesma janela disparada duas vezes no dia (agenda recarregada no meio) | Conta uma vez só | Conjunto `_feitas` de pares `(horario_id, dia)` |
+| Mesma janela disparada duas vezes no dia (agenda recarregada no meio) | Conta uma vez só | Conjunto `_feitas` de trios `(origem, id, dia)` |
 | Celebração marcada como `cancelada` | Não liga a câmera | Conferido antes de contar |
 | Erro no motor ou câmera que não volta | Sessão `interrompida`; as próximas missas continuam funcionando | O erro é capturado em `_contar()` e a trava é sempre solta num `finally` |
 | `Ctrl+C` no meio da contagem | Sessão `interrompida` (não entra no Histórico) | `encerrar()` marca `_encerrando`, para o motor e espera a sessão ser gravada (`shutdown(wait=True)`); `_contar()` lança `_Encerrado` dentro do `with` |
@@ -621,18 +683,39 @@ Com um motor falso (que "conta" sozinho), um relógio falso (para simular "domin
 
 Com o vídeo de teste e o programa real: uma janela cadastrada com início já passado começou a contar ao abrir o programa, parou sozinha no horário de fim e entrou no Histórico como "Missa das …" com a estimativa; e um horário cadastrado pela tela, com o programa aberto, começou a contar sem reiniciar.
 
+### 9.6 Celebrações avulsas
+
+Além da agenda semanal, o agendador conta as celebrações cadastradas na tela Celebrações (Natal, Páscoa, casamento, missa de última hora). Antes, uma missa fora da rotina só era contada com `python main.py --agora`, entrando como "Missa (monitoramento automatico)".
+
+| Fonte | Disparo | Quando existe |
+|---|---|---|
+| Agenda semanal (`horario_padrao`) | `CronTrigger` semanal no horário de início da gravação | Um por horário ativo |
+| Celebração avulsa (`celebracao` com `horario_padrao_id` nulo e `status = 'agendada'`) | `DateTrigger` de data única no início da gravação | Uma por celebração, de hoje em diante |
+
+O `recarregar()` lê as duas fontes, e as rotas `/api/celebracoes` e `/api/configuracoes` o chamam depois de cada mudança. A contagem (`_contar`) e a trava de uma contagem por vez são as mesmas. A diferença está em `_executar_celebracao`, que lê a janela da própria celebração, e em `_reservar()`, que marca a janela como feita com a chave `(origem, id, dia)`: a origem (`"agenda"` ou `"celebracao"`) evita colisão entre ids de tabelas diferentes. Se o computador ligar no meio da janela, o disparo já venceu, mas o `misfire_grace_time` é a duração da janela, então ele roda na hora.
+
+**`repetirSemanalmente`:** a celebração criada fica ligada ao horário da agenda (`horario_padrao_id`). Por isso o agendador **não** cria um disparo avulso para ela: quem a conta é o disparo semanal, que encontra a celebração pela chave `(data, horario_missa)` e a reaproveita (`obter_ou_criar_celebracao`), preservando título e tipo.
+
+**Limpeza (`limpar_celebracoes_vencidas`).** Avulsa que passou e **nunca foi contada** é apagada 24 horas depois do fim da gravação, na inicialização (`main.py`) e todo dia às 03:00 no próprio agendador, porque o computador pode ficar ligado por dias.
+
+| Regra | Motivo |
+|---|---|
+| Só `origem = 'personalizada'` e sem `horario_padrao_id` | As ligadas à agenda semanal não são avulsas |
+| Só `agendada` ou `cancelada` | Em andamento e finalizada têm contagem |
+| Só sem nenhuma sessão | `sessao_monitoramento` tem `ON DELETE CASCADE`: apagar a celebração apagaria a contagem, e o Histórico lê a celebração |
+
+Missa contada **nunca** é apagada: fica como `finalizada` e alimenta o Histórico.
+
 ---
 
 ## 10. Limitações conhecidas
 
 | Onde | Limitação | Efeito |
 |---|---|---|
-| `integracao/agendador.py` | Só a agenda semanal (`horario_padrao`) dispara contagens | Uma celebração avulsa (missa de última hora, Natal) precisa do modo manual (`--agora`) por enquanto (seção 11) |
 | `integracao/agendador.py` | Janela de gravação que passa da meia-noite não é suportada | A tela já recusa: o fim precisa ser depois do início no mesmo dia |
-| `integracao/agendador.py` | O agendador só funciona com o programa aberto | Iniciar junto com o Windows faz parte do empacotamento (seção 11) |
-| `integracao/agendador.py` | Os avisos do agendador ("contagem iniciada", "falhou") saem só no terminal | No executável sem console, ninguém os vê. Gravar em arquivo de log ou em `evento_sistema` |
+| `integracao/agendador.py` | O agendador só funciona com o programa aberto | O `.exe` se registra para iniciar com o Windows (`DOCUMENTACAO_DISTRIBUICAO.md`), mas com o computador desligado na hora da missa ela não é contada |
 | `integracao/agendador.py` | O controle de "uma vez por dia" fica em memória | Reiniciar o programa dentro de uma janela que já foi contada (vídeo que acabou antes do fim) conta de novo, numa segunda sessão da mesma celebração. O Histórico mostra a mais recente |
-| `Celebracoes.tsx` | A tela de Celebrações ainda usa `celebrationsMock.ts` | As alterações feitas no calendário ficam apenas em memória no navegador; a rota `GET /api/celebracoes` já existe no backend, mas ainda não foi integrada à página |
+| `Celebracoes.tsx` | O calendário lista só o que está na tabela `celebracao` | As missas da agenda semanal aparecem ali quando a contagem delas começa (é nesse momento que a celebração é criada); as futuras ainda não são mostradas. Celebrações avulsas aparecem desde o cadastro |
 
 Corrigido: `EstimativaComunhao.tsx` antes calculava as hóstias sugeridas no próprio frontend multiplicando por `1.1` fixo. Agora `GET /api/dashboard` devolve `hostiasSugeridas` diretamente de `calcular_estimativa(db, ocupacao, celebracao).hostias`, garantindo que o Dashboard e o Histórico usem sempre a mesma `margem_hostias` configurada no banco.
 
@@ -640,6 +723,5 @@ Corrigido: `EstimativaComunhao.tsx` antes calculava as hóstias sugeridas no pr�
 
 ## 11. Próximos passos previstos
 
-- **Celebrações eventuais no agendador.** Hoje só a agenda semanal (`horario_padrao`) dispara contagens. Agendar também as celebrações avulsas com `status = 'agendada'` (missa de última hora, Natal, Páscoa), com cadastro pela tela Celebrações.
-- **Empacotamento (PyInstaller + Inno Setup).** O código já traz a preparação para o executável: `freeze_support()` no `main.py`, resolução de caminhos estáticos por `sys._MEIPASS` no `api/frontend.py`, leitura do `.env` na pasta do `.exe` em `motor/config.py`, e modelos `.joblib` de regressão salvos junto à pasta do banco (`CAMINHO_BANCO.parent`). Falta também abrir o programa junto com o Windows, para o agendador funcionar sem ninguém precisar abri-lo.
+- **Empacotamento (PyInstaller + Inno Setup).** O `.exe` único, o banco em `%APPDATA%`, o início com o Windows e a abertura automática do dashboard já estão no código e estão descritos em [`DOCUMENTACAO_DISTRIBUICAO.md`](./DOCUMENTACAO_DISTRIBUICAO.md). Falta validar o build numa máquina Windows e criar o instalador (Inno Setup).
 - **Controle manual da contagem.** Hoje não há botões no dashboard nem rotas na API para iniciar ou encerrar o motor: ele começa pelo `main.py` (na hora, com `--agora`, ou pela agenda) e termina no fim do vídeo ou da janela, por ESC/Q na janela ou por Ctrl+C.

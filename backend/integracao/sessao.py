@@ -15,7 +15,12 @@ from typing import Iterator
 
 from db import crud
 from db.database import obter_conexao
-from integracao.estimativa import preencher_estimativas_pendentes, registrar_estimativa_da_sessao
+from integracao.regressao import assumir_estimativas_nao_confirmadas, atualizar_estimativa
+from integracao.estimativa import (
+    motivo_contagem_invalida,
+    preencher_estimativas_pendentes,
+    registrar_estimativa_da_sessao,
+)
 from motor.config import Config, mascarar_senha
 from motor.monitor import Metricas, Monitor
 
@@ -30,6 +35,8 @@ class GravadorSessao:
         self._ultimo = -math.inf
         self.pico = 0
         self._totais = (0, 0) # entradas e saidas finais
+        # Preenchido ao fechar a sessao quando a contagem e descartada (quem chamou le depois do with).
+        self.motivo_descarte: str | None = None
 
     def __call__(self, metricas: Metricas, instante: float) -> None:
         self.pico = max(self.pico, metricas.dentro)
@@ -88,6 +95,13 @@ def sessao_de_monitoramento(
     parametros = asdict(config)
     parametros["camera"]["fonte"] = mascarar_senha(config.camera.fonte)
 
+    # Uma missa nova comecando: a anterior que ficou sem confirmacao passa a valer pela estimativa.
+    if assumir_estimativas_nao_confirmadas(conexao):
+        try:
+            print(f"[estimativa] {atualizar_estimativa(conexao)}")
+        except Exception as e:
+            print(f"[AVISO] Nao foi possivel recalcular a estimativa: {e}")
+
     sessao_id = crud.iniciar_sessao(
         conexao, celebracao_id,
         origem_contagem="visao_computacional",
@@ -96,6 +110,7 @@ def sessao_de_monitoramento(
 
     gravador = GravadorSessao(conexao, sessao_id)
 
+    # Status final: 'concluida' ate que algum erro ou interrupcao mude para 'interrompida'.
     status = "concluida"
     try:
         yield gravador
@@ -107,6 +122,17 @@ def sessao_de_monitoramento(
     # Sempre fecha a sessao, com os totais das ultimas metricas do monitor.
     finally:
         m = monitor.metricas
+
+        # Contagem impossivel ou baixa demais (oclusao): a sessao fica guardada
+        # como interrompida, sem estimativa, Historico nem regressao.
+        motivo = None
+        if status == "concluida" and config.contagem.ativo:
+            motivo = motivo_contagem_invalida(m.entradas, m.saidas, config.contagem.minimo_pessoas)
+            if motivo:
+                status = "interrompida"
+                gravador.motivo_descarte = motivo
+                print(f"[AVISO] Contagem descartada: {motivo} (entradas {m.entradas}, saidas {m.saidas}).")
+
         crud.finalizar_sessao(
             conexao, sessao_id,
             total_entradas=m.entradas,
@@ -114,6 +140,7 @@ def sessao_de_monitoramento(
             ocupacao_final=m.dentro,
             ocupacao_maxima=gravador.pico,
             contagem_sistema=m.dentro,
+            observacoes=f"Contagem descartada: {motivo}" if motivo else None,
             status=status,
         )
         # So contagem concluida entra no Historico, entao so ela precisa de estimativa.

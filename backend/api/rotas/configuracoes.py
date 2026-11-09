@@ -1,5 +1,5 @@
 """
-GET/POST/DELETE /api/configuracoes — pagina Configuracoes.
+GET/POST/PUT/DELETE /api/configuracoes — pagina Configuracoes.
 
 A agenda padrao fica na tabela horario_padrao; camera e deteccao vem do
 config.json.
@@ -10,7 +10,7 @@ import sqlite3
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.dependencias import obter_db
-from api.schemas import AgendaDia, AgendaDiaCriar, ConfiguracoesGlobais, InfoCamera
+from api.schemas import AgendaDia, AgendaDiaCriar, CapacidadeIgreja, ConfiguracoesGlobais, InfoCamera
 from db import crud
 from integracao.agendador import recarregar_agenda
 from motor.config import Config, mascarar_senha
@@ -50,7 +50,7 @@ def get_configuracoes(db: sqlite3.Connection = Depends(obter_db)):
             fpsProcessado=config.camera.fps_processamento,
         )
 
-    return ConfiguracoesGlobais(agendaPadrao=agenda, infoCamera=info_camera)
+    return ConfiguracoesGlobais(agendaPadrao=agenda, infoCamera=info_camera, capacidade=crud.obter_capacidade(db))
 
 
 @router.post("/configuracoes/agenda", response_model=AgendaDia)
@@ -70,3 +70,10 @@ def deletar_agenda(agenda_id: int, db: sqlite3.Connection = Depends(obter_db)):
         raise HTTPException(status_code=404, detail="Horario nao encontrado")
     recarregar_agenda()
     return {"sucesso": True}
+
+
+@router.put("/configuracoes/capacidade", response_model=CapacidadeIgreja)
+def definir_capacidade(corpo: CapacidadeIgreja, db: sqlite3.Connection = Depends(obter_db)):
+    # Linha de referencia do grafico do Dashboard.
+    crud.definir_capacidade(db, corpo.capacidade)
+    return corpo

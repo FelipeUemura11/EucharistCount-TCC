@@ -3,6 +3,7 @@ import Sidebar from "./Sidebar";
 import HeaderPage from "./HeaderPage";
 import { useStatusContagem } from "../hooks/useStatusContagem";
 
+// Titulo do header por rota.
 const TITULOS: Record<string, string> = {
     "/": "Dashboard da Comunhão",
     "/celebracoes": "Celebrações",
@@ -18,6 +19,7 @@ export default function AppLayout() {
     return (
         <div className="flex min-h-screen bg-app-bg">
             <Sidebar />
+            {/* ml-70 = largura da sidebar fixa */}
             <div className="ml-70 flex min-h-screen min-w-0 flex-1 flex-col">
                 <HeaderPage
                     title={TITULOS[pathname] ?? ""}

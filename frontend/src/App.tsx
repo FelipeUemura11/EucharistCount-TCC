@@ -9,6 +9,7 @@ import Ajuda from "./pages/Ajuda";
 function App() {
     return (
         <Routes>
+            {/* Todas as paginas dentro do AppLayout (sidebar + header); rota desconhecida volta ao Dashboard. */}
             <Route element={<AppLayout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/celebracoes" element={<Celebracoes />} />

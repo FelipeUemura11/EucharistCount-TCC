@@ -13,6 +13,7 @@ export const criarAgendaPadrao = async (agenda: AgendaDiaCriar): Promise<AgendaD
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(agenda)
     });
+    // 422 = validacao do backend (formato de hora ou fim antes do inicio).
     if (res.status === 422) throw new Error("Horário inválido: o fim da gravação deve ser depois do início.");
     if (!res.ok) throw new Error("Erro ao criar agenda");
     return res.json();
@@ -23,4 +24,13 @@ export const removerAgendaPadrao = async (id: number): Promise<void> => {
         method: "DELETE"
     });
     if (!res.ok) throw new Error("Erro ao deletar agenda");
+};
+
+export const salvarCapacidade = async (capacidade: number): Promise<void> => {
+    const res = await fetch("/api/configuracoes/capacidade", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ capacidade })
+    });
+    if (!res.ok) throw new Error("Capacidade inválida: use um número entre 1 e 5000.");
 };

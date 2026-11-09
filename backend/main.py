@@ -11,20 +11,24 @@ Dois modos:
 
 import multiprocessing
 import sys
+import threading
 import time
 
+import inicializacao
 from api.app import criar_app
 from api.servidor import iniciar_em_background
 
 from cli import aplicar_argumentos, modo_manual, montar_argumentos
 from integracao import agendador as agenda
+from integracao import regressao
 from integracao.sessao import fechar_sessoes_presas, preencher_estimativas_atrasadas, sessao_de_monitoramento
 
 from motor.monitor import Monitor
-from motor.config import RAIZ, Config
+from motor.config import EMPACOTADO, RAIZ, Config
 
 from db.database import inicializar_banco
 
+# Indice = dia_semana do banco (0 = domingo); usado so para listar as proximas contagens.
 DIAS = ("domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado")
 
 
@@ -40,7 +44,9 @@ def executar_manual(config: Config) -> None:
             metricas = monitor.executar(ao_atualizar=gravador)
 
         print("\n" + "=" * 52)
-        print(" >>> Sessão Concluída ")
+        print(" >>> Contagem descartada " if gravador.motivo_descarte else " >>> Sessão Concluída ")
+        if gravador.motivo_descarte:
+            print(f"Motivo             : {gravador.motivo_descarte}")
         print(f"Entradas           : {metricas.entradas}")
         print(f"Saídas             : {metricas.saidas}")
         print(f"Dentro da igreja   : {metricas.dentro}")
@@ -85,11 +91,22 @@ def iniciar_agendado(config: Config) -> agenda.Agendador | None:
 
 
 def main() -> int:
+    # Necessario no executavel do PyInstaller (Windows); sem efeito fora dele.
     multiprocessing.freeze_support()
+
+    # .exe sem console: o log em arquivo precisa existir antes de qualquer print.
+    if EMPACOTADO:
+        inicializacao.preparar_saida()
 
     # Precedencia: linha de comando > config.json > padrao. A CLI e aplicada por cima do que o Config carregou.
     args = montar_argumentos().parse_args()
     config = aplicar_argumentos(Config.carregar(), args)
+
+    # Programa ja aberto (ex.: iniciou com o Windows e o padre clicou no atalho): so mostra o dashboard.
+    if EMPACOTADO and not inicializacao.adquirir_instancia_unica():
+        if not args.boot:
+            inicializacao.abrir_dashboard()
+        return 0
 
     print("=" * 52)
     print("  EUCHARIST COUNT — Dashboard & Sistema ON-PREMISE")
@@ -107,15 +124,31 @@ def main() -> int:
                   f"terminado e foi(ram) fechada(s) como interrompida(s).")
 
         # Contagens antigas (ou cuja estimativa falhou) que ficaram com estimativa zerada no Historico.
+        # Banco novo (primeiro uso do .exe): entra com as missas de referencia e a estimativa ja calibrada.
+        semeadas = regressao.semear_banco_novo(RAIZ / "counting_people.csv")
+        if semeadas:
+            print(f"[!] Banco novo: {semeadas} missa(s) de referencia importada(s) do counting_people.csv.")
+
         atrasadas = preencher_estimativas_atrasadas()
         if atrasadas:
             print(f"[!] Estimativa calculada para {atrasadas} contagem(ns) que estava(m) sem.")
+
+        # Celebracoes avulsas que passaram ha mais de 24h sem serem contadas (o Historico nao e afetado).
+        vencidas = agenda.limpar_celebracoes_vencidas()
+        if vencidas:
+            print(f"[!] {vencidas} celebracao(oes) avulsa(s) vencida(s) removida(s).")
 
         # API numa thread daemon; o motor de visao roda na thread principal (bloqueante).
         iniciar_em_background(criar_app())
         print("\n")
         print("[✓] Dashboard: http://127.0.0.1:8000")
         print("[✓] Documentação da API: http://127.0.0.1:8000/docs")
+
+        # .exe: inicia com o Windows e mostra o dashboard (no boot fica quieto: a agenda conta sozinha).
+        if EMPACOTADO:
+            inicializacao.registrar_inicio_com_windows()
+            if not args.boot:
+                threading.Thread(target=inicializacao.abrir_dashboard, daemon=True).start()
 
         if modo_manual(args):
             print("[✓] Modo manual: puxando motor visual e câmeras...\n")

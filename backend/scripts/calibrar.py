@@ -76,6 +76,7 @@ def descrever_video(caminho: str) -> None:
     if total > 0:
         print(f"Duracao   : {total / max(fps, 1):.0f}s ({total} frames)")
 
+    # Brilho medio do primeiro frame: cena escura pede confianca menor.
     ok, frame = cap.read()
     if ok:
         brilho = frame.mean()

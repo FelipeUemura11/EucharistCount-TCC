@@ -14,24 +14,24 @@ de paroquia. Se o projeto crescer, trocar por SQLAlchemy aqui e um detalhe
 de implementacao que nao muda o `schema.sql`.
 """
 
+import os
 import sqlite3
+import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent
 CAMINHO_SCHEMA = RAIZ / "schema.sql"
 
-# /* Apagar (ou comentar) a linha de deploy na raiz temp na hora do envio definitivo do Executável */
-CAMINHO_BANCO = RAIZ / "eucharist_count.db"
-
-# ==============================================================================
-# /* Na hora do envio (deploy) via Inno Setup, alterar deploy do db para aqui
-# (descomentar as 3 linhas abaixo). Isso salvará o banco de dados na pasta real
-# do Windows %APPDATA%, não evaporando quando o sistema for desligado. */
-# ==============================================================================
-# PASTA_APPDATA = Path(os.getenv('APPDATA', RAIZ)) / "EucharistCount"
-# PASTA_APPDATA.mkdir(parents=True, exist_ok=True)
-# CAMINHO_BANCO = PASTA_APPDATA / "eucharist_count.db"
-
+# Executavel: o banco fica em %APPDATA%\EucharistCount, porque a pasta onde o
+# .exe se descompacta e temporaria e some ao fechar. Mesma pasta de
+# motor.config.PASTA_DADOS; repetida aqui porque os scripts desta pasta
+# (import_csv.py etc.) rodam soltos, sem o pacote motor.
+if getattr(sys, "frozen", False):
+    PASTA_DADOS = Path(os.getenv("APPDATA") or Path.home()) / "EucharistCount"
+    PASTA_DADOS.mkdir(parents=True, exist_ok=True)
+    CAMINHO_BANCO = PASTA_DADOS / "eucharist_count.db"
+else:
+    CAMINHO_BANCO = RAIZ / "eucharist_count.db"
 
 
 def obter_conexao(caminho: Path = CAMINHO_BANCO) -> sqlite3.Connection:

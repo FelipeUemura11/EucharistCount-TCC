@@ -21,6 +21,8 @@ backend/modelos/
 .aiassistant
 .agents
 .gemini
+CLAUDE.md
+.claude/
 
 # Videos — NUNCA versionar filmagens de fieis (LGPD)
 backend/videos/
@@ -51,6 +53,8 @@ kernel.errors.txt
 build/
 dist/
 *.spec
+# Receita do build do .exe: versionada (ver backend/DOCUMENTACAO_DISTRIBUICAO.md)
+!backend/eucharist_count.spec
 
 # IDEs
 .idea/
