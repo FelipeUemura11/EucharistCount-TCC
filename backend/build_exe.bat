@@ -1,5 +1,5 @@
 @echo off
-rem Gera dist\EucharistCount.exe: um arquivo so, com dashboard, modelo e configuracao dentro.
+rem Gera dist\EucharistCount.exe: um arquivo so, com dashboard, modelo, configuracao e camera dentro.
 rem Precisa de: Windows, Python 3.11 (comando "py -3.11") e Node.js com npm.
 rem Uso: dois cliques neste arquivo, ou "build_exe.bat" de dentro de backend\.
 setlocal
@@ -36,12 +36,18 @@ if not exist "modelos\yolo11n.onnx" (
 
 echo.
 echo [4/4] Gerando o executavel (demora alguns minutos)...
+rem A fonte da camera (CAMERA_FONTE no .env) vai dentro do .exe.
+if not exist ".env" (
+    echo Falta o arquivo backend\.env com CAMERA_FONTE=rtsp://... da camera da paroquia.
+    echo Copie o .env.example para .env, preencha o link e rode de novo.
+    goto erro
+)
 pyinstaller eucharist_count.spec --noconfirm --clean
 if errorlevel 1 goto erro
 
 echo.
 echo Pronto: %~dp0dist\EucharistCount.exe
-echo Antes de levar para a paroquia, coloque o .env (CAMERA_FONTE=...) na mesma pasta do .exe.
+echo A camera do .env ja vai dentro do .exe: e so entregar o arquivo.
 pause
 exit /b 0
 

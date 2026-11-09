@@ -22,6 +22,10 @@ datas = [
     (str(RAIZ / "counting_people.csv"), "."),                    # missas de referencia do banco novo
 ]
 
+# Fonte da camera da paroquia (CAMERA_FONTE) dentro do exe. Um .env ao lado do .exe tem prioridade.
+if (RAIZ / ".env").exists():
+    datas.append((str(RAIZ / ".env"), "."))
+
 # YAMLs internos do Ultralytics (configuracao e trackers).
 datas += collect_data_files("ultralytics")
 
