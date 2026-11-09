@@ -4,6 +4,7 @@
 # Ambientes virtuais
 venv/
 .venv/
+.venv-build/
 __pycache__/
 *.pyc
 
