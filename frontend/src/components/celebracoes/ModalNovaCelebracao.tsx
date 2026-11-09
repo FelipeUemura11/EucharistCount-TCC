@@ -1,6 +1,7 @@
 import { Save } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import type { CelebracaoCriar, TipoCelebracao } from '../../types/celebrations';
+import { janelaPadrao } from '../../utils/janelaGravacao';
 
 interface ModalNovaCelebracaoProps {
   dataInicial: string; // "YYYY-MM-DD"
@@ -43,8 +44,7 @@ export default function ModalNovaCelebracao({
     tipo: 'comum',
     data: dataInicial,
     horarioMissa: '19:00',
-    inicioGravacao: '18:30',
-    fimGravacao: '20:00',
+    ...janelaPadrao('19:00'),
     repetirSemanalmente: false,
     ...inicial,
   });
@@ -128,7 +128,7 @@ export default function ModalNovaCelebracao({
             <input
               type="time"
               value={corpo.horarioMissa}
-              onChange={(e) => alterar({ horarioMissa: e.target.value })}
+              onChange={(e) => alterar({ horarioMissa: e.target.value, ...(e.target.value ? janelaPadrao(e.target.value) : {}) })}
               className={inputClassName}
             />
           </label>

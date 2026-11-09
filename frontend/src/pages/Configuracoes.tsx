@@ -3,6 +3,7 @@ import { PlusCircle, Trash2, Camera } from "lucide-react";
 import type { ConfiguracoesGlobais, AgendaDiaCriar } from "../types/configuracoes";
 import { getConfiguracoesGlobais, criarAgendaPadrao, removerAgendaPadrao } from "../services/configuracoes";
 import CapacidadeIgreja from "../components/configuracoes/CapacidadeIgreja";
+import { janelaPadrao } from "../utils/janelaGravacao";
 
 // Indice = dia_semana do banco (0 = domingo).
 const DIAS_SEMANA = [
@@ -24,8 +25,7 @@ export default function Configuracoes() {
     const [novaAgenda, setNovaAgenda] = useState<AgendaDiaCriar>({
         diaSemana: 0,
         horarioMissa: "08:00",
-        inicioGravacao: "08:00",
-        fimGravacao: "09:00"
+        ...janelaPadrao("08:00")
     });
 
     // Recarga apos adicionar/remover: nao volta para "Carregando...".
@@ -130,7 +130,8 @@ export default function Configuracoes() {
                                     type="time" 
                                     className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                                     value={novaAgenda.horarioMissa}
-                                    onChange={(e) => setNovaAgenda({...novaAgenda, horarioMissa: e.target.value})}
+                                    // Trocar a missa ja sugere a janela padrao; os dois campos continuam editaveis.
+                                    onChange={(e) => setNovaAgenda({...novaAgenda, horarioMissa: e.target.value, ...(e.target.value ? janelaPadrao(e.target.value) : {})})}
                                 />
                             </div>
                             <div className="flex-1 min-w-30">
