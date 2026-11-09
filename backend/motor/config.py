@@ -27,9 +27,11 @@ if EMPACOTADO and (PASTA_DADOS / "config.json").exists():
     ARQUIVO_CONFIG = PASTA_DADOS / "config.json"
 PASTA_MODELOS = RAIZ / "modelos"
 
-# Executavel (PyInstaller): o .env fica ao lado do .exe.
+# Executavel (PyInstaller): vale o .env ao lado do .exe; sem ele, o embutido no build (camera da paroquia).
 if EMPACOTADO:
     ARQUIVO_ENV = Path(sys.executable).parent / ".env"
+    if not ARQUIVO_ENV.exists():
+        ARQUIVO_ENV = RAIZ / ".env"
 else:
     ARQUIVO_ENV = RAIZ / ".env"
 
