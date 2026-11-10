@@ -120,7 +120,7 @@ export default function Ajuda() {
                         <li>Para remover um horário, clique na lixeira ao lado dele.</li>
                         <li>As mudanças valem na hora, sem precisar reiniciar o programa.</li>
                         <li>O fim da gravação precisa ser depois do início, no mesmo dia (o período não pode passar da meia-noite).</li>
-                        <li>Ao preencher o horário da missa, o sistema já sugere o período padrão: de 20 minutos antes até 10 minutos depois do início da missa. Dá para alterar.</li>
+                        <li>Ao preencher o horário da missa, o sistema já sugere o período padrão: de 30 minutos antes até 10 minutos depois do início da missa. Dá para alterar.</li>
                         <li>Comece a gravação antes de os fiéis chegarem: quem entra antes do início da gravação não é contado.</li>
                     </ul>
                     <div>
