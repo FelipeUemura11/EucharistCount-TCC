@@ -1,5 +1,5 @@
-// Janela padrao da contagem: 20 min antes da missa (os fieis chegam cedo) ate 10 min depois do inicio.
-const ANTES_DA_MISSA_MIN = 20;
+// Janela padrao da contagem: 30 min antes da missa (os fieis chegam cedo) ate 10 min depois do inicio.
+const ANTES_DA_MISSA_MIN = 30;
 const DEPOIS_DO_INICIO_MIN = 10;
 
 function deslocar(horario: string, minutos: number): string {
