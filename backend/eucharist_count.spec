@@ -66,4 +66,5 @@ exe = EXE(
     name="EucharistCount",
     console=False,  # sem terminal; a saida vai para o log
     upx=False,
+    icon=str(RAIZ / "logo.ico"),  # icone do .exe (gerado a partir de frontend/src/assets/logo.png)
 )

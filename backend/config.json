@@ -1,6 +1,6 @@
 {
   "camera": {
-    "fps_processamento": 7.5,
+    "fps_processamento": 30,
     "segundos_reconexao": 3.0
   },
   "deteccao": {
