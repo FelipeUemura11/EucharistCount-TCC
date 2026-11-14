@@ -1,8 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
 #
 # Receita do PyInstaller: gera um unico EucharistCount.exe.
-# Antes: npm run build (em frontend/) e python -m scripts.preparar_modelo.
-# Depois: pyinstaller eucharist_count.spec  ->  dist/EucharistCount.exe
+# Normalmente nao se roda direto: o build_exe.bat compila o frontend, monta o
+# ambiente, confere o modelo e chama "pyinstaller eucharist_count.spec".
 # Passo a passo em DOCUMENTACAO_DISTRIBUICAO.md.
 
 from pathlib import Path
@@ -22,13 +22,18 @@ datas = [
     (str(RAIZ / "counting_people.csv"), "."),                    # missas de referencia do banco novo
 ]
 
+# Fonte da camera da paroquia (CAMERA_FONTE) dentro do exe. Um .env ao lado do .exe tem prioridade.
+if (RAIZ / ".env").exists():
+    datas.append((str(RAIZ / ".env"), "."))
+
 # YAMLs internos do Ultralytics (configuracao e trackers).
 datas += collect_data_files("ultralytics")
 
 # Modulos carregados por nome, que o PyInstaller nao enxerga. O scikit-learn vai inteiro:
 # a regressao treina no proprio computador da paroquia e o joblib precisa das classes dele.
 hiddenimports = (collect_submodules("uvicorn") + collect_submodules("apscheduler")
-                 + collect_submodules("sklearn"))
+                 # Sem os testes do scikit-learn: so aumentariam o .exe.
+                 + collect_submodules("sklearn", filter=lambda nome: ".tests" not in nome))
 
 # Ultralytics e APScheduler consultam os metadados dos pacotes; sem eles
 # o Ultralytics tenta instalar via pip, o que nao funciona dentro do exe.
@@ -36,6 +41,7 @@ for pacote in (
     "ultralytics", "onnx", "onnxruntime", "lap", "torch", "torchvision",
     "numpy", "opencv-python", "pillow", "pyyaml", "requests", "scipy",
     "tqdm", "psutil", "apscheduler", "scikit-learn", "joblib", "threadpoolctl", "pandas",
+    "matplotlib", "py-cpuinfo", "ultralytics-thop",
 ):
     try:
         datas += copy_metadata(pacote)
@@ -60,4 +66,5 @@ exe = EXE(
     name="EucharistCount",
     console=False,  # sem terminal; a saida vai para o log
     upx=False,
+    icon=str(RAIZ / "logo.ico"),  # icone do .exe (gerado a partir de frontend/src/assets/logo.png)
 )

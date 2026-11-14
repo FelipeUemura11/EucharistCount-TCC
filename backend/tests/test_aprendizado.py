@@ -226,6 +226,22 @@ class TesteMelhoraComOTempo(Base):
         self.assertAlmostEqual(calcular_estimativa(self.db, 150, prox_quarta).comungantes, 90, delta=6)
 
     @unittest.skipIf(sklearn is None, "scikit-learn nao instalado")
+    def test_regressao_nao_extrapola_fora_das_missas_do_treino(self):
+        # Domingo cheio (200 a 260) comunga 95%, quarta (80 a 120) 70%. Num domingo vazio a
+        # reta passaria de 100%; a previsao fica presa na maior proporcao vista no treino.
+        domingo, quarta = date(2026, 9, 6), date(2026, 9, 9)
+        for semana in range(8):
+            cheio, vazio = 200 + semana * 8, 80 + semana * 5
+            self.missa_contada_a_mao((domingo + timedelta(weeks=semana)).isoformat(), cheio, round(cheio * 0.95))
+            self.missa_contada_a_mao((quarta + timedelta(weeks=semana)).isoformat(), vazio, round(vazio * 0.70))
+        self.assertIn("regressao adotada", regressao.atualizar_estimativa(self.db, self.pasta_modelos))
+
+        domingo_vazio = {"data": "2026-11-08", "horario_missa": "18:00", "tipo": "comum"}
+        estimativa = calcular_estimativa(self.db, 60, domingo_vazio)
+        self.assertLessEqual(estimativa.comungantes, 60)
+        self.assertGreaterEqual(estimativa.comungantes, 60 * 0.69)
+
+    @unittest.skipIf(sklearn is None, "scikit-learn nao instalado")
     def test_volta_para_o_coeficiente_se_a_regressao_deixar_de_ser_melhor(self):
         crud.definir_configuracao_estimativa(self.db, coeficiente_comunhao=0.9, metodo="regressao", modelo_path="x.joblib")
         for i in range(regressao.MINIMO_AMOSTRAS):

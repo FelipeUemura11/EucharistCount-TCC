@@ -1,0 +1,4 @@
+# So para gerar o .exe (alem do requirements.txt). Versoes fixas: o build tem que dar
+# o mesmo resultado em qualquer maquina.
+pyinstaller==6.11.1
+pyinstaller-hooks-contrib==2024.10
