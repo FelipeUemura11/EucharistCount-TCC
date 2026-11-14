@@ -65,3 +65,6 @@ dist/
 # Node / frontend
 node_modules/
 frontend/dist/
+
+# Backups do banco feitos a mao
+*.bak*
