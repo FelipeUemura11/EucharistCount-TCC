@@ -160,8 +160,13 @@ def _prever_por_regressao(
         }])
 
         predicao = float(modelo.predict(X)[0])
-        # So nao pode ser negativo. A contagem da camera e um piso do total presente,
-        # nao um teto: em 18/10 comungaram 184 e a camera contou 162.
+        # Longe das missas do treino a reta extrapola (ex.: missa vazia num horario cheio passava
+        # de 100%). A proporcao prevista fica entre a menor e a maior ja vistas no treino.
+        faixa = getattr(modelo, "faixa_razao_", None)
+        if faixa:
+            predicao = min(max(predicao, faixa[0] * ocupacao), faixa[1] * ocupacao)
+        # Pode passar da contagem da camera (ela e um piso do total presente: em 18/10
+        # comungaram 184 e a camera contou 162), so nao pode ser negativa.
         return max(0, int(round(predicao)))
     except Exception:
         return None

@@ -164,6 +164,9 @@ def _treinar_e_salvar(exemplos_: list[dict], pasta: Path) -> Path:
 
     df = pd.DataFrame(exemplos_)
     modelo = _pipeline().fit(df[FEATURES_NUMERICAS + FEATURES_CATEGORICAS], df[ALVO])
+    # Menor e maior proporcao vistas no treino: a previsao fica presa entre elas (estimativa.py).
+    razoes = df[ALVO] / df["ocupacao_final"]
+    modelo.faixa_razao_ = (float(razoes.min()), float(razoes.max()))
 
     pasta.mkdir(parents=True, exist_ok=True)
     # Nome novo a cada treino: a versao anterior continua no disco e o cache em memoria troca sozinho.
