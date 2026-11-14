@@ -45,7 +45,8 @@ class ConfigCamera:
     # que e versionado. Vazio = nao configurada.
     fonte: str = ""
 
-    # 5 a 8 fps é suficiente para rastreio confiável e reduz muito o uso de CPU.
+    # Teto de quadros analisados por segundo; o config.json usa 20 (o PC processa o que conseguir).
+    # Num arquivo, define quantos quadros de cada segundo de video entram na contagem.
     fps_processamento: float = 7.5
 
     # Segundos de espera antes de tentar reconectar um stream que caiu.
