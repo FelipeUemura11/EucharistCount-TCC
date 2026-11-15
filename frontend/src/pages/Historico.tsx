@@ -86,7 +86,6 @@ export default function Historico() {
         });
     };
 
-    // Exportar ainda nao gera arquivo, so loga no console.
     const handleExportRecords = () => {
         if (filteredRecords.length === 0) return;
         exportarCsv(filteredRecords);
