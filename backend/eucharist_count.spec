@@ -33,7 +33,11 @@ datas += collect_data_files("ultralytics")
 # a regressao treina no proprio computador da paroquia e o joblib precisa das classes dele.
 hiddenimports = (collect_submodules("uvicorn") + collect_submodules("apscheduler")
                  # Sem os testes do scikit-learn: so aumentariam o .exe.
-                 + collect_submodules("sklearn", filter=lambda nome: ".tests" not in nome))
+                 + collect_submodules("sklearn", filter=lambda nome: ".tests" not in nome)
+                 # SciPy >= 1.16 importa este modulo compilado so pelo codigo C, e o
+                 # pyinstaller-hooks-contrib fixado no build e anterior a ele. Sem isso o
+                 # rastreio (ultralytics -> scipy) quebra no primeiro quadro da camera.
+                 + ["scipy._cyutility"])
 
 # Ultralytics e APScheduler consultam os metadados dos pacotes; sem eles
 # o Ultralytics tenta instalar via pip, o que nao funciona dentro do exe.
