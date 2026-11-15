@@ -154,6 +154,11 @@ resultado = self.modelo.track(
 
 O modelo usado é o **YOLO11n** (variante "nano" da 11ª geração da arquitetura) — a menor e mais rápida disponível, mantendo precisão suficiente para o cenário. Modelos maiores (`s`, `m`, `l`, `x`) trocam velocidade por uma capacidade de detecção maior, principalmente em objetos pequenos e distantes; numa máquina sem GPU, a variante "nano" é o único ponto de operação que ainda permite processamento em tempo aproximado ao real.
 
+Durante o desenvolvimento também testamos o **YOLOv8n** e o **YOLO11s**, mas preferimos o YOLO11n por dois motivos:
+
+- **Geração 11:** no mesmo tamanho, o YOLO11 tem mAP maior que o YOLOv8 no COCO (mAP50-95 de 39,5 contra 37,3, segundo a Ultralytics), com menos parâmetros.
+- **Tamanho `n`:** é o mais leve, e foi o único teste com folga para acompanhar o vídeo em tempo real na CPU, sem perder contagens reais. Na missa de 18/10 (240 pessoas, vídeo de 40 minutos), o YOLO11n contou 190 entradas em 24 minutos de processamento. O YOLO11s chegou a 203, mas levou 55 minutos: mais lento que o próprio vídeo, o que numa câmera ao vivo significaria descartar frames.
+
 A resolução de inferência atual é **`imgsz: 480`**: antes de entrar na rede, cada frame é redimensionado para 480 pixels no lado maior. Resoluções menores rodam mais rápido, mas pessoas pequenas (distantes da câmera) ocupam poucos pixels e deixam de ser detectadas. 640 é o equilíbrio usual, e 960 alcança mais longe a cerca de metade da velocidade. O valor é ajustável sem reexportar o modelo (seção 2).
 
 ---
@@ -518,7 +523,7 @@ A mesma fonte (`camera.fonte`) aceita três tipos, e cada um precisa chegar ao O
 
 Como a URL da câmera IP leva usuário e senha, ela não fica no `config.json`, que é versionado. A fonte vem **só** da variável `CAMERA_FONTE` do `backend/.env`, que fica fora do Git, aplicada em `Config.carregar()`; o `--fonte` da linha de comando ainda ganha dela. O padrão do dataclass é vazio: sem `.env` nem `--fonte`, `resolver_fonte_camera()` levanta `RuntimeError`, já no construtor do `Monitor`, antes de abrir sessão no banco, e o `main.py` mantém o dashboard no ar. Uma `fonte` que sobre no `config.json` é ignorada com aviso. Antes de ir para o `parametros_contagem` do banco, a fonte passa por `mascarar_senha()` (`rtsp://usuario:***@...`). O modelo é o `backend/.env.example`. No executável do PyInstaller, o `.env` é lido da pasta do `.exe`.
 
-Quem decide é `Config.resolver_fonte_camera()`: dígitos e URLs (`rtsp://`, `http://`, `https://`) passam sem mudança, e só o resto é tratado como arquivo. A regra existe por causa de um bug real: a versão anterior aplicava `caminho_absoluto()` a qualquer fonte, e no Windows isso transformava `"0"` em `...\backend\0` e `rtsp://...` em `...\backend\rtsp:\...`. **Webcam e câmera IP nunca abriam**, e só arquivos de vídeo funcionavam, justamente o contrário do que a instalação na paróquia precisa. Os scripts `calibrar.py` e `calibrar_linha.py` usam a mesma função.
+Quem decide é `Config.resolver_fonte_camera()`: dígitos e URLs (`rtsp://`, `http://`, `https://`) passam sem mudança, e só o resto é tratado como arquivo. A regra existe por causa de um bug real: a versão anterior aplicava `caminho_absoluto()` a qualquer fonte, e no Windows isso transformava `"0"` em `...\backend\0` e `rtsp://...` em `...\backend\rtsp:\...`. **Webcam e câmera IP nunca abriam**, e só arquivos de vídeo funcionavam, justamente o contrário do que a instalação na paróquia precisa.
 
 ---
 
@@ -577,7 +582,7 @@ Esse padrão se chama **callback**: o motor avisa "atualizei", e quem passou a f
 
 Quem escuta, hoje, é o `GravadorSessao` de `integracao/sessao.py`, que grava os totais no banco a cada passagem pela linha e um ponto do gráfico a cada 5 segundos de vídeo. É o mesmo nos dois modos do programa: na contagem manual (`main.py --agora`) e na agendada (`integracao/agendador.py`), que reaproveita a mesma instância do `Monitor` em todas as missas. Esse lado está descrito em [`DOCUMENTACAO_API.md`](./DOCUMENTACAO_API.md), seção 6, e o motivo do intervalo de 5 segundos em [`DOCUMENTACAO_BANCO.md`](./DOCUMENTACAO_BANCO.md), seção 7.3.
 
-O parâmetro é opcional: chamar `executar()` sem ele, como fazem os scripts de calibração, funciona exatamente como antes.
+O parâmetro é opcional: chamar `executar()` sem ele, como em um teste isolado, funciona exatamente como antes.
 
 ---
 

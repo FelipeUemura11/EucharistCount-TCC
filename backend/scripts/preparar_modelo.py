@@ -20,7 +20,7 @@ from motor.config import PASTA_MODELOS  # noqa: E402
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--modelo", default="yolo11n",
-                    help="yolo11n, yolo11s, yolov8n, ...")
+                    help="modelo YOLO a exportar (padrao: yolo11n)")
     ap.add_argument("--imgsz", type=int, default=640,
                     help="resolucao de inferencia (multiplo de 32)")
     ap.add_argument("--fixo", action="store_true",

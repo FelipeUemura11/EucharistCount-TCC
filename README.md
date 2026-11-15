@@ -133,9 +133,7 @@ EucharistCount-TCC/
 │   │   └── ...                  # importação do CSV e treino da regressão de comunhão
 │   │
 │   ├── scripts/
-│   │   ├── preparar_modelo.py   # exporta o modelo YOLO para ONNX
-│   │   ├── calibrar.py          # testa combinações de modelo/resolução/confiança
-│   │   └── calibrar_linha.py    # marca a linha de contagem por clique
+│   │   └── preparar_modelo.py   # exporta o modelo YOLO para ONNX
 │   │
 │   ├── modelos/                 # modelos .onnx
 │   └── videos/                  # vídeos de teste (fora do Git)
@@ -171,7 +169,7 @@ O dashboard fica em `http://127.0.0.1:8000`. O programa tem dois modos:
 
 No modo manual, quando o vídeo termina (ou caso a câmera não esteja conectada), o dashboard continua no ar mostrando o resultado da última missa e permitindo consultar Histórico e Configurações. Nos dois modos, `Ctrl+C` no terminal encerra o programa; uma contagem em andamento é fechada como interrompida e não entra no Histórico.
 
-Instruções completas — calibração de modelo, ajuste da linha de contagem e parâmetros de `config.json` — estão em [`backend/README.md`](./backend/README.md).
+Instruções completas — preparação do modelo, ajuste da linha de contagem e parâmetros de `config.json` — estão em [`backend/README.md`](./backend/README.md).
 
 O frontend (`frontend/`) é servido já compilado pelo próprio backend, na mesma porta da API: depois de qualquer mudança nele, é preciso rodar `npm run build` de novo. Todas as telas consomem a API. Instruções em [`frontend/README.md`](./frontend/README.md).
 

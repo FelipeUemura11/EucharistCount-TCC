@@ -113,7 +113,7 @@ Se o modelo não existir (`FileNotFoundError`) ou a fonte de vídeo não estiver
 | Argumento | Sobrescreve | Exemplo |
 |---|---|---|
 | `--fonte` | `camera.fonte` | `--fonte videos/20-09-teste.mp4` |
-| `--modelo` | `deteccao.modelo` | `--modelo modelos/yolo11s_dyn.onnx` |
+| `--modelo` | `deteccao.modelo` | `--modelo modelos/yolo11n.onnx` |
 | `--imgsz` | `deteccao.imgsz` | `--imgsz 640` |
 | `--conf` | `deteccao.confianca` | `--conf 0.25` |
 | `--fps` | `camera.fps_processamento` | `--fps 5` |
