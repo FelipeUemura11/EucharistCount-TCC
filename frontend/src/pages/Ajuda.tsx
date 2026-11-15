@@ -63,8 +63,8 @@ export default function Ajuda() {
         setOpenId(openId === id ? null : id);
     };
 
-    // O texto descreve o comportamento atual do sistema (agendador, estimativa,
-    // historico). Mudou o comportamento, atualize aqui tambem.
+    // O texto descreve o comportamento atual do sistema (agendador, celebracoes,
+    // estimativa, historico). Mudou o comportamento, atualize aqui tambem.
     const faqs: FaqItem[] = [
         {
             id: "funciona",
@@ -116,7 +116,7 @@ export default function Ajuda() {
                         <li>Clique em <Termo>Adicionar</Termo>.</li>
                     </ol>
                     <ul style={MARCADOR} className="space-y-1.5 pl-5">
-                        <li>O horário vale para <Termo>todas as semanas</Termo>, até ser removido.</li>
+                        <li>O horário vale para <Termo>todas as semanas</Termo>, até ser removido. Para uma missa de um dia só, ou para mudar uma missa da rotina em uma data, use a aba <Termo>Celebrações</Termo>.</li>
                         <li>Para remover um horário, clique na lixeira ao lado dele.</li>
                         <li>As mudanças valem na hora, sem precisar reiniciar o programa.</li>
                         <li>O fim da gravação precisa ser depois do início, no mesmo dia (o período não pode passar da meia-noite).</li>
@@ -208,15 +208,33 @@ export default function Ajuda() {
         {
             id: "celebracoes",
             icon: <CalendarDays size={24} />,
-            title: "E a aba Celebrações?",
+            title: "Como agendo uma missa fora da rotina, ou mudo uma missa só num dia?",
             colorClass: "bg-rose-50 text-rose-600",
             content: (
-                <p>
-                    A aba <Termo>Celebrações</Termo> ainda está em desenvolvimento: o calendário mostra dados de exemplo,
-                    e as alterações feitas nele não são salvas nem ligam a câmera. Para que uma missa seja contada,
-                    cadastre o horário em <Termo>Configurações</Termo>. Missas fora da agenda semanal, como uma missa de
-                    última hora, ainda não podem ser agendadas pelo sistema.
-                </p>
+                <>
+                    <p>
+                        Na aba <Termo>Celebrações</Termo>. O calendário mostra, mês a mês, as missas da agenda semanal
+                        (marcadas como <Termo>Rotina semanal</Termo>) e as celebrações cadastradas só para uma data, como
+                        Natal, Páscoa, casamento, exéquias ou uma missa de última hora. Clique em um dia para ver as
+                        celebrações dele e a situação de cada uma: <Termo>Agendada</Termo>, <Termo>Em andamento</Termo>,{" "}
+                        <Termo>Finalizada</Termo> ou <Termo>Cancelada</Termo>.
+                    </p>
+                    <p>Para cadastrar uma celebração:</p>
+                    <ol className="list-decimal space-y-1.5 pl-5">
+                        <li>Clique em <Termo>Nova celebração</Termo> (no topo da tela ou dentro do dia escolhido).</li>
+                        <li>Preencha o <Termo>Título</Termo>, o <Termo>Tipo</Termo>, a <Termo>Data</Termo>, o <Termo>Horário da missa</Termo> e o período de gravação (<Termo>Início da gravação</Termo> e <Termo>Fim da gravação</Termo>).</li>
+                        <li>Clique em <Termo>Salvar celebração</Termo>.</li>
+                    </ol>
+                    <ul style={MARCADOR} className="space-y-1.5 pl-5">
+                        <li>Sem marcar nada, a celebração vale só para aquela data. Marcando <Termo>Repetir toda semana neste dia</Termo>, ela também entra na agenda semanal de <Termo>Configurações</Termo>.</li>
+                        <li>Em uma missa da rotina, <Termo>Alterar neste dia</Termo> muda o título ou os horários e <Termo>Cancelar neste dia</Termo> suspende a missa (um feriado, por exemplo). As outras semanas continuam iguais.</li>
+                        <li>Em uma celebração avulsa, use <Termo>Editar</Termo> ou <Termo>Cancelar</Termo>. Cancelada, a contagem não liga naquele horário.</li>
+                        <li>Só uma contagem acontece por vez: no mesmo dia, os períodos de gravação de duas celebrações não podem se sobrepor.</li>
+                        <li>Depois que a contagem começa, a celebração não pode mais ser alterada nem cancelada.</li>
+                        <li>As mudanças valem na hora, sem reiniciar o programa. Como na agenda semanal, o programa precisa estar aberto no horário.</li>
+                        <li>O <Termo>Tipo</Termo> da celebração é usado na sugestão de hóstias, já que em datas como Natal e Páscoa a proporção de quem comunga costuma ser diferente.</li>
+                    </ul>
+                </>
             )
         },
         {
@@ -243,6 +261,10 @@ export default function Ajuda() {
                     <li>
                         Em <Termo>Configurações</Termo>, o horário está cadastrado para o dia da semana certo, e o horário
                         atual está dentro do período de gravação?
+                    </li>
+                    <li>
+                        Em <Termo>Celebrações</Termo>, a missa daquele dia não está como <Termo>Cancelada</Termo> nem foi
+                        alterada para outro horário?
                     </li>
                     <li>
                         Em <Termo>Configurações</Termo> → <Termo>Info. da Câmera</Termo>, a fonte de vídeo aparece? Se estiver
