@@ -6,7 +6,7 @@ id,date,time,celebration_type,people,communed,system_count,hosts_consecrated,not
 4,2026-09-27,18:00,common,155,140,143,,
 5,2026-10-11,18:00,common,181,148,176,,
 6,2026-10-17,18:00,common,95,74,52,,""
-7,2026-10-18,10:00,common,240,184,162,,
+7,2026-10-18,10:00,common,240,190,162,,
 8,2026-10-24,18:00,common,103,80,53,,""
 9,2026-10-25,18:00,common,140,108,127,,""
 10,2026-10-25,10:00,common,246,191,,,""
@@ -14,3 +14,8 @@ id,date,time,celebration_type,people,communed,system_count,hosts_consecrated,not
 12,2026-11-07,18:00,common,88,71,80,,sintetica
 13,2026-11-08,10:00,common,231,178,209,,sintetica
 14,2026-11-08,18:00,common,168,137,152,,sintetica
+15,2026-10-31,18:00,common,135,105,135,,""
+16,2026-11-01,10:00,common,283,220,254,,""
+17,2026-11-01,18:00,common,143,111,121,,""
+18,2026-11-15,08:00,common,97,91,,,""
+19,2026-11-15,10:00,common,277,217,,,""

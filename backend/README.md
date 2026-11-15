@@ -53,9 +53,7 @@ backend/
 │
 ├── tests/                   # testes automatizados (unittest)
 ├── scripts/
-│   ├── preparar_modelo.py   # baixa e exporta o modelo para ONNX
-│   ├── calibrar.py          # descobre a melhor configuração pro seu vídeo
-│   └── calibrar_linha.py    # marca a linha de contagem por clique
+│   └── preparar_modelo.py   # baixa e exporta o modelo para ONNX
 │
 ├── modelos/                 # modelos .onnx
 └── videos/                  # vídeos de teste (fora do Git)
@@ -103,35 +101,28 @@ mascarada (`rtsp://usuario:***@...`).
 
 ## Primeira execução
 
-### 1. Descubra a melhor configuração para o seu vídeo
-
-```bash
-python -m scripts.calibrar
-```
-
-Testa combinações de modelo/resolução/confiança nos frames da fonte configurada
-(`CAMERA_FONTE` no `.env` ou `--fonte`) e mede a velocidade **nesta máquina**. Os frames de teste
-ficam só em memória durante a execução — nada é salvo em disco.
-
-O script recomenda uma configuração com base em quantidade de detecções
-e velocidade.
-
-### 2. Prepare o modelo escolhido
+### 1. Prepare o modelo
 
 ```bash
 python -m scripts.preparar_modelo --modelo yolo11n --imgsz 640
 ```
 
-Exporta para ONNX, que roda 2 a 4× mais rápido em CPU que o `.pt`, e
+O modelo do projeto é o **YOLO11n**. Também testamos o YOLOv8n e o
+YOLO11s, mas preferimos o YOLO11n: a geração 11 tem mAP maior que a 8 no
+mesmo tamanho, e a variante `n` (nano) é a mais leve, a única que
+acompanha o vídeo em tempo real numa CPU sem GPU, com contagem próxima da
+real (detalhes em [`DOCUMENTACAO_MOTOR.md`](./DOCUMENTACAO_MOTOR.md),
+seção 3).
+
+O script exporta para ONNX, que roda 2 a 4× mais rápido em CPU que o `.pt`, e
 salva em `modelos/`. Por padrão o modelo é exportado com resolução
 **dinâmica**: o mesmo `.onnx` aceita qualquer `imgsz` (múltiplo de 32)
 definido no `config.json`. `--fixo` trava o modelo no `--imgsz` da
 exportação.
 
-### 3. Posicione a linha de contagem e rode
+### 2. Posicione a linha de contagem e rode
 
 ```bash
-python -m scripts.calibrar_linha     # opcional: clique os 2 pontos da linha
 python main.py --agora               # conta agora, com a janela do vídeo
 ```
 
@@ -143,10 +134,6 @@ Ajuste `contagem.linha` no `config.json` até a linha amarela ficar sobre
 o portão. A seta verde **ENTRA** aponta para a esquerda e a vermelha
 **SAI** para a direita. As duas linhas cinzas ao redor delimitam a zona
 morta (`margem`): quem fica entre elas ainda não foi contado.
-
-O `scripts.calibrar_linha` evita editar as coordenadas no escuro: ele
-pausa o vídeo, você clica os dois pontos sobre o portão e ele imprime a
-tupla pronta para colar no `config.json`.
 
 ---
 
@@ -356,8 +343,7 @@ de perfil e parcialmente oculta pelos bancos.
 O sistema **não possui, em nenhum ponto do código, capacidade de salvar
 imagem ou vídeo em disco.** Os frames capturados pela câmera existem
 somente em memória (RAM) durante o processamento e são descartados
-assim que o próximo frame chega. Isso vale para o monitoramento
-(`main.py`) e para a calibração (`scripts/calibrar.py`).
+assim que o próximo frame chega.
 
 Ao final do processamento, só permanecem números agregados (entradas,
 saídas, ocupação) — nunca a imagem em si. Essa é a base técnica da
